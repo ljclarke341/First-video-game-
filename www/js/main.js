@@ -9,6 +9,7 @@ const canvas = document.getElementById('game');
 
 const game = new Game(canvas, {
   onHud: (score, coins, mult) => ui.hud(score, coins, mult),
+  onHint: msg => ui.hint(msg),
   onGameOver: result => onGameOver(result)
 });
 

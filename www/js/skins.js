@@ -9,7 +9,7 @@ export const SKINS = [
     bg: '#06060d', grid: 'rgba(120,140,255,.10)'
   },
   {
-    id: 'sunset', name: 'SUNSET', cost: 250,
+    id: 'sunset', name: 'SUNSET', cost: 150,
     colors: ['#ff9f45', '#ff5d8f', '#9b5de5'],
     bg: '#120714', grid: 'rgba(255,150,120,.10)'
   },

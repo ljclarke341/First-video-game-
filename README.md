@@ -60,11 +60,16 @@ Everything lives in `level.js`:
 
 | What | Where |
 |---|---|
-| How fast it ramps | `difficulty` — `gates / 55` |
-| Speed range | `speed` — `lerp(300, 770, d)` |
-| Reaction time | `gap` — `lerp(0.95, 0.70, d)` seconds between gates |
-| Wall frequency | `wallChance` — `lerp(0.06, 0.46, d)` |
-| Shape-change frequency | `needsChange` — `lerp(0.30, 0.65, d)` |
+| How fast it ramps | `difficulty` — `passed / 80` |
+| Speed range | `speed` — `lerp(215, 700, d)` |
+| Reaction time | `gap` — `lerp(1.55, 0.72, d)` seconds between gates |
+| When walls start | `wallChance` — nothing before 12 gates passed |
+| When shape changes start | `changeChance` — nothing before 4 gates passed |
+| Free second safe cell | `mercyChance` — guaranteed for the first 6 gates |
+
+Difficulty is keyed to gates **passed**, not gates spawned. The generator runs
+about six gates ahead, so keying it to spawns ran the course ~17% hotter than
+the numbers above suggest.
 
 Playtest after changing any of them — small changes here move the difficulty
 curve a lot.

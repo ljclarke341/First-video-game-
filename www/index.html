@@ -21,6 +21,7 @@
       <div id="combo" class="hidden">x1</div>
     </div>
     <div id="coinHud"><span class="coin-dot"></span><span id="coinCount">0</span></div>
+    <div id="hint" hidden></div>
   </div>
 
   <!-- Main menu -->
@@ -48,11 +49,14 @@
       <h2>HOW TO PLAY</h2>
       <ul class="rules">
         <li><b>Tap left / right</b> side of the screen to change lane.</li>
-        <li>Each gate has three cells. Go through the cell whose
+        <li>Each gate has three cells. Go through the one whose
             <b>shape matches yours</b>.</li>
-        <li>Wrong shape or a <b>striped wall</b> ends the run.</li>
+        <li>The <b>glowing column</b> shows your lane and your current shape.</li>
         <li>Grab <b>paint blobs</b> to change your shape before the next gate.</li>
-        <li>Collect <b>coins</b> to unlock themes. Chain gates for a combo multiplier.</li>
+        <li><b>Striped walls</b> are instant death. They start appearing once
+            you're a dozen gates in.</li>
+        <li>Collect <b>coins</b> to unlock themes. Chain gates for a combo
+            multiplier up to 5x.</li>
       </ul>
       <button id="howBack" class="btn primary">GOT IT</button>
     </div>

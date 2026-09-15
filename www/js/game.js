@@ -10,6 +10,7 @@ const PLAYER_R = 24;
 const GATE_H = 44;
 const LOOKAHEAD = 1400;
 const PICKUP_BAND = 32;   // vertical grab window around the player
+const EDGE_FORGIVE = 13;  // how close to a cell edge still counts as the neighbour
 const MAX_DT = 1 / 30;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -104,6 +105,10 @@ export class Game {
     this.player.squash = 0;
     this.gen.pathLane = 1;
     this.gen.pathColor = 0;
+    // Contextual hints for a player's first few runs. A rules screen gets
+    // skipped; a prompt at the moment the thing appears gets read.
+    this.hints = profile.runs < 3 ? { paint: false, wall: false } : null;
+    if (this.hints) this.hooks.onHint?.('TAP LEFT OR RIGHT TO MOVE');
     // Place the first gate just above the screen so the run opens with a short
     // "get ready" beat instead of several dead seconds.
     this.gen.lastGateY = this.gen.gap - 60;
@@ -215,15 +220,45 @@ export class Game {
     this.gen.fill(this.items, LOOKAHEAD);
 
     this.updateParticles(dt);
+    if (this.hints) this.checkHints();
     this.hooks.onHud?.(this.score, this.coinsEarned, this.mult);
+  }
+
+  /** Fires each hint once, as its mechanic first comes into view. */
+  checkHints() {
+    for (const it of this.items) {
+      if (it.y < -60 || it.y > this.playerY) continue;
+      if (!this.hints.paint && it.type === 'paint') {
+        this.hints.paint = true;
+        this.hooks.onHint?.('GRAB THE BLOB TO CHANGE YOUR SHAPE');
+        return;
+      }
+      if (!this.hints.wall && it.type === 'gate' && it.cells.includes(WALL)) {
+        this.hints.wall = true;
+        this.hooks.onHint?.('STRIPED WALLS ARE DEADLY');
+        return;
+      }
+    }
   }
 
   resolveGate(gate) {
     const cellW = VW / LANES;
     const idx = clamp(Math.floor(this.player.x / cellW), 0, LANES - 1);
-    const cell = gate.cells[idx];
+    let cell = gate.cells[idx];
+
+    // If the player is within a hair of a cell edge, let the neighbour count.
+    // Losing a run to a few pixels reads as the game cheating, not as a
+    // mistake the player can learn from.
+    if (cell !== this.player.color) {
+      const edge = this.player.x - idx * cellW;
+      const near = edge < EDGE_FORGIVE ? idx - 1 : edge > cellW - EDGE_FORGIVE ? idx + 1 : -1;
+      if (near >= 0 && near < LANES && gate.cells[near] === this.player.color) {
+        cell = gate.cells[near];
+      }
+    }
 
     if (cell === this.player.color) {
+      this.gen.passed += 1;      // drives the difficulty curve
       this.combo += 1;
       this.bestCombo = Math.max(this.bestCombo, this.combo);
       this.score += 10 * this.mult;
@@ -331,6 +366,7 @@ export class Game {
     this.drawStars(ctx);
     this.drawGrid(ctx, h, skin);
     this.drawLaneGuides(ctx, h, skin);
+    if (this.state !== 'idle') this.drawBeam(ctx);
 
     for (const it of this.items) {
       if (it.y < -120 || it.y > h + 120) continue;
@@ -384,6 +420,25 @@ export class Game {
       ctx.moveTo(0, y); ctx.lineTo(VW, y);
     }
     ctx.stroke();
+  }
+
+  /**
+   * A soft column in the player's own colour, running from the player up the
+   * lane they are aimed at. New players lose track of their own shape while
+   * reading the gate; this puts both in one glance without solving the gate
+   * for them.
+   */
+  drawBeam(ctx) {
+    const col = this.colorOf(this.player.color);
+    const top = Math.max(0, this.playerY - 520);
+    const g = ctx.createLinearGradient(0, top, 0, this.playerY);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, col);
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = g;
+    ctx.fillRect(this.player.x - VW / 6, top, VW / 3, this.playerY - top);
+    ctx.restore();
   }
 
   drawLaneGuides(ctx, h, skin) {

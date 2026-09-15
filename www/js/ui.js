@@ -22,6 +22,7 @@ export class UI {
   // ------------------------------------------------------------- navigation
 
   show(name) {
+    $('hint').hidden = true;
     for (const id of SCREENS) this.el[id].hidden = id !== name;
     this.el.hud.hidden = name !== null;
     if (name === 'menu' || name === 'shop') this.refresh();
@@ -30,6 +31,14 @@ export class UI {
   showHud() {
     for (const id of SCREENS) this.el[id].hidden = true;
     this.el.hud.hidden = false;
+  }
+
+  hint(msg) {
+    const el = $('hint');
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(this._hintTimer);
+    this._hintTimer = setTimeout(() => { el.hidden = true; }, 2600);
   }
 
   toast(msg) {

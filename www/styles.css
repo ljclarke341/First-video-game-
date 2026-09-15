@@ -55,6 +55,18 @@ body{
   box-shadow:0 0 12px rgba(245,185,58,.65);flex:none
 }
 
+#hint{
+  position:absolute;left:50%;top:46%;transform:translateX(-50%);
+  padding:11px 18px;border-radius:11px;white-space:nowrap;
+  background:rgba(10,10,22,.9);border:1px solid var(--line);
+  font-size:12px;font-weight:800;letter-spacing:1.6px;color:var(--accent);
+  animation:hintIn .25s ease-out;pointer-events:none
+}
+@keyframes hintIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (prefers-reduced-motion:reduce){
+  #hint,.toast,.screen{animation:none}
+}
+
 /* ---------- Screens ---------- */
 .screen{
   display:grid;place-items:center;padding:calc(var(--safe-t) + 20px) 22px calc(var(--safe-b) + 24px);
