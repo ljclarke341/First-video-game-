@@ -1,0 +1,13 @@
+{
+  "name": "Chroma Rush",
+  "short_name": "Chroma Rush",
+  "description": "Match the shape. Hold the line. A one-thumb arcade run.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#06060d",
+  "theme_color": "#06060d",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

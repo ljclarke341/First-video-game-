@@ -104,3 +104,10 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Capacitor / Android build output
+/android/
+/node_modules/
+*.keystore
+*.jks
+keystore.properties

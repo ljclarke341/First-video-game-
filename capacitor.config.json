@@ -1,0 +1,16 @@
+{
+  "appId": "com.yourname.chromarush",
+  "appName": "Chroma Rush",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#06060dff",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#06060dff",
+      "showSpinner": false
+    }
+  }
+}

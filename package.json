@@ -1,0 +1,15 @@
+{
+  "name": "chroma-rush",
+  "version": "1.0.0",
+  "description": "Chroma Rush - a one-thumb arcade game for Android, built with HTML5 Canvas + Capacitor.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/dev-server.js",
+    "cap:add": "npx @capacitor/cli@latest add android",
+    "cap:sync": "npx @capacitor/cli@latest sync android",
+    "cap:open": "npx @capacitor/cli@latest open android"
+  },
+  "keywords": ["game", "arcade", "capacitor", "android"],
+  "license": "MIT"
+}
