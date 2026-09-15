@@ -80,7 +80,19 @@ namespace GarageTycoon.Unity.Platform
         {
             float deltaTime = Time.deltaTime * Mathf.Max(0.01f, _timeScale);
 
-            _simulation.Tick(deltaTime);
+            // The garage stands still while a full-screen panel is open.
+            //
+            // Without this, a customer can run out of patience while the player is reading the
+            // upgrade list - losing a car to a menu you cannot see past is the kind of thing that
+            // makes people stop opening the menu, which is the opposite of what an upgrade screen
+            // is for. There is nothing to exploit here: it is a single player game, and the idle
+            // mechanics are paid out from elapsed time rather than from frames.
+            bool modalOpen = _upgradeScreen.IsVisible || _popup.IsVisible;
+
+            if (!modalOpen)
+            {
+                _simulation.Tick(deltaTime);
+            }
 
             _garageScreen.Refresh();
             _upgradeScreen.Refresh();

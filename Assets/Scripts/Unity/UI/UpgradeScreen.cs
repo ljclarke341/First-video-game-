@@ -95,6 +95,9 @@ namespace GarageTycoon.Unity.UI
             _rowHost.anchorMin = new Vector2(0f, 1f);
             _rowHost.anchorMax = new Vector2(1f, 1f);
             _rowHost.pivot = new Vector2(0.5f, 1f);
+            // Width follows the viewport; the ContentSizeFitter below drives the height.
+            _rowHost.offsetMin = Vector2.zero;
+            _rowHost.offsetMax = Vector2.zero;
             UIFactory.AddVerticalLayout(_rowHost.gameObject, Theme.ElementSpacing);
             ContentSizeFitter fitter = _rowHost.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;

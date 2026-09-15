@@ -38,13 +38,27 @@ namespace GarageTycoon.Unity.UI
         // Core objects
         // ------------------------------------------------------------------
 
-        /// <summary>Creates an empty UI object with a RectTransform, parented and ready to position.</summary>
+        /// <summary>
+        /// Creates an empty UI object with a RectTransform, parented and ready to position.
+        ///
+        /// Note the explicit anchors. A freshly created RectTransform anchors to its parent's
+        /// BOTTOM-LEFT corner, which is a classic Unity trap: an element positioned at (0, 120)
+        /// expecting to sit near the middle of the screen ends up just off the bottom-left instead.
+        /// Centring here means anything this factory makes behaves predictably even if the caller
+        /// never sets anchors itself.
+        /// </summary>
         public static RectTransform CreateRect(string name, Transform parent)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
             RectTransform rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.localScale = Vector3.one;
+
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+
             return rect;
         }
 

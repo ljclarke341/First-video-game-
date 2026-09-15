@@ -17,7 +17,12 @@ I made a reasonable choice on and would rather you confirmed.
   you are looking down at the workbench. Completed cars flash gold or green, lost customers red.
 - Popups fade and scale in over 150ms rather than appearing instantly.
 
-**Two bugs found while reviewing the Unity layer**
+**The garage pauses while a full-screen panel is open.** Previously a customer could run out of
+patience while you were reading the upgrade list. Losing a car to a menu you cannot see past teaches
+players not to open the menu, which defeats the point of having one. Nothing is exploitable by it:
+this is a single player game, and idle income is paid from elapsed time rather than frames.
+
+**Three bugs found while reviewing the Unity layer**
 
 - **Destroyed sprites after a second Play session.** The generated-sprite cache is static, so it can
   outlive the sprites it holds (leaving play mode, or a domain reload with Fast Enter Play Mode on).
@@ -27,6 +32,10 @@ I made a reasonable choice on and would rather you confirmed.
   save still on disk, the offline calculation read that stale timestamp and credited the fresh garage
   with hours of the old garage's idle income. Offline progress now only applies when a save was
   actually restored.
+- **Every floating message would have appeared off-screen.** A freshly created `RectTransform`
+  anchors to its parent's bottom-left corner, not its centre — so the toast positions, which are all
+  written as offsets from the middle of the screen, would have placed them just off the bottom-left.
+  The UI factory now sets explicit centre anchors, so nothing it builds depends on that default.
 - Also fixed while wiring the card flashes: cars are removed from their bay *before* the
   completed/left-angry events fire, so a live bay lookup would have found nothing at exactly the two
   moments most worth flashing. The lookup now falls back to the car's last bay index.

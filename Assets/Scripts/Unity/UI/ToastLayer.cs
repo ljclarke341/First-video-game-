@@ -38,6 +38,10 @@ namespace GarageTycoon.Unity.UI
             for (int i = 0; i < PoolSize; i++)
             {
                 RectTransform rect = UIFactory.CreateRect("Toast" + i, _root);
+                // Toast positions passed to Show() are measured from the centre of the screen.
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
                 rect.sizeDelta = new Vector2(520f, 70f);
 
                 Text label = UIFactory.CreateText("Label", rect, string.Empty, Theme.FontHeading,
