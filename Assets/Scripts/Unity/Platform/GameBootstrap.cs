@@ -50,6 +50,13 @@ namespace GarageTycoon.Unity.Platform
         private float _autoSaveTimer;
         private bool _isQuitting;
 
+        /// <summary>
+        /// True only when this session actually restored a save. Offline progress keys off this
+        /// rather than "a save file exists", so starting fresh with a save still on disk cannot
+        /// hand the new garage hours of the old garage's idle income.
+        /// </summary>
+        private bool _loadedExistingSave;
+
         /// <summary>The running game, exposed for the editor tools and for debugging.</summary>
         public GarageSimulation Simulation { get { return _simulation; } }
 
@@ -125,6 +132,10 @@ namespace GarageTycoon.Unity.Platform
                     {
                         // A corrupt save is not a crash: tell the player and start fresh.
                         Debug.LogWarning("[GarageTycoon] The save file could not be read, starting a new garage.");
+                    }
+                    else
+                    {
+                        _loadedExistingSave = true;
                     }
                 }
             }
@@ -239,6 +250,9 @@ namespace GarageTycoon.Unity.Platform
         {
             _toasts.Show(job.Type.DisplayName() + " done!  +$" + CashFormat.Short(payout),
                 Theme.Cash, new Vector2(0f, -120f));
+
+            // Light the car's own card up too, so the feedback is tied to the bay it came from.
+            _garageScreen.FlashCar(car, Theme.Cash);
         }
 
         private void HandleCarCompleted(ActiveCar car, double earned)
@@ -248,11 +262,13 @@ namespace GarageTycoon.Unity.Platform
                 : car.Definition.DisplayName + " done!  +$" + CashFormat.Short(earned);
 
             _toasts.Show(message, car.IsFlawless ? Theme.PerfectZone : Theme.Success, new Vector2(0f, 60f));
+            _garageScreen.FlashCar(car, car.IsFlawless ? Theme.PerfectZone : Theme.Success);
         }
 
         private void HandleCarLeft(ActiveCar car)
         {
             _toasts.Show(car.Definition.DisplayName + " gave up and left!", Theme.Danger, new Vector2(0f, 60f));
+            _garageScreen.FlashCar(car, Theme.Danger);
         }
 
         private void HandleCarSpawned(ActiveCar car)
@@ -337,6 +353,8 @@ namespace GarageTycoon.Unity.Platform
 
         private void ApplyOfflineProgress()
         {
+            if (!_loadedExistingSave) return;
+
             string json = SaveFile.Read();
             if (string.IsNullOrEmpty(json)) return;
 
@@ -418,6 +436,7 @@ namespace GarageTycoon.Unity.Platform
 
             UnsubscribeFromSimulation();
             _simulation = new GarageSimulation(Environment.TickCount);
+            _loadedExistingSave = false;
             SubscribeToSimulation();
 
             // The screens hold a reference to the old simulation, so rebuild them against the new one.

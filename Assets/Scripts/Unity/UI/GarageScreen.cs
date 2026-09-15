@@ -98,6 +98,7 @@ namespace GarageTycoon.Unity.UI
             UIFactory.AnchorTop(_tokenLabel.rectTransform, 40f, 18f, Theme.PanelPadding);
 
             _prestigeBar = UIFactory.CreateProgressBar("PrestigeBar", hud.transform, Theme.Prestige, 5);
+            _prestigeBar.SmoothSpeed = 6f;
             RectTransform barRect = _prestigeBar.Rect;
             barRect.anchorMin = new Vector2(0.5f, 0f);
             barRect.anchorMax = new Vector2(1f, 0f);
@@ -331,6 +332,30 @@ namespace GarageTycoon.Unity.UI
         {
             if (bayIndex < 0 || bayIndex >= _bayCards.Count) return null;
             return _bayCards[bayIndex].Root;
+        }
+
+        /// <summary>
+        /// Flashes the card for a car.
+        ///
+        /// Note the fallback: a car is removed from its bay BEFORE the completed / left-angry events
+        /// are raised, so searching the live bays would find nothing for exactly the two moments most
+        /// worth flashing. ActiveCar keeps its last bay index, which is what we fall back to.
+        /// </summary>
+        public void FlashCar(ActiveCar car, Color color)
+        {
+            if (car == null) return;
+
+            for (int i = 0; i < _bayCards.Count && i < _simulation.Bays.Count; i++)
+            {
+                if (_simulation.Bays[i] == car)
+                {
+                    _bayCards[i].Flash(color);
+                    return;
+                }
+            }
+
+            int lastBay = car.BayIndex;
+            if (lastBay >= 0 && lastBay < _bayCards.Count) _bayCards[lastBay].Flash(color);
         }
     }
 }

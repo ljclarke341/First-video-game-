@@ -14,6 +14,24 @@ namespace GarageTycoon.Unity.UI
         private static readonly Dictionary<string, Sprite> _cache = new Dictionary<string, Sprite>();
 
         /// <summary>
+        /// Looks a sprite up in the cache.
+        ///
+        /// The validity check matters: the static cache can outlive the sprites it holds (leaving
+        /// play mode, or a domain reload with Fast Enter Play Mode on), and a destroyed Unity object
+        /// is not the same as a missing dictionary entry. Without this the game would come back from
+        /// a second Play session assigning already-destroyed sprites to every Image on screen.
+        /// </summary>
+        private static bool TryGetCached(string key, out Sprite sprite)
+        {
+            if (_cache.TryGetValue(key, out sprite) && sprite != null) return true;
+
+            // Stale entry: drop it so the sprite is rebuilt.
+            _cache.Remove(key);
+            sprite = null;
+            return false;
+        }
+
+        /// <summary>
         /// A white rounded rectangle set up for 9-slice scaling, so one texture stretches to any size
         /// without distorting the corners. Tint it with Image.color.
         /// </summary>
@@ -21,7 +39,7 @@ namespace GarageTycoon.Unity.UI
         {
             string key = "round_" + radius;
             Sprite cached;
-            if (_cache.TryGetValue(key, out cached)) return cached;
+            if (TryGetCached(key, out cached)) return cached;
 
             // The texture only needs to be big enough to hold two corners plus a stretchable middle.
             int size = radius * 2 + 4;
@@ -59,7 +77,7 @@ namespace GarageTycoon.Unity.UI
         public static Sprite Solid()
         {
             Sprite cached;
-            if (_cache.TryGetValue("solid", out cached)) return cached;
+            if (TryGetCached("solid", out cached)) return cached;
 
             Texture2D texture = NewTexture(4, 4);
             Color[] pixels = new Color[16];
@@ -77,7 +95,7 @@ namespace GarageTycoon.Unity.UI
         {
             string key = "circle_" + diameter;
             Sprite cached;
-            if (_cache.TryGetValue(key, out cached)) return cached;
+            if (TryGetCached(key, out cached)) return cached;
 
             Texture2D texture = NewTexture(diameter, diameter);
             Color[] pixels = new Color[diameter * diameter];
@@ -109,7 +127,7 @@ namespace GarageTycoon.Unity.UI
         {
             string key = "ring_" + diameter + "_" + thickness;
             Sprite cached;
-            if (_cache.TryGetValue(key, out cached)) return cached;
+            if (TryGetCached(key, out cached)) return cached;
 
             Texture2D texture = NewTexture(diameter, diameter);
             Color[] pixels = new Color[diameter * diameter];
@@ -143,7 +161,7 @@ namespace GarageTycoon.Unity.UI
         public static Sprite GarageBackground()
         {
             Sprite cached;
-            if (_cache.TryGetValue("garage_bg", out cached)) return cached;
+            if (TryGetCached("garage_bg", out cached)) return cached;
 
             const int Width = 64;
             const int Height = 256;
@@ -210,7 +228,7 @@ namespace GarageTycoon.Unity.UI
         public static Sprite CarSilhouette()
         {
             Sprite cached;
-            if (_cache.TryGetValue("car", out cached)) return cached;
+            if (TryGetCached("car", out cached)) return cached;
 
             const int Width = 128;
             const int Height = 64;

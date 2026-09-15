@@ -48,6 +48,22 @@ namespace GarageTycoon.Unity.UI
         /// <summary>The card's rect, so the screen can position it and toasts can find it.</summary>
         public RectTransform Root { get { return _root; } }
 
+        /// <summary>Strength of the current completion flash, decaying to zero.</summary>
+        private float _flash;
+
+        /// <summary>Colour the current flash is tinted with.</summary>
+        private Color _flashColor = Theme.Success;
+
+        /// <summary>
+        /// Lights the card up briefly. Called when a job finishes or a car is completed, so the
+        /// player's eye is drawn to the right bay even if they were looking at the workbench.
+        /// </summary>
+        public void Flash(Color color)
+        {
+            _flash = 1f;
+            _flashColor = color;
+        }
+
         public BayCardView(int bayIndex, Action<int> onSelected)
         {
             _bayIndex = bayIndex;
@@ -162,9 +178,12 @@ namespace GarageTycoon.Unity.UI
             // ---- bars along the bottom ----
             _progressBar = UIFactory.CreateProgressBar("Progress", _root, Theme.Info, 8);
             UIFactory.AnchorBottom(_progressBar.Rect, 12f, 36f, Theme.PanelPadding);
+            // Repair progress slides rather than jumping, so a completed round reads as a movement.
+            _progressBar.SmoothSpeed = 9f;
 
             _timerBar = UIFactory.CreateProgressBar("Timer", _root, Theme.Success, 8);
             UIFactory.AnchorBottom(_timerBar.Rect, 14f, 14f, Theme.PanelPadding);
+            _timerBar.SmoothSpeed = 14f;
 
             // ---- empty-bay message ----
             _emptyText = UIFactory.CreateText("Empty", _root, "Empty bay - waiting for a customer",
@@ -199,8 +218,18 @@ namespace GarageTycoon.Unity.UI
                 return;
             }
 
-            // Selected bay gets a brighter card so it is obvious what you are working on.
-            _background.color = isPlayerWorking ? Theme.PanelRaised * 1.15f : Theme.PanelRaised;
+            // Selected bay gets a brighter card so it is obvious what you are working on,
+            // and a recently completed job tints it towards the flash colour as that fades out.
+            Color baseColor = isPlayerWorking ? Theme.PanelRaised * 1.15f : Theme.PanelRaised;
+
+            if (_flash > 0f)
+            {
+                _flash -= Time.deltaTime * 2.2f;
+                if (_flash < 0f) _flash = 0f;
+                baseColor = Color.Lerp(baseColor, _flashColor, _flash * 0.55f);
+            }
+
+            _background.color = baseColor;
 
             _carImage.color = Theme.Hex(car.Definition.BodyColorHex);
 

@@ -254,28 +254,62 @@ namespace GarageTycoon.Unity.UI
         private Image _track;
         private Image _fill;
         private float _fraction;
+        private float _displayed;
+
+        /// <summary>
+        /// How quickly the bar slides towards its target, in bar-widths per second.
+        /// Zero snaps instantly, which is what you want for something like a torque gauge where the
+        /// exact value is the game. Anything above zero smooths, which suits progress and timers.
+        /// </summary>
+        public float SmoothSpeed { get; set; }
 
         public void Initialise(Image track, Image fill)
         {
             _track = track;
             _fill = fill;
-            Fraction = 0f;
+            SmoothSpeed = 0f;
+            _fraction = 0f;
+            _displayed = 0f;
+            Apply(0f);
         }
 
-        /// <summary>How full the bar is, 0..1.</summary>
+        /// <summary>How full the bar is, 0..1. Reading it gives the target, not the drawn position.</summary>
         public float Fraction
         {
             get { return _fraction; }
             set
             {
                 _fraction = Mathf.Clamp01(value);
-                if (_fill == null) return;
 
-                RectTransform fillRect = _fill.rectTransform;
-                fillRect.anchorMax = new Vector2(_fraction, 1f);
-                fillRect.offsetMin = Vector2.zero;
-                fillRect.offsetMax = Vector2.zero;
+                if (SmoothSpeed <= 0f)
+                {
+                    _displayed = _fraction;
+                    Apply(_displayed);
+                }
             }
+        }
+
+        private void Update()
+        {
+            if (SmoothSpeed <= 0f) return;
+            if (Mathf.Abs(_displayed - _fraction) < 0.0005f) return;
+
+            // Move towards the target at a fixed rate, then snap over the last sliver so the bar
+            // always actually arrives rather than creeping forever.
+            _displayed = Mathf.Lerp(_displayed, _fraction, Mathf.Clamp01(Time.deltaTime * SmoothSpeed));
+            if (Mathf.Abs(_displayed - _fraction) < 0.002f) _displayed = _fraction;
+
+            Apply(_displayed);
+        }
+
+        private void Apply(float fraction)
+        {
+            if (_fill == null) return;
+
+            RectTransform fillRect = _fill.rectTransform;
+            fillRect.anchorMax = new Vector2(fraction, 1f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
         }
 
         /// <summary>Recolours the fill, e.g. a timer bar going from green to red.</summary>

@@ -68,6 +68,10 @@ namespace GarageTycoon.Unity.UI
             UIFactory.AnchorBottom(_secondary.GetComponent<RectTransform>(), Theme.TouchTargetHeight, 32f + Theme.TouchTargetHeight + 14f, Theme.PanelPadding);
             _secondaryLabel = _secondary.GetComponentInChildren<Text>();
 
+            // A popup that snaps into existence reads as a glitch; a short fade reads as intent.
+            UiFader fader = _root.gameObject.AddComponent<UiFader>();
+            fader.ScaleTarget = _card.rectTransform;
+
             _root.gameObject.SetActive(false);
         }
 

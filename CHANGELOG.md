@@ -6,6 +6,33 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 5 — Polish and a second bug pass
+
+**Polish**
+
+- Progress bars now slide to their target instead of snapping. The patience timer, repair progress
+  and the prestige bar all animate; the torque gauge deliberately does not, because on that one the
+  exact needle position *is* the game.
+- Finishing a job flashes the bay card it came from, so your eye is drawn to the right car even when
+  you are looking down at the workbench. Completed cars flash gold or green, lost customers red.
+- Popups fade and scale in over 150ms rather than appearing instantly.
+
+**Two bugs found while reviewing the Unity layer**
+
+- **Destroyed sprites after a second Play session.** The generated-sprite cache is static, so it can
+  outlive the sprites it holds (leaving play mode, or a domain reload with Fast Enter Play Mode on).
+  A destroyed Unity object is not the same as a missing dictionary entry, so the cache would happily
+  hand out already-destroyed sprites on the next run. Lookups now check validity and rebuild.
+- **Offline income could be paid into a brand new game.** With "load save on start" turned off but a
+  save still on disk, the offline calculation read that stale timestamp and credited the fresh garage
+  with hours of the old garage's idle income. Offline progress now only applies when a save was
+  actually restored.
+- Also fixed while wiring the card flashes: cars are removed from their bay *before* the
+  completed/left-angry events fire, so a live bay lookup would have found nothing at exactly the two
+  moments most worth flashing. The lookup now falls back to the car's last bay index.
+
+---
+
 ## Stage 4 — Documentation and project wiring
 
 - `README.md` covering how to open and play the project, how everything is organised, how to run the

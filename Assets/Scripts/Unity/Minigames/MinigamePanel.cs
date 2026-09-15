@@ -51,6 +51,8 @@ namespace GarageTycoon.Unity.Minigames
             UIFactory.AnchorTop(_carLabel.rectTransform, 40f, 14f, Theme.PanelPadding);
 
             _jobProgress = UIFactory.CreateProgressBar("JobProgress", _root, Theme.Success, 8);
+            // Smoothed so finishing a round reads as the bar sweeping forward.
+            _jobProgress.SmoothSpeed = 10f;
             UIFactory.AnchorTop(_jobProgress.Rect, 12f, 58f, Theme.PanelPadding);
 
             _roundTimer = UIFactory.CreateProgressBar("RoundTimer", _root, Theme.Warning, 6);
