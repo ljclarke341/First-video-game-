@@ -7,9 +7,10 @@ namespace GarageTycoon.HeadlessTests
     {
         public static int Main(string[] args)
         {
-            if (args != null && args.Length > 0 && args[0] == "diag")
+            // "probe" prints balance measurements instead of running the pass/fail suite.
+            if (args != null && args.Length > 0 && args[0] == "probe")
             {
-                Diagnostics.Run();
+                BalanceProbe.Run();
                 return 0;
             }
 

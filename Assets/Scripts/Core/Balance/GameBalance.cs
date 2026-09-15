@@ -70,13 +70,21 @@ namespace GarageTycoon.Core.Balance
 
         /// <summary>
         /// Cash the player must reach before the "Sell the garage" prestige unlocks.
-        /// Measured against the balance tests, a committed player reaches this in a couple of hours,
-        /// which is the pacing this genre wants for a first prestige.
+        ///
+        /// This number was MEASURED, not guessed. Running the balance probe
+        /// (dotnet run --project Tools/HeadlessTests -- probe) shows a committed player has bought
+        /// essentially every upgrade by about the two hour mark, after which there is nothing left
+        /// to spend on. The cap is set so prestige unlocks shortly after that - around two and a
+        /// half hours - rather than leaving hours of dead time with an empty shop.
         /// </summary>
-        public const double PrestigeCashCap = 1000000d;
+        public const double PrestigeCashCap = 150000d;
 
-        /// <summary>Lifetime earnings needed per prestige token awarded.</summary>
-        public const double LifetimeEarningsPerToken = 250000d;
+        /// <summary>
+        /// Lifetime earnings needed per prestige token awarded. At the pacing above a first reset
+        /// lands about four tokens, so run two starts nearly 50% richer - enough to feel like a
+        /// genuine reward rather than a slap on the wrist for having to start again.
+        /// </summary>
+        public const double LifetimeEarningsPerToken = 100000d;
 
         /// <summary>Permanent payout bonus granted by each prestige token (0.12 = +12%).</summary>
         public const float PrestigeBonusPerToken = 0.12f;

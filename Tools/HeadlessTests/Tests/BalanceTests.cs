@@ -224,21 +224,46 @@ namespace GarageTycoon.HeadlessTests.Tests
 
         private static void PrestigeIsReachable()
         {
-            // Two hours of committed play, buying upgrades the whole way.
+            // How long does a committed player actually take to reach their first prestige?
+            // This is the single most important pacing number in the game, so it is measured
+            // directly rather than inferred: play in five minute blocks until the sell-up unlocks.
             GarageSimulation simulation = new GarageSimulation(7800);
-            GameplayHarness.Play(simulation, 7200f, 0.85f, true);
 
-            double lifetime = simulation.Wallet.LifetimeEarnings;
-            double fractionOfCap = lifetime / GameBalance.PrestigeCashCap;
+            float minutes = 0f;
+            const float BlockMinutes = 5f;
+            const float GiveUpAfterMinutes = 420f;
 
-            Console.WriteLine(string.Format("        (2 hours earned ${0:0}, {1:0}% of the prestige cap; {2} upgrade levels)",
-                lifetime, fractionOfCap * 100d, simulation.Upgrades.TotalLevels));
+            while (minutes < GiveUpAfterMinutes && !simulation.CanPrestige())
+            {
+                GameplayHarness.Play(simulation, BlockMinutes * 60f, 0.85f, true);
+                minutes += BlockMinutes;
+            }
 
-            // The prestige cap should be a goal for a session or two - neither trivial nor hopeless.
-            Check.IsTrue(fractionOfCap > 0.05d,
-                "After two hours the player should be meaningfully on the way to prestige");
-            Check.IsTrue(fractionOfCap < 20d,
-                "The prestige cap should not be reached dozens of times over in two hours");
+            bool reached = simulation.CanPrestige();
+            int tokens = simulation.Prestige.TokensForReset(simulation.Wallet.LifetimeEarnings);
+
+            Console.WriteLine(string.Format("        (first prestige after {0:0} minutes, awarding {1} tokens; shop at {2}/{3} levels)",
+                minutes, tokens, simulation.Upgrades.TotalLevels, TotalUpgradeLevels()));
+
+            Check.IsTrue(reached,
+                "A committed player should reach their first prestige within a few hours of play");
+
+            Check.IsTrue(minutes >= 45f,
+                "Prestige arriving in under three quarters of an hour would make the reset meaningless");
+
+            Check.IsTrue(minutes <= 300f,
+                "Prestige should not take five hours of active play to reach for the first time");
+
+            Check.IsTrue(tokens >= 2,
+                "A first prestige should award enough tokens to noticeably speed up the next run");
+        }
+
+        /// <summary>Total upgrade levels available across the whole shop, for the progress readout.</summary>
+        private static int TotalUpgradeLevels()
+        {
+            int total = 0;
+            for (int i = 0; i < UpgradeCatalog.All.Count; i++) total += UpgradeCatalog.All[i].MaxLevel;
+            return total;
         }
 
         private static void IdleIsWeakerThanPlaying()
