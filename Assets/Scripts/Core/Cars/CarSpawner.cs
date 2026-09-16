@@ -149,6 +149,7 @@ namespace GarageTycoon.Core.Cars
             }
 
             float patience = definition.BasePatienceSeconds + definition.PatiencePerJobSeconds * (finalJobs.Count - 1);
+            patience *= Balance.GameBalance.PatienceScale;
             patience *= parameters.PatienceMultiplier <= 0f ? 1f : parameters.PatienceMultiplier;
 
             ActiveCar car = new ActiveCar(_nextInstanceId, definition, finalJobs, patience);

@@ -106,21 +106,37 @@ namespace GarageTycoon.HeadlessTests.Tests
             return report;
         }
 
-        /// <summary>Puts the player into whichever bay has the most urgent car.</summary>
+        /// <summary>
+        /// Puts the player into the bay with the most MONEY AT RISK - the unfinished payout
+        /// weighed against how soon that customer will walk.
+        ///
+        /// This started out as "work on whoever is closest to leaving", which turned out to model
+        /// a bad player: cheap cars have the shortest patience, so pure urgency quietly prioritises
+        /// rusty utes over supercars. That made extra bays measure as a 30% INCOME LOSS, which said
+        /// more about the strategy than about the upgrade.
+        /// </summary>
         private static void ClaimAnyBay(GarageSimulation simulation)
         {
             int bestBay = -1;
-            float bestTime = float.MaxValue;
+            double bestScore = double.MinValue;
 
             for (int i = 0; i < simulation.Bays.Count; i++)
             {
                 ActiveCar car = simulation.Bays[i];
                 if (car == null || car.AllJobsComplete) continue;
 
-                // Work on the customer closest to walking out.
-                if (car.TimeRemaining < bestTime)
+                double atRisk = 0d;
+                for (int j = 0; j < car.Jobs.Count; j++)
                 {
-                    bestTime = car.TimeRemaining;
+                    if (!car.Jobs[j].IsComplete) atRisk += car.Jobs[j].Payout;
+                }
+
+                // Value per second of remaining patience: high-value or nearly-out-of-time wins.
+                double score = atRisk / (car.TimeRemaining < 1f ? 1f : car.TimeRemaining);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
                     bestBay = i;
                 }
             }

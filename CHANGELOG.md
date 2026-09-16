@@ -6,6 +6,65 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 6 — Playtest fixes (the first round of real human feedback)
+
+A person played it and reported three things no automated test could ever have caught:
+*"you have to like guess"*, *"it moves a bit too fast I can't even read the question"*, and that
+holding the torque button highlighted the word on it. All three were real, and chasing them down
+turned up four further balance faults underneath.
+
+**Readability — the actual complaint**
+
+- Tool matching previews were `1.5 / difficulty` seconds, so a rare car gave about a second to read
+  a job prompt *and* scan up to five tool names. That is not a memory test, it is a coin flip. Now
+  `2.6 / sqrt(difficulty)` with a 1.5s floor — roughly double, and it no longer collapses on hard cars.
+- **The job prompt now stays on screen for the whole round.** Only the tool labels hide. You are
+  being tested on which tool you grabbed, not on whether you read the question before it vanished.
+- Tool buttons are numbered, so you can remember "it was 3" instead of holding a position in mind.
+- Sequence steps flashed for as little as a sixth of a second. Now around half a second each, with a
+  beat at the end before the pattern hides.
+- **The sequence pattern is drawn as arrows rather than the words UP/RIGHT/DOWN/LEFT.** A glance
+  reads an arrow far faster than a word, which is the entire point of something shown for a moment.
+- Added a **Relaxed pace** setting (in Stats): more reading time, slower markers, identical payouts.
+  Reading speed is personal, and a mini-game nobody can read is not a difficulty setting.
+- Web build: holding any button no longer selects its text — the bug reported on the torque game,
+  where holding is mandatory, so it fired on every single round.
+
+**Four balance faults found while fixing the above**
+
+Making rounds readable made them longer, and that broke things tuned against the old fast rounds:
+
+- **Customers timed out mid-repair**, quietly turning the whole Reputation branch into a trap.
+  Patience raised 30% (`GameBalance.PatienceScale`).
+- **The patience clock ran while you were reading.** Every second spent reading cost the customer's
+  goodwill, which made "Labelled Tool Wall" — an upgrade whose entire purpose is buying reading
+  time — lose 39% of income. The clock now eases off during a preview phase.
+- **Extra Bay made you poorer.** A car in a bay lost patience faster than one in the queue, so a new
+  bay pulled cars out of the forgiving queue into a harsher one where, with a single pair of hands,
+  they sat and rotted. One rate now covers every car nobody is touching, wherever it is parked.
+- **The finishing tip was half the economy.** A flat $1.50 per second remaining was worth more than
+  the entire repair on a cheap ute and pocket change on a supercar — and because it only rewarded
+  reaching a car instantly, it punished owning bays. It is now 25% of the car's payout, scaled by
+  how much patience survived **from when work began**, so it rewards a fast repair rather than a
+  lucky arrival.
+
+Every upgrade is now measurably worth buying in isolation, where two were previously negative.
+
+**Two faults in the tests themselves**
+
+- The virtual player's accuracy did not depend on preview length at all, so longer previews were
+  pure cost in simulation — true of a robot, false of a person. It now models reading time, which is
+  what exposed the patience-during-preview fault above.
+- The virtual player picked the most *urgent* car. Cheap cars have the shortest patience, so that
+  quietly prioritised rusty utes over supercars and made extra bays measure as a 30% income loss.
+  It now picks by money at risk. A second test was comparing a single four-minute run and calling
+  the noise a result; it averages seeds now, the same lesson already learned once in Stage 2.
+
+Measured after all of it: ~$430/min opening income, first upgrade at 19s, first prestige at ~195
+minutes for 4 tokens, idle at 72% of hands-on play. All 88 tests pass.
+
+---
+
 ## Stage 5 — Polish and a second bug pass
 
 **Polish**
@@ -162,6 +221,12 @@ I would want a second opinion on.
 3. **First prestige at ~3 hours.** That is on the patient side for a mobile idle game — many aim for
    90 minutes. Lowering `GameBalance.PrestigeCashCap` moves it directly, and the balance probe will
    tell you exactly where it lands.
+7. **Is Relaxed pace on or off by default?** It is off, so the default is the tuned experience. If
+   the normal pace still rushes you, say so and I will make relaxed the default — it costs the
+   player nothing, since payouts are identical either way.
+8. **There is a web build of this game** (published as an Artifact) used for playtesting, because
+   Unity cannot run in a browser. Every fix in Stage 6 was applied to both. It is not in this repo
+   yet — keeping two implementations in step is a real cost, so that is your call.
 4. **The UI is built in code, not prefabs.** Deliberate, and explained in `Assets/Prefabs/README.md`.
    If you would rather learn Unity's editor-driven workflow, converting one screen to prefabs is a
    good exercise — but it is a real fork in the road, so it is your call.

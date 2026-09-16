@@ -20,6 +20,19 @@ namespace GarageTycoon.Core.Balance
         /// <summary>How many cars can sit in the waiting queue before customers stop arriving.</summary>
         public const int MaxQueuedCars = 6;
 
+        /// <summary>
+        /// Global multiplier on how patient every customer is.
+        ///
+        /// This exists because of a playtest: making the mini-game previews long enough to
+        /// actually READ made every round meaningfully longer, and patience had been tuned
+        /// against the old, faster rounds. Cars started timing out mid-repair, which quietly
+        /// turned the whole Reputation branch into a trap - attracting rarer cars meant
+        /// attracting cars you could no longer finish in time.
+        ///
+        /// Raise this if rounds ever get slower again; the balance tests will tell you.
+        /// </summary>
+        public const float PatienceScale = 1.3f;
+
         /// <summary>How many repair bays the player starts with (more can be unlocked).</summary>
         public const int StartingBayCount = 1;
 
@@ -58,8 +71,17 @@ namespace GarageTycoon.Core.Balance
         /// <summary>Cash the player starts with, and gets back after a prestige reset.</summary>
         public const double StartingCash = 50d;
 
-        /// <summary>Tip added when a whole car is finished with time to spare, per second remaining.</summary>
-        public const double SpeedTipPerSecond = 1.5d;
+        /// <summary>
+        /// Finishing tip, as a FRACTION of the car's payout, scaled by how much patience was left.
+        /// Finish the moment it arrives and you earn a quarter extra; finish on the buzzer and you
+        /// earn nothing on top.
+        ///
+        /// This used to be a flat $1.50 per second remaining, which was a mistake on two counts:
+        /// on a $42 ute the tip was bigger than the entire repair, while on a $1,850 supercar it
+        /// was pocket change - and because it only rewarded reaching a car instantly, buying MORE
+        /// BAYS measurably made the player poorer. Measured at 32% less income before this change.
+        /// </summary>
+        public const double SpeedTipFraction = 0.25d;
 
         /// <summary>Fraction of a car's payout earned when the customer leaves angry (a token apology fee).</summary>
         public const double AbandonedCarRecovery = 0d;

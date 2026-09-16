@@ -37,6 +37,16 @@ namespace GarageTycoon.Core.Cars
         /// <summary>Which job the player is currently working on, or -1 if none is selected.</summary>
         public int ActiveJobIndex { get; private set; }
 
+        /// <summary>
+        /// Patience left at the moment someone first put a spanner on this car, or -1 until then.
+        ///
+        /// The finishing tip is measured against THIS rather than against the car's full patience,
+        /// so it rewards repairing quickly rather than happening to be free when the car rolled in.
+        /// Measured against the old rule, buying more bays made the player 32% poorer, because
+        /// every extra bay meant cars waiting longer before anyone reached them.
+        /// </summary>
+        public float TimeRemainingWhenWorkBegan { get; private set; }
+
         private readonly List<RepairJob> _jobs = new List<RepairJob>();
 
         public ActiveCar(int instanceId, CarDefinition definition, List<RepairJob> jobs, float patienceSeconds)
@@ -50,6 +60,7 @@ namespace GarageTycoon.Core.Cars
             State = CarState.Waiting;
             BayIndex = -1;
             ActiveJobIndex = -1;
+            TimeRemainingWhenWorkBegan = -1f;
 
             TotalPayout = 0d;
             for (int i = 0; i < _jobs.Count; i++) TotalPayout += _jobs[i].Payout;
@@ -156,6 +167,25 @@ namespace GarageTycoon.Core.Cars
         public void AddEarnings(double amount)
         {
             EarnedSoFar += amount;
+        }
+
+        /// <summary>Called the first time anyone starts work on this car. Later calls do nothing.</summary>
+        public void MarkWorkBegun()
+        {
+            if (TimeRemainingWhenWorkBegan < 0f) TimeRemainingWhenWorkBegan = TimeRemaining;
+        }
+
+        /// <summary>
+        /// How much of the patience that was left when work STARTED is still left now, 0..1.
+        /// This is what the finishing tip is paid on.
+        /// </summary>
+        public float RepairSpeedFraction
+        {
+            get
+            {
+                if (TimeRemainingWhenWorkBegan <= 0f) return TimeFraction;
+                return MathUtil.Clamp01(TimeRemaining / TimeRemainingWhenWorkBegan);
+            }
         }
 
         public void MarkCompleted()

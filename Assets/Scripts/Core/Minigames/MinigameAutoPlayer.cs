@@ -123,8 +123,12 @@ namespace GarageTycoon.Core.Minigames
             // Wait a beat after the labels hide, the way a person would.
             if (_game.Elapsed < game.PreviewSeconds + _reactionDelay) return;
 
-            // Skill decides whether the mechanic actually remembered which button it was.
-            bool remembers = _random.NextFloat() < System.Math.Pow(_skill, 0.7d);
+            // Skill AND reading time decide whether the mechanic remembered which button it was.
+            // Modelling the reading time matters: without it a longer preview is pure cost in
+            // simulation, and the balance tests conclude that the upgrade whose entire purpose is
+            // buying reading time makes you poorer - which is true of a robot and false of a person.
+            double recall = System.Math.Pow(_skill, 0.7d) * PreviewComfort(game.PreviewSeconds, 2.2f);
+            bool remembers = _random.NextFloat() < recall;
 
             if (remembers)
             {
@@ -153,7 +157,8 @@ namespace GarageTycoon.Core.Minigames
             int index = game.ProgressIndex;
             if (index >= game.Sequence.Count) return;
 
-            bool remembers = _random.NextFloat() < System.Math.Pow(_skill, 0.5d);
+            double recall = System.Math.Pow(_skill, 0.5d) * PreviewComfort(game.StepSeconds, 0.55f);
+            bool remembers = _random.NextFloat() < recall;
             int correct = (int)game.Sequence[index];
 
             if (remembers)
@@ -168,6 +173,19 @@ namespace GarageTycoon.Core.Minigames
             }
 
             _nextInputAt = _game.Elapsed + _stepInterval;
+        }
+
+        /// <summary>
+        /// How well a player could take the information in, given how long it was on screen.
+        /// Below the comfortable duration recall falls away quickly; above it there are gentle
+        /// returns, because past a point more staring does not help.
+        /// </summary>
+        private static double PreviewComfort(float actualSeconds, float comfortableSeconds)
+        {
+            if (comfortableSeconds <= 0f) return 1d;
+            float ratio = actualSeconds / comfortableSeconds;
+            if (ratio >= 1f) return MathUtil.Clamp(1f + (ratio - 1f) * 0.12f, 1f, 1.18f);
+            return MathUtil.Clamp(0.45f + ratio * 0.55f, 0.35f, 1f);
         }
 
         /// <summary>

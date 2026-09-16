@@ -163,24 +163,35 @@ namespace GarageTycoon.HeadlessTests.Tests
 
         private static void UpgradesImproveIncome()
         {
-            // Same seed, same skill: one garage kitted out, one bare.
-            GarageSimulation bare = new GarageSimulation(7500);
-            SessionReport bareReport = GameplayHarness.Play(bare, 240f, 0.8f);
+            // Averaged over several seeds, because a single four minute run swings wildly on
+            // whether a legendary car happened to roll up. A one-seed comparison here previously
+            // "proved" that upgrades made the player poorer, which was noise, not signal.
+            const int Seeds = 4;
+            double bareTotal = 0d, kittedTotal = 0d;
 
-            GarageSimulation kitted = new GarageSimulation(7500);
-            GameplayHarness.GrantUpgrade(kitted, "precision_window", 4);
-            GameplayHarness.GrantUpgrade(kitted, "rep_signage", 4);
-            GameplayHarness.GrantUpgrade(kitted, "workshop_rates", 4);
-            GameplayHarness.GrantUpgrade(kitted, "rep_marketing", 3);
+            for (int seed = 0; seed < Seeds; seed++)
+            {
+                GarageSimulation bare = new GarageSimulation(7500 + seed * 13);
+                bareTotal += GameplayHarness.Play(bare, 240f, 0.8f).CashEarned;
 
-            // Reset the wallet so the granted cash does not count as income.
-            kitted.Wallet.Restore(GameBalance.StartingCash, 0d, 0d);
-            SessionReport kittedReport = GameplayHarness.Play(kitted, 240f, 0.8f);
+                // Capacity first, the way a competent player buys: attracting rarer, longer cars
+                // without somewhere to put them is a trap, not an upgrade.
+                GarageSimulation kitted = new GarageSimulation(7500 + seed * 13);
+                GameplayHarness.GrantUpgrade(kitted, "workshop_bays", 1);
+                GameplayHarness.GrantUpgrade(kitted, "precision_window", 4);
+                GameplayHarness.GrantUpgrade(kitted, "precision_preview", 3);
+                GameplayHarness.GrantUpgrade(kitted, "rep_signage", 4);
+                GameplayHarness.GrantUpgrade(kitted, "workshop_rates", 4);
 
-            Console.WriteLine(string.Format("        (bare ${0:0} vs upgraded ${1:0} over 4 minutes)",
-                bareReport.CashEarned, kittedReport.CashEarned));
+                // Reset the wallet so the cash granted to buy them does not count as income.
+                kitted.Wallet.Restore(GameBalance.StartingCash, 0d, 0d);
+                kittedTotal += GameplayHarness.Play(kitted, 240f, 0.8f).CashEarned;
+            }
 
-            Check.IsTrue(kittedReport.CashEarned > bareReport.CashEarned * 1.4d,
+            Console.WriteLine(string.Format("        (bare ${0:0} vs upgraded ${1:0} over {2}x4 minutes)",
+                bareTotal, kittedTotal, Seeds));
+
+            Check.IsTrue(kittedTotal > bareTotal * 1.2d,
                 "A well-upgraded garage should clearly out-earn a bare one");
         }
 

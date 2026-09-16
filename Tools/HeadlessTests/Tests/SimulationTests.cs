@@ -69,8 +69,9 @@ namespace GarageTycoon.HeadlessTests.Tests
             GarageSimulation simulation = new GarageSimulation(2003);
             double startCash = simulation.Wallet.Cash;
 
-            // Nobody touches anything for two minutes.
-            for (int i = 0; i < 60 * 120; i++) simulation.Tick(1f / 60f);
+            // Nobody touches anything for eight minutes. It takes a while now: untouched cars
+            // tick down slowly by design, so this is a test of "eventually", not "immediately".
+            for (int i = 0; i < 60 * 480; i++) simulation.Tick(1f / 60f);
 
             Check.AreClose(startCash, simulation.Wallet.Cash, 0.001d, "An untouched garage must not earn anything");
             Check.IsTrue(simulation.Stats.CarsLost > 0, "Ignored customers should eventually leave");

@@ -34,6 +34,11 @@ namespace GarageTycoon.Core.Minigames
 
         public override MinigameType Type { get { return MinigameType.ToolMatch; } }
 
+        /// <summary>
+        /// The job being done. This stays on screen for the WHOLE round: the player is being
+        /// tested on which tool they grabbed, not on whether they managed to read the question
+        /// before it vanished. Only the tool labels hide.
+        /// </summary>
         public override string Prompt { get { return TaskPrompt; } }
 
         public ToolMatchMinigame(JobType jobType, float difficulty, MinigameTuning tuning, IRandomSource random)
@@ -47,11 +52,16 @@ namespace GarageTycoon.Core.Minigames
 
             BuildOptions(task.CorrectTool, optionCount);
 
-            // Preview shrinks with difficulty and is pushed back up by Precision upgrades.
-            PreviewSeconds = MathUtil.Clamp(1.5f / Difficulty + Tuning.PreviewBonusSeconds, 0.55f, 3.5f);
+            // PLAYTEST FIX: this used to be 1.5f / Difficulty, which gave a rare car about a
+            // second to read a job prompt AND scan up to five tool names. Testers could not read
+            // it at all, so the round was pure guesswork rather than recall.
+            //
+            // It now scales by the SQUARE ROOT of difficulty and has a much higher floor, so a
+            // legendary car is still tighter than a ute without ever becoming unreadable.
+            PreviewSeconds = MathUtil.Clamp(
+                2.6f / (float)System.Math.Sqrt(Difficulty) + Tuning.PreviewBonusSeconds, 1.5f, 6f);
 
-            // The player gets the preview plus a fixed window to answer in.
-            TimeLimit = PreviewSeconds + 3.2f;
+            TimeLimit = PreviewSeconds + 4.2f;
         }
 
         /// <summary>Fills the button row with the correct tool plus unique decoys, then shuffles it.</summary>
@@ -80,6 +90,9 @@ namespace GarageTycoon.Core.Minigames
             CorrectIndex = _options.IndexOf(correctTool);
         }
 
+        /// <summary>The patience clock is eased off while the player is still reading.</summary>
+        public override bool IsShowingPreview { get { return IsPreviewing; } }
+
         protected override void OnTick(float deltaTime)
         {
             // Nothing to animate: this game is driven entirely by the preview timer and the player's tap.
@@ -102,9 +115,9 @@ namespace GarageTycoon.Core.Minigames
 
             if (optionIndex == CorrectIndex)
             {
-                // Answering within a second of the labels hiding shows real recall: that is a PERFECT.
+                // Answering quickly after the labels hide shows real recall: that is a PERFECT.
                 float answerDelay = Elapsed - PreviewSeconds;
-                if (answerDelay <= 1.0f)
+                if (answerDelay <= 1.4f)
                 {
                     Finish(MinigameResult.FromOutcome(MinigameOutcome.Perfect, "PERFECT!"));
                 }

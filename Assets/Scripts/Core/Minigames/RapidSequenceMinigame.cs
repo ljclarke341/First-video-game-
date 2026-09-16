@@ -28,6 +28,9 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>Seconds the pattern stays visible.</summary>
         public float PreviewSeconds { get; private set; }
 
+        /// <summary>How long each step is highlighted for. The view uses this to pace the lights.</summary>
+        public float StepSeconds { get; private set; }
+
         /// <summary>True while the pattern is still on screen.</summary>
         public bool IsPreviewing { get { return Elapsed < PreviewSeconds; } }
 
@@ -43,8 +46,9 @@ namespace GarageTycoon.Core.Minigames
             get
             {
                 if (!IsPreviewing || _sequence.Count == 0) return -1;
-                float perStep = PreviewSeconds / _sequence.Count;
-                int step = (int)(Elapsed / perStep);
+                // Paced by StepSeconds rather than by dividing the whole preview, so the trailing
+                // "take it in" beat holds on the last step instead of racing past it.
+                int step = StepSeconds <= 0f ? 0 : (int)(Elapsed / StepSeconds);
                 return MathUtil.ClampInt(step, 0, _sequence.Count - 1);
             }
         }
@@ -81,15 +85,22 @@ namespace GarageTycoon.Core.Minigames
                 previous = next;
             }
 
-            float perStep = MathUtil.Clamp(0.42f / Difficulty, 0.16f, 0.5f);
-            PreviewSeconds = perStep * length + Tuning.PreviewBonusSeconds;
+            // PLAYTEST FIX: each step used to flash for as little as a sixth of a second, which
+            // is not long enough to read a direction and commit it to memory. Steps are now held
+            // for around half a second, scaled by the square root of difficulty, and the pattern
+            // lingers for a beat after the last step before it hides.
+            float perStep = MathUtil.Clamp(0.62f / (float)System.Math.Sqrt(Difficulty), 0.34f, 0.9f);
+            StepSeconds = perStep;
+            PreviewSeconds = perStep * length + Tuning.PreviewBonusSeconds + 0.45f;
 
-            // Input window: roughly threequarters of a second per step, never less than two seconds.
-            float inputWindow = MathUtil.Clamp(length * 0.78f, 2f, 6f);
+            float inputWindow = MathUtil.Clamp(length * 1.0f, 3f, 8f);
             TimeLimit = PreviewSeconds + inputWindow;
 
             ProgressIndex = 0;
         }
+
+        /// <summary>The patience clock is eased off while the player is still reading.</summary>
+        public override bool IsShowingPreview { get { return IsPreviewing; } }
 
         protected override void OnTick(float deltaTime)
         {
@@ -124,7 +135,7 @@ namespace GarageTycoon.Core.Minigames
                 float inputWindow = TimeLimit - PreviewSeconds;
                 float usedFraction = inputWindow <= 0f ? 1f : (Elapsed - PreviewSeconds) / inputWindow;
 
-                if (usedFraction <= 0.5f)
+                if (usedFraction <= 0.6f)
                 {
                     Finish(MinigameResult.FromOutcome(MinigameOutcome.Perfect, "FLAWLESS!"));
                 }

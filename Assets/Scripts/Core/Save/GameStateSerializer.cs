@@ -36,6 +36,9 @@ namespace GarageTycoon.Core.Save
             root.Add("lifetimeEarnings", simulation.Wallet.LifetimeEarnings);
             root.Add("allTimeEarnings", simulation.Wallet.AllTimeEarnings);
 
+            // --- settings ---
+            root.Add("relaxedPace", simulation.RelaxedPace);
+
             // --- prestige ---
             root.Add("prestigeTokens", simulation.Prestige.Tokens);
             root.Add("prestigeCount", simulation.Prestige.PrestigeCount);
@@ -138,6 +141,8 @@ namespace GarageTycoon.Core.Save
             if (root == null || root.Type != JsonType.Object) return null;
 
             GarageSimulation simulation = new GarageSimulation(fallbackSeed);
+
+            simulation.RelaxedPace = root["relaxedPace"].AsBool(false);
 
             // --- prestige first: it feeds the payout multiplier used by BuildEffects ---
             simulation.Prestige.Restore(

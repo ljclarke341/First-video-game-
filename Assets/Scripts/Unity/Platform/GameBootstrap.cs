@@ -326,9 +326,22 @@ namespace GarageTycoon.Unity.Platform
                 "Earned this run:  $" + CashFormat.Full(_simulation.Wallet.LifetimeEarnings) + "\n" +
                 "Earned all time:  $" + CashFormat.Full(_simulation.Wallet.AllTimeEarnings) + "\n\n" +
                 "Time in the garage:  " + CashFormat.Duration(stats.PlayTimeSeconds) + "\n" +
-                "Garage sold:  " + _simulation.Prestige.PrestigeCount + " times";
+                "Garage sold:  " + _simulation.Prestige.PrestigeCount + " times\n\n" +
+                "Relaxed pace gives you longer to read the tools and patterns, and slows the\n" +
+                "markers down. It pays exactly the same.";
 
-            _popup.Show("GARAGE STATS", body, "CLOSE", null, null, null, Theme.Info);
+            string paceLabel = _simulation.RelaxedPace ? "RELAXED PACE: ON" : "RELAXED PACE: OFF";
+
+            _popup.Show("GARAGE STATS", body, "CLOSE", null, paceLabel, TogglePace, Theme.Info);
+        }
+
+        /// <summary>Flips the relaxed-pace setting and reopens the stats panel showing the new state.</summary>
+        private void TogglePace()
+        {
+            _simulation.RelaxedPace = !_simulation.RelaxedPace;
+            Save();
+            _toasts.ShowCentre(_simulation.RelaxedPace ? "Relaxed pace on" : "Relaxed pace off", Theme.Info);
+            ShowStats();
         }
 
         private void ShowPrestigeConfirmation()

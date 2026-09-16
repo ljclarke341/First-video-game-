@@ -39,6 +39,16 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>Difficulty this round was built with (1.0 = easiest common car).</summary>
         public float Difficulty { get; private set; }
 
+        /// <summary>
+        /// True while the round is showing the player something to memorise and taking no input yet.
+        ///
+        /// The simulation slows the customer's patience during this phase. Without that, every
+        /// second spent READING is a second of the customer's goodwill, which made the
+        /// "Labelled Tool Wall" upgrade - whose whole purpose is more reading time - actively
+        /// lose the player money. Measured: it cost 39% of income before this rule existed.
+        /// </summary>
+        public virtual bool IsShowingPreview { get { return false; } }
+
         protected IRandomSource Random { get; private set; }
         protected MinigameTuning Tuning { get; private set; }
 

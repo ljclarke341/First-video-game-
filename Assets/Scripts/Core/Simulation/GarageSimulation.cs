@@ -52,6 +52,28 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>Cached upgrade effects. Recalculated whenever something is bought.</summary>
         public UpgradeEffects Effects { get; private set; }
 
+        /// <summary>
+        /// An accessibility setting, not a difficulty one: it buys reading time and slows the
+        /// moving parts, and changes nothing about what anything pays. People read at different
+        /// speeds, and a mini-game nobody can read is not a skill test - it is a coin flip.
+        /// </summary>
+        public bool RelaxedPace { get; set; }
+
+        /// <summary>The mini-game tuning to build rounds with, including the relaxed-pace setting.</summary>
+        public MinigameTuning CurrentTuning()
+        {
+            MinigameTuning tuning = Effects.ToTuning();
+
+            if (RelaxedPace)
+            {
+                tuning.WindowMultiplier *= 1.25f;
+                tuning.PreviewBonusSeconds += 1.5f;
+                tuning.SpeedReduction += 0.25f;
+            }
+
+            return tuning.Sanitised();
+        }
+
         /// <summary>Seconds until the next car rolls in.</summary>
         public float TimeUntilNextCar { get { return _spawnTimer; } }
 
@@ -373,13 +395,15 @@ namespace GarageTycoon.Core.Simulation
             if (session.Minigame == null)
             {
                 MinigameBase minigame = MinigameFactory.Create(
-                    job.Minigame, job.Type, job.Difficulty, Effects.ToTuning(), Random);
+                    job.Minigame, job.Type, job.Difficulty, CurrentTuning(), Random);
 
                 session.BeginRound(minigame, Random);
 
                 Action<WorkSession> startHandler = RoundStarted;
                 if (startHandler != null) startHandler(session);
             }
+
+            car.MarkWorkBegun();
 
             // Advance the round, then let a mechanic's auto-player react to the new state.
             session.Minigame.Tick(scaledDelta);
@@ -443,8 +467,12 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>Pays the finishing tips, frees the bay and tells the UI the customer drove off happy.</summary>
         private void CompleteCar(ActiveCar car)
         {
-            // Finishing early earns a tip, which is what makes speed worth chasing.
-            double tip = MathUtil.RoundCash(car.TimeRemaining * GameBalance.SpeedTipPerSecond);
+            // Finishing early earns a tip proportional to the car's value, which is what makes
+            // speed worth chasing without letting the tip eclipse the repair itself.
+            double basePayout = 0d;
+            for (int i = 0; i < car.Jobs.Count; i++) basePayout += car.Jobs[i].Payout;
+
+            double tip = MathUtil.RoundCash(basePayout * GameBalance.SpeedTipFraction * car.RepairSpeedFraction);
             if (tip > 0d)
             {
                 Wallet.Earn(tip);
@@ -461,18 +489,27 @@ namespace GarageTycoon.Core.Simulation
             if (handler != null) handler(car, car.EarnedSoFar);
         }
 
+        /// <summary>
+        /// How fast a car loses patience while NOBODY is working on it - whether it is queuing
+        /// outside or parked in a bay.
+        ///
+        /// One rate for both, and that matters. It used to be faster in a bay than in the queue,
+        /// which quietly made Extra Bay a TRAP: the new bay pulled a car out of the forgiving
+        /// queue into a harsher bay where, with only one pair of hands, it sat and rotted. Buying
+        /// capacity made you poorer. With a single rate, parking a car is never worse than leaving
+        /// it outside, so a bay is strictly an upgrade and the real clock is the one on the car
+        /// you are actually working on.
+        /// </summary>
+        private const float UnattendedPatienceRate = 0.22f;
+
         /// <summary>Counts down every customer's patience and boots out the ones who give up.</summary>
         private void TickPatience(float deltaTime)
         {
-            // Cars still outside are far more forgiving than a customer watching you work on theirs.
-            // This is what makes the waiting queue a useful buffer rather than a stream of lost income:
-            // a car can sit outside for a few minutes, but once it is on the ramp the clock is real.
-            const float QueuePatienceRate = 0.22f;
 
             for (int i = _waiting.Count - 1; i >= 0; i--)
             {
                 ActiveCar car = _waiting[i];
-                if (car.TickPatience(deltaTime * QueuePatienceRate))
+                if (car.TickPatience(deltaTime * UnattendedPatienceRate))
                 {
                     _waiting.RemoveAt(i);
                     LoseCar(car);
@@ -484,11 +521,45 @@ namespace GarageTycoon.Core.Simulation
                 ActiveCar car = _bays[bayIndex];
                 if (car == null) continue;
 
-                if (car.TickPatience(deltaTime))
+                // The pressure comes from the car under your hands, not from the ones waiting -
+                // and not from the seconds you spend reading what the round is asking of you.
+                float rate = IsAttended(car) && !IsReadingPreview(car) ? 1f : UnattendedPatienceRate;
+
+                if (car.TickPatience(deltaTime * rate))
                 {
                     LoseCar(car);
                 }
             }
+        }
+
+        /// <summary>True when this car's current round is still showing something to memorise.</summary>
+        private bool IsReadingPreview(ActiveCar car)
+        {
+            if (PlayerSession != null && PlayerSession.Car == car)
+            {
+                return PlayerSession.Minigame != null && PlayerSession.Minigame.IsShowingPreview;
+            }
+
+            for (int i = 0; i < _mechanicSessions.Count; i++)
+            {
+                WorkSession session = _mechanicSessions[i];
+                if (session.Car != car) continue;
+                return session.Minigame != null && session.Minigame.IsShowingPreview;
+            }
+            return false;
+        }
+
+        /// <summary>True when the player or a mechanic is currently working on this car.</summary>
+        public bool IsAttended(ActiveCar car)
+        {
+            if (car == null) return false;
+            if (PlayerSession != null && PlayerSession.Car == car) return true;
+
+            for (int i = 0; i < _mechanicSessions.Count; i++)
+            {
+                if (_mechanicSessions[i].Car == car) return true;
+            }
+            return false;
         }
 
         /// <summary>The customer has had enough: cancel any work, free the bay, log the loss.</summary>
