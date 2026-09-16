@@ -53,6 +53,9 @@ namespace GarageTycoon.Unity.UI
         /// <summary>Raised when the player taps the (rare) sell-the-garage button.</summary>
         public event Action PrestigeRequested;
 
+        /// <summary>Raised when the player taps the help button.</summary>
+        public event Action HelpRequested;
+
         public void Build(RectTransform parent, GarageSimulation simulation)
         {
             _simulation = simulation;
@@ -210,8 +213,15 @@ namespace GarageTycoon.Unity.UI
             _statsButton = UIFactory.CreateButton("Stats", bar, "STATS", Theme.PanelRaised,
                 Theme.TextPrimary, Theme.FontBody, () => Raise(StatsRequested));
 
-            _prestigeButton = UIFactory.CreateButton("Prestige", bar, "SELL GARAGE", Theme.Prestige,
+            _prestigeButton = UIFactory.CreateButton("Prestige", bar, "SELL", Theme.Prestige,
                 Theme.TextOnAccent, Theme.FontBody, () => Raise(PrestigeRequested));
+
+            // Narrow, so the three word-buttons keep their room on a phone.
+            Button help = UIFactory.CreateButton("Help", bar, "?", Theme.PanelRaised,
+                Theme.TextPrimary, Theme.FontHeading, () => Raise(HelpRequested));
+            LayoutElement helpLayout = help.gameObject.AddComponent<LayoutElement>();
+            helpLayout.preferredWidth = 110f;
+            helpLayout.flexibleWidth = 0f;
         }
 
         private static void Raise(Action handler)

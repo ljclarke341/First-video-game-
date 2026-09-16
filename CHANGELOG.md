@@ -6,6 +6,24 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 7 — How to play
+
+The game explained nothing. It now opens with a **How to play** screen the first time anyone plays,
+and a **?** button on the bottom bar brings it back any time.
+
+It covers the loop in three numbered steps, then each of the four mini-games in its own card —
+the web build shows a working miniature of each one, because a picture of the actual bar, gauge and
+arrows teaches them faster than a paragraph does. Then how you get paid (perfect bonus, speed tip,
+what damage costs), what each upgrade branch is for, and what selling the garage does.
+
+It closes by pointing at **Relaxed pace** for anyone the normal speed still rushes, and notes the
+keyboard controls for desktop play.
+
+Built for both the Unity project (`HelpScreen.cs`) and the web build. The garage pauses while it is
+open, like the other full-screen panels.
+
+---
+
 ## Stage 6 — Playtest fixes (the first round of real human feedback)
 
 A person played it and reported three things no automated test could ever have caught:
@@ -221,10 +239,13 @@ I would want a second opinion on.
 3. **First prestige at ~3 hours.** That is on the patient side for a mobile idle game — many aim for
    90 minutes. Lowering `GameBalance.PrestigeCashCap` moves it directly, and the balance probe will
    tell you exactly where it lands.
-7. **Is Relaxed pace on or off by default?** It is off, so the default is the tuned experience. If
+7. **Is the how-to-play screen too long?** It is one scroll on a phone. I would rather it be
+   complete than short, but if people bounce off it, the honest fix is to cut it to the loop plus
+   the four games and let the rest be discovered.
+8. **Is Relaxed pace on or off by default?** It is off, so the default is the tuned experience. If
    the normal pace still rushes you, say so and I will make relaxed the default — it costs the
    player nothing, since payouts are identical either way.
-8. **There is a web build of this game** (published as an Artifact) used for playtesting, because
+9. **There is a web build of this game** (published as an Artifact) used for playtesting, because
    Unity cannot run in a browser. Every fix in Stage 6 was applied to both. It is not in this repo
    yet — keeping two implementations in step is a real cost, so that is your call.
 4. **The UI is built in code, not prefabs.** Deliberate, and explained in `Assets/Prefabs/README.md`.

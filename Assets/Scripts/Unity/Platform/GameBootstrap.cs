@@ -43,6 +43,7 @@ namespace GarageTycoon.Unity.Platform
         private Canvas _canvas;
         private GarageScreen _garageScreen;
         private UpgradeScreen _upgradeScreen;
+        private HelpScreen _helpScreen;
         private PopupPanel _popup;
         private ToastLayer _toasts;
         private RectTransform _toastRoot;
@@ -74,6 +75,9 @@ namespace GarageTycoon.Unity.Platform
             BuildUi();
             SubscribeToSimulation();
             ApplyOfflineProgress();
+
+            // A brand new player gets the rules up front rather than having to go looking.
+            if (!_loadedExistingSave) _helpScreen.Show();
         }
 
         private void Update()
@@ -87,7 +91,7 @@ namespace GarageTycoon.Unity.Platform
             // makes people stop opening the menu, which is the opposite of what an upgrade screen
             // is for. There is nothing to exploit here: it is a single player game, and the idle
             // mechanics are paid out from elapsed time rather than from frames.
-            bool modalOpen = _upgradeScreen.IsVisible || _popup.IsVisible;
+            bool modalOpen = _upgradeScreen.IsVisible || _popup.IsVisible || _helpScreen.IsVisible;
 
             if (!modalOpen)
             {
@@ -182,9 +186,13 @@ namespace GarageTycoon.Unity.Platform
             _garageScreen.UpgradesRequested += () => _upgradeScreen.Show();
             _garageScreen.StatsRequested += ShowStats;
             _garageScreen.PrestigeRequested += ShowPrestigeConfirmation;
+            _garageScreen.HelpRequested += () => _helpScreen.Show();
 
             _upgradeScreen = new UpgradeScreen();
             _upgradeScreen.Build(canvasRect, _simulation, HandleUpgradePurchased);
+
+            _helpScreen = new HelpScreen();
+            _helpScreen.Build(canvasRect);
 
             _popup = new PopupPanel();
             _popup.Build(canvasRect);
@@ -328,7 +336,8 @@ namespace GarageTycoon.Unity.Platform
                 "Time in the garage:  " + CashFormat.Duration(stats.PlayTimeSeconds) + "\n" +
                 "Garage sold:  " + _simulation.Prestige.PrestigeCount + " times\n\n" +
                 "Relaxed pace gives you longer to read the tools and patterns, and slows the\n" +
-                "markers down. It pays exactly the same.";
+                "markers down. It pays exactly the same.\n\n" +
+                "Tap ? on the bottom bar for how to play.";
 
             string paceLabel = _simulation.RelaxedPace ? "RELAXED PACE: ON" : "RELAXED PACE: OFF";
 
