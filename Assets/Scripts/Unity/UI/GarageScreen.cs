@@ -4,6 +4,7 @@ using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Events;
 using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Economy;
 using GarageTycoon.Unity.Minigames;
 using UnityEngine;
 using UnityEngine.UI;
@@ -29,6 +30,11 @@ namespace GarageTycoon.Unity.UI
 
         private Image _eventBanner;
         private Text _eventText;
+
+        private Image _streakPanel;
+        private Text _streakCount;
+        private Text _streakMultiplier;
+        private ProgressBar _streakBar;
 
         private readonly List<BayCardView> _bayCards = new List<BayCardView>();
         private RectTransform _bayColumn;
@@ -56,6 +62,12 @@ namespace GarageTycoon.Unity.UI
         /// <summary>Raised when the player taps the help button.</summary>
         public event Action HelpRequested;
 
+        /// <summary>Raised when the player taps the Reputation button.</summary>
+        public event Action PerksRequested;
+
+        /// <summary>Raised when the player buys a waiting customer a coffee, with the bay index.</summary>
+        public event Action<int> CalmRequested;
+
         public void Build(RectTransform parent, GarageSimulation simulation)
         {
             _simulation = simulation;
@@ -65,6 +77,7 @@ namespace GarageTycoon.Unity.UI
 
             BuildBackground();
             BuildHud();
+            BuildStreakMeter();
             BuildEventBanner();
             BuildBays();
             BuildQueue();
@@ -110,10 +123,47 @@ namespace GarageTycoon.Unity.UI
             barRect.offsetMax = new Vector2(-Theme.PanelPadding, 30f);
         }
 
+        /// <summary>
+        /// The work streak, sitting directly under the money because it IS money: while it runs,
+        /// every job finished pays more. It needs to be the second thing the eye lands on.
+        /// </summary>
+        private void BuildStreakMeter()
+        {
+            _streakPanel = UIFactory.CreatePanel("Streak", _root, Theme.PanelSunken, 12);
+            UIFactory.AnchorTop(_streakPanel.rectTransform, 48f, 182f, Theme.ScreenPadding);
+
+            _streakCount = UIFactory.CreateText("Count", _streakPanel.transform, "0x", Theme.FontHeading,
+                Theme.TextMuted, TextAnchor.MiddleLeft, FontStyle.Bold);
+            RectTransform countRect = _streakCount.rectTransform;
+            countRect.anchorMin = new Vector2(0f, 0f);
+            countRect.anchorMax = new Vector2(0f, 1f);
+            countRect.pivot = new Vector2(0f, 0.5f);
+            countRect.sizeDelta = new Vector2(96f, 0f);
+            countRect.anchoredPosition = new Vector2(Theme.PanelPadding * 0.8f, 0f);
+
+            _streakMultiplier = UIFactory.CreateText("Multiplier", _streakPanel.transform, "1.00x",
+                Theme.FontSmall, Theme.TextMuted, TextAnchor.MiddleRight, FontStyle.Bold);
+            RectTransform multRect = _streakMultiplier.rectTransform;
+            multRect.anchorMin = new Vector2(1f, 0f);
+            multRect.anchorMax = new Vector2(1f, 1f);
+            multRect.pivot = new Vector2(1f, 0.5f);
+            multRect.sizeDelta = new Vector2(130f, 0f);
+            multRect.anchoredPosition = new Vector2(-Theme.PanelPadding * 0.8f, 0f);
+
+            _streakBar = UIFactory.CreateProgressBar("StreakBar", _streakPanel.transform, Theme.Cash, 5);
+            RectTransform barRect = _streakBar.Rect;
+            barRect.anchorMin = new Vector2(0f, 0.5f);
+            barRect.anchorMax = new Vector2(1f, 0.5f);
+            barRect.pivot = new Vector2(0.5f, 0.5f);
+            barRect.offsetMin = new Vector2(112f, -5f);
+            barRect.offsetMax = new Vector2(-146f, 5f);
+            _streakBar.SmoothSpeed = 12f;
+        }
+
         private void BuildEventBanner()
         {
             _eventBanner = UIFactory.CreatePanel("EventBanner", _root, Theme.Success, 12);
-            UIFactory.AnchorTop(_eventBanner.rectTransform, 56f, 184f, Theme.ScreenPadding);
+            UIFactory.AnchorTop(_eventBanner.rectTransform, 52f, 236f, Theme.ScreenPadding);
 
             _eventText = UIFactory.CreateText("EventText", _eventBanner.transform, string.Empty, Theme.FontSmall,
                 Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -136,14 +186,14 @@ namespace GarageTycoon.Unity.UI
         {
             _bayColumn = UIFactory.CreateRect("Bays", _root);
             // Sits below the HUD and banner, above the queue strip.
-            UIFactory.AnchorMiddle(_bayColumn, 250f, 856f, Theme.ScreenPadding);
+            UIFactory.AnchorMiddle(_bayColumn, 296f, 856f, Theme.ScreenPadding);
             UIFactory.AddVerticalLayout(_bayColumn.gameObject, Theme.ElementSpacing);
 
             // Cards for every bay the garage could ever have are built up front and shown as unlocked.
             for (int i = 0; i < GameBalance.MaxBayCount; i++)
             {
                 int bayIndex = i;
-                BayCardView card = new BayCardView(bayIndex, HandleBaySelected);
+                BayCardView card = new BayCardView(bayIndex, HandleBaySelected, HandleCalmRequested);
                 card.Build(_bayColumn);
                 UIFactory.SetPreferredHeight(card.Root.gameObject, BayCardView.CardHeight);
                 _bayCards.Add(card);
@@ -207,14 +257,18 @@ namespace GarageTycoon.Unity.UI
             UIFactory.AnchorBottom(bar, Theme.TouchTargetHeight, 28f, Theme.ScreenPadding);
             UIFactory.AddHorizontalLayout(bar.gameObject, Theme.ElementSpacing);
 
-            _upgradeButton = UIFactory.CreateButton("Upgrades", bar, "UPGRADES", Theme.Info,
-                Theme.TextOnAccent, Theme.FontBody, () => Raise(UpgradesRequested));
+            // Short labels: five buttons on a phone have about seventy points of width each.
+            _upgradeButton = UIFactory.CreateButton("Upgrades", bar, "SHOP", Theme.Info,
+                Theme.TextOnAccent, Theme.FontSmall, () => Raise(UpgradesRequested));
 
             _statsButton = UIFactory.CreateButton("Stats", bar, "STATS", Theme.PanelRaised,
-                Theme.TextPrimary, Theme.FontBody, () => Raise(StatsRequested));
+                Theme.TextPrimary, Theme.FontSmall, () => Raise(StatsRequested));
+
+            Button perks = UIFactory.CreateButton("Perks", bar, "REP", Theme.Prestige,
+                Theme.TextOnAccent, Theme.FontSmall, () => Raise(PerksRequested));
 
             _prestigeButton = UIFactory.CreateButton("Prestige", bar, "SELL", Theme.Prestige,
-                Theme.TextOnAccent, Theme.FontBody, () => Raise(PrestigeRequested));
+                Theme.TextOnAccent, Theme.FontSmall, () => Raise(PrestigeRequested));
 
             // Narrow, so the three word-buttons keep their room on a phone.
             Button help = UIFactory.CreateButton("Help", bar, "?", Theme.PanelRaised,
@@ -234,6 +288,12 @@ namespace GarageTycoon.Unity.UI
             _simulation.SelectBay(bayIndex);
         }
 
+        private void HandleCalmRequested(int bayIndex)
+        {
+            Action<int> handler = CalmRequested;
+            if (handler != null) handler(bayIndex);
+        }
+
         // ------------------------------------------------------------------
         // Per-frame refresh
         // ------------------------------------------------------------------
@@ -241,6 +301,7 @@ namespace GarageTycoon.Unity.UI
         public void Refresh()
         {
             RefreshHud();
+            RefreshStreak();
             RefreshEventBanner();
             RefreshBays();
             RefreshQueue();
@@ -256,10 +317,12 @@ namespace GarageTycoon.Unity.UI
                 ? mechanics + (mechanics == 1 ? " mechanic on shift" : " mechanics on shift")
                 : "No mechanics hired";
 
-            int tokens = _simulation.Prestige.Tokens;
-            _tokenLabel.text = tokens > 0
-                ? tokens + (tokens == 1 ? " token  (+" : " tokens  (+")
-                  + Mathf.RoundToInt((float)(_simulation.Prestige.PayoutMultiplier - 1d) * 100f) + "%)"
+            // Unspent tokens are the interesting number: they are something to go and spend.
+            int available = _simulation.Prestige.TokensAvailable;
+            int earned = _simulation.Prestige.TokensEarned;
+            _tokenLabel.text = earned > 0
+                ? (available > 0 ? available + " token" + (available == 1 ? "" : "s") + " to spend"
+                                 : earned + " token" + (earned == 1 ? "" : "s") + " spent")
                 : string.Empty;
 
             _prestigeBar.Fraction = _simulation.Prestige.ProgressTowardsPrestige(_simulation.Wallet.Cash);
@@ -268,6 +331,22 @@ namespace GarageTycoon.Unity.UI
             _prestigeButton.interactable = canPrestige;
             _prestigeButton.GetComponent<Image>().color = canPrestige ? Theme.Prestige : Theme.PanelSunken;
             _prestigeButton.GetComponentInChildren<Text>().color = canPrestige ? Theme.TextOnAccent : Theme.TextMuted;
+        }
+
+        private void RefreshStreak()
+        {
+            ComboTracker combo = _simulation.Combo;
+            bool hot = combo.IsHot;
+
+            _streakCount.text = combo.Streak + "x";
+            _streakCount.color = hot ? Theme.Cash : Theme.TextMuted;
+
+            _streakMultiplier.text = combo.Multiplier.ToString("0.00") + "x";
+            _streakMultiplier.color = hot ? Theme.Cash : Theme.TextMuted;
+
+            _streakPanel.color = hot ? Theme.WithAlpha(Theme.Cash, 0.14f) : Theme.PanelSunken;
+
+            _streakBar.Fraction = combo.Cap <= 0 ? 0f : (float)combo.Streak / combo.Cap;
         }
 
         private void RefreshEventBanner()
@@ -312,7 +391,8 @@ namespace GarageTycoon.Unity.UI
                     }
                 }
 
-                _bayCards[i].Refresh(car, playerWorking, mechanicWorking);
+                _bayCards[i].Refresh(car, playerWorking, mechanicWorking,
+                    _simulation.CanCalmCustomer, _simulation.CalmCooldownRemaining);
             }
         }
 

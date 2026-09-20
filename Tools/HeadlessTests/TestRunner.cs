@@ -99,7 +99,8 @@ namespace GarageTycoon.HeadlessTests
                 Tests.SimulationTests.Build(),
                 Tests.SaveTests.Build(),
                 Tests.BalanceTests.Build(),
-                Tests.EdgeCaseTests.Build()
+                Tests.EdgeCaseTests.Build(),
+                Tests.FeatureTests.Build()
             };
 
             int passed = 0;

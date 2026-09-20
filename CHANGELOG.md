@@ -6,6 +6,67 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 8 — Depth pass: streaks, customers and a real prestige
+
+Researched what comparable games do and built against two specific findings.
+
+**From the time-management genre (Diner Dash's chain bonus)**
+
+- **The work streak.** Land rounds back to back and a meter under your cash climbs; every job you
+  finish while it runs pays more, up to 1.5x. A miss or a breakage drops it, and so does letting
+  your own customer walk. A scrappy round holds it but does not build it, so a cautious player
+  cannot sit on a maximum streak by never taking a risk.
+  This is the single biggest change to how the game feels: before it, a perfect round and a scrappy
+  one were worth nearly the same, so no individual round mattered. Measured effect: the gap between
+  expert and novice play went from 3.7x to **7.3x**.
+  Hired mechanics deliberately do not build it — a mechanic silently holding a 12x chain in a bay
+  you are not looking at would make the whole mechanic meaningless.
+- **Customer temperaments.** Every car now arrives with someone attached: *In a hurry* (impatient,
+  tips well), *Big tipper*, *VIP* (pays 60% over the odds), *No rush*. Two identical hatchbacks are
+  no longer the same job, and a busy forecourt is now a real decision.
+- **Buy them a coffee.** A free button on each car that buys back patience it has lost, on a
+  cooldown — so it is a decision about *which* car to save. Taken from the genre's mood-recovery
+  mechanic, which is what stops a timer running out from feeling like something that merely
+  happened to you.
+
+**From the idle genre**
+
+The literature is consistent that a single flat multiplier is what separates a shallow prestige
+from a deep one, and that is exactly what this game had: "+12% per token", applied automatically.
+
+- **Tokens are now a currency, not a score.** Seven permanent perks to spend them on — higher
+  rates, an opening float, an inherited bay, a pre-trained crew, more patient customers, a longer
+  streak cap, better night shifts. They cost more per level and survive every future sell-up.
+  A sell-up now asks the player a question instead of just handing them a bigger number.
+- A tampered or out-of-date save can never conjure tokens: what has been spent is re-derived from
+  the perks owned rather than trusted from the file.
+
+**Sound, synthesised**
+
+Every sound effect is generated at runtime with the Web Audio API — taps, the cash chime, the
+streak note that climbs with the chain, the engine burst when a car arrives. No audio files, so the
+game stays one self-contained page, matching how the sprites are drawn rather than imported. The
+audio context is created lazily on first tap (browsers require a gesture) and every call is wrapped,
+so a browser that blocks audio cannot break the game. This closes the "no audio at all" gap flagged
+back in Stage 4 — for the web build. **Unity still has no audio.**
+
+**A third modelling fault in the tests**
+
+`precision_speed` measured at **-29% income**. The virtual player's aiming error was stored in
+*position* units, so a slower marker gave it no benefit at all — it only made rounds longer. A
+person's error is a *timing* error in seconds, which only becomes a positional error once you
+multiply by how fast the thing is moving. Modelling it properly turned that upgrade from -29% to
+**+30%**. Every upgrade now measures positive in isolation (+2% to +67%).
+
+That is the third time the test model, not the game, was the thing that was wrong. Worth
+remembering when reading any of these numbers.
+
+**19 new tests** (107 total, all passing) covering streak behaviour, mood effects, the calm
+cooldown and its edge cases, perk costs, perks surviving prestige, and that every perk changes
+something measurable.
+
+---
+
 ## Stage 7 — How to play
 
 The game explained nothing. It now opens with a **How to play** screen the first time anyone plays,
@@ -245,7 +306,14 @@ I would want a second opinion on.
 8. **Is Relaxed pace on or off by default?** It is off, so the default is the tuned experience. If
    the normal pace still rushes you, say so and I will make relaxed the default — it costs the
    player nothing, since payouts are identical either way.
-9. **There is a web build of this game** (published as an Artifact) used for playtesting, because
+9. **Unity has no sound.** The web build synthesises all of its audio; the same trick works in
+   Unity (generating AudioClips procedurally) but is not done yet. Worth doing before anyone else
+   plays the Unity build, because the difference in feel is large.
+10. **The streak may be too strong.** At 1.5x it is the largest single multiplier in the game and
+   it rewards exactly the skill the mini-games test — which I think is right for a game where the
+   mini-games are the point. If it makes upgrades feel irrelevant by comparison, lower
+   `comboStep` and the balance probe will show the effect immediately.
+11. **There is a web build of this game** (published as an Artifact) used for playtesting, because
    Unity cannot run in a browser. Every fix in Stage 6 was applied to both. It is not in this repo
    yet — keeping two implementations in step is a real cost, so that is your call.
 4. **The UI is built in code, not prefabs.** Deliberate, and explained in `Assets/Prefabs/README.md`.

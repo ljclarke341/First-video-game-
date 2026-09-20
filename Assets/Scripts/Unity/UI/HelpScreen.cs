@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GarageTycoon.Core.Balance;
+using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Minigames;
 using UnityEngine;
@@ -98,6 +99,25 @@ namespace GarageTycoon.Unity.UI
                 "A short pattern of directions lights up one at a time, then hides. Repeat it on the "
                 + "pad. One wrong tap ends the round, so take the moment to read it.");
 
+            Heading("KEEP A STREAK GOING");
+            Paragraph("Land rounds back to back and the streak bar under your cash climbs. Every job "
+                      + "you finish while it is running pays more, up to half as much again. A miss or "
+                      + "a breakage drops it to zero, and so does letting your own customer walk out. "
+                      + "A scrappy round holds the streak but does not build it.");
+
+            Heading("KNOW YOUR CUSTOMER");
+            Bullet(Theme.Hex(CustomerMood.Impatient.ColorHex()),
+                "In a hurry - will not wait long, but tips well if you are quick.");
+            Bullet(Theme.Hex(CustomerMood.BigTipper.ColorHex()),
+                "Big tipper - ordinary patience, very generous at the end.");
+            Bullet(Theme.Hex(CustomerMood.Vip.ColorHex()),
+                "VIP - pays well over the odds. The best car on the forecourt.");
+            Bullet(Theme.Hex(CustomerMood.Relaxed.ColorHex()),
+                "No rush - happy to wait while you deal with someone else.");
+            Paragraph("The COFFEE button on a car buys back some of the patience that customer has "
+                      + "lost. It is free, but there is a wait before you can use it again, so it is a "
+                      + "decision about WHICH car to save.");
+
             Heading("GETTING PAID");
             Bullet(Theme.Cash, "Perfect rounds pay a bonus. Finish a whole job without dropping a "
                                + "single round and it pays 25% more.");
@@ -114,8 +134,12 @@ namespace GarageTycoon.Unity.UI
                 Bullet(Theme.Hex(branch.ColorHex()), branch.DisplayName() + " - " + branch.Description());
             }
             Paragraph("Once you bank $" + CashFormat.Short(GameBalance.PrestigeCashCap)
-                      + " you can sell the garage: you lose your cash and upgrades, but keep Reputation "
-                      + "Tokens that raise every future payout, permanently.");
+                      + " you can sell the garage. You lose your cash and your upgrades, and you keep "
+                      + "Reputation Tokens.");
+            Paragraph("Tokens are spent under REP on perks that last forever: higher rates on every "
+                      + "job, an extra bay you start the next garage with, a crew that arrives already "
+                      + "trained. They are a currency, not a score - nothing happens until you choose "
+                      + "what to buy, and that choice is what makes each run different from the last.");
 
             Heading("IF IT FEELS TOO FAST");
             Paragraph("Open STATS and turn on RELAXED PACE. It gives you longer to read the tools and "

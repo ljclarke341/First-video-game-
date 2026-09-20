@@ -12,6 +12,9 @@ namespace GarageTycoon.Core.Simulation
         public double BestCarPayout;
         public float PlayTimeSeconds;
 
+        /// <summary>Longest work streak ever landed.</summary>
+        public int BestStreak;
+
         /// <summary>Share of rounds that came back perfect, 0..1.</summary>
         public float PerfectRate
         {
@@ -38,6 +41,7 @@ namespace GarageTycoon.Core.Simulation
             DamagedRounds = 0;
             BestCarPayout = 0d;
             PlayTimeSeconds = 0f;
+            BestStreak = 0;
         }
     }
 

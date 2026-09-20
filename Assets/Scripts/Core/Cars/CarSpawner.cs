@@ -98,6 +98,27 @@ namespace GarageTycoon.Core.Cars
         /// Builds a car from a specific blueprint, skipping the rarity roll.
         /// Handy for tests and for scripted "a VIP just called ahead" events.
         /// </summary>
+        /// <summary>Rolls who is dropping the car off.</summary>
+        public CustomerMood RollMood()
+        {
+            CustomerMood[] moods =
+            {
+                CustomerMood.Relaxed, CustomerMood.Ordinary, CustomerMood.Impatient,
+                CustomerMood.BigTipper, CustomerMood.Vip
+            };
+
+            float total = 0f;
+            for (int i = 0; i < moods.Length; i++) total += moods[i].SpawnWeight();
+
+            float roll = _random.NextFloat() * total;
+            for (int i = 0; i < moods.Length; i++)
+            {
+                roll -= moods[i].SpawnWeight();
+                if (roll < 0f) return moods[i];
+            }
+            return CustomerMood.Ordinary;
+        }
+
         public ActiveCar SpawnSpecific(CarDefinition definition, SpawnParameters parameters)
         {
             int jobCount = _random.NextInt(definition.MinJobs, definition.MaxJobs + 1);
@@ -136,7 +157,9 @@ namespace GarageTycoon.Core.Cars
                 jobs.Add(new RepairJob(jobType, minigame, work, 0d, difficulty));
             }
 
-            double payoutPool = definition.BasePayout * parameters.PayoutMultiplier;
+            CustomerMood mood = RollMood();
+
+            double payoutPool = definition.BasePayout * parameters.PayoutMultiplier * mood.PayoutMultiplier();
 
             List<RepairJob> finalJobs = new List<RepairJob>();
             for (int i = 0; i < jobs.Count; i++)
@@ -150,9 +173,10 @@ namespace GarageTycoon.Core.Cars
 
             float patience = definition.BasePatienceSeconds + definition.PatiencePerJobSeconds * (finalJobs.Count - 1);
             patience *= Balance.GameBalance.PatienceScale;
+            patience *= mood.PatienceMultiplier();
             patience *= parameters.PatienceMultiplier <= 0f ? 1f : parameters.PatienceMultiplier;
 
-            ActiveCar car = new ActiveCar(_nextInstanceId, definition, finalJobs, patience);
+            ActiveCar car = new ActiveCar(_nextInstanceId, definition, finalJobs, patience, mood);
             _nextInstanceId++;
             return car;
         }

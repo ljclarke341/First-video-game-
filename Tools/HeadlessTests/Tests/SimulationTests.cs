@@ -278,12 +278,12 @@ namespace GarageTycoon.HeadlessTests.Tests
             int tokens = simulation.TryPrestige();
 
             Check.IsTrue(tokens >= 1, "Prestige should award at least one token");
-            Check.AreEqual(Core.Balance.GameBalance.StartingCash > 0d ? 1 : 1, simulation.BayCount, "Bays should reset to one");
+            Check.AreEqual(1, simulation.BayCount, "Bays should reset to one");
             Check.AreClose(Core.Balance.GameBalance.StartingCash, simulation.Wallet.Cash, 0.001d, "Cash should reset");
             Check.AreEqual(0, simulation.Upgrades.GetLevel("precision_window"), "Upgrades should be wiped");
             Check.AreEqual(0, simulation.Upgrades.TotalLevels, "Every upgrade should be wiped");
             Check.AreEqual(0, GameplayHarness.CarsOnSite(simulation), "The forecourt should be cleared");
-            Check.IsTrue(simulation.Effects.PayoutMultiplier > 1d, "Tokens should permanently raise payouts");
+            Check.IsTrue(simulation.Prestige.TokensAvailable >= 1, "Tokens should be available to spend on perks");
 
             // And the game keeps running afterwards.
             SessionReport report = GameplayHarness.Play(simulation, 120f, 0.9f);

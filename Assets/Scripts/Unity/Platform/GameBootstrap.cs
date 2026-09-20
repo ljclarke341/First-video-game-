@@ -44,6 +44,7 @@ namespace GarageTycoon.Unity.Platform
         private GarageScreen _garageScreen;
         private UpgradeScreen _upgradeScreen;
         private HelpScreen _helpScreen;
+        private PerkScreen _perkScreen;
         private PopupPanel _popup;
         private ToastLayer _toasts;
         private RectTransform _toastRoot;
@@ -91,7 +92,8 @@ namespace GarageTycoon.Unity.Platform
             // makes people stop opening the menu, which is the opposite of what an upgrade screen
             // is for. There is nothing to exploit here: it is a single player game, and the idle
             // mechanics are paid out from elapsed time rather than from frames.
-            bool modalOpen = _upgradeScreen.IsVisible || _popup.IsVisible || _helpScreen.IsVisible;
+            bool modalOpen = _upgradeScreen.IsVisible || _popup.IsVisible
+                             || _helpScreen.IsVisible || _perkScreen.IsVisible;
 
             if (!modalOpen)
             {
@@ -100,6 +102,7 @@ namespace GarageTycoon.Unity.Platform
 
             _garageScreen.Refresh();
             _upgradeScreen.Refresh();
+            _perkScreen.Refresh();
 
             TickAutoSave(deltaTime);
         }
@@ -187,12 +190,17 @@ namespace GarageTycoon.Unity.Platform
             _garageScreen.StatsRequested += ShowStats;
             _garageScreen.PrestigeRequested += ShowPrestigeConfirmation;
             _garageScreen.HelpRequested += () => _helpScreen.Show();
+            _garageScreen.PerksRequested += () => _perkScreen.Show();
+            _garageScreen.CalmRequested += HandleCalmRequested;
 
             _upgradeScreen = new UpgradeScreen();
             _upgradeScreen.Build(canvasRect, _simulation, HandleUpgradePurchased);
 
             _helpScreen = new HelpScreen();
             _helpScreen.Build(canvasRect);
+
+            _perkScreen = new PerkScreen();
+            _perkScreen.Build(canvasRect, _simulation, HandlePerkPurchased);
 
             _popup = new PopupPanel();
             _popup.Build(canvasRect);
@@ -233,6 +241,8 @@ namespace GarageTycoon.Unity.Platform
             _simulation.CarLeftAngry += HandleCarLeft;
             _simulation.CarSpawned += HandleCarSpawned;
             _simulation.EventStarted += HandleEventStarted;
+            _simulation.Combo.Changed += HandleComboChanged;
+            _simulation.Combo.Broken += HandleComboBroken;
         }
 
         private void UnsubscribeFromSimulation()
@@ -245,6 +255,22 @@ namespace GarageTycoon.Unity.Platform
             _simulation.CarLeftAngry -= HandleCarLeft;
             _simulation.CarSpawned -= HandleCarSpawned;
             _simulation.EventStarted -= HandleEventStarted;
+            _simulation.Combo.Changed -= HandleComboChanged;
+            _simulation.Combo.Broken -= HandleComboBroken;
+        }
+
+        private void HandleComboChanged(int streak, float multiplier)
+        {
+            // Shout about it every few rounds rather than every round, or the screen is all toast.
+            if (streak >= 3 && streak % 3 == 0)
+            {
+                _toasts.Show(streak + "x STREAK", Theme.PerfectZone, new Vector2(0f, 300f));
+            }
+        }
+
+        private void HandleComboBroken(int lostStreak)
+        {
+            if (lostStreak >= 3) _toasts.Show("Streak lost", Theme.Danger, new Vector2(0f, 300f));
         }
 
         private void HandleRoundResolved(WorkSession session, MinigameResult result)
@@ -306,6 +332,21 @@ namespace GarageTycoon.Unity.Platform
             if (definition == null) return;
 
             _toasts.ShowCentre(definition.DisplayName + "!", Theme.Hex(definition.ColorHex));
+        }
+
+        private void HandlePerkPurchased()
+        {
+            _toasts.ShowCentre("Perk unlocked!", Theme.Prestige);
+            Save();
+        }
+
+        private void HandleCalmRequested(int bayIndex)
+        {
+            float granted = _simulation.TryCalmCustomer(bayIndex);
+            if (granted > 0f)
+            {
+                _toasts.ShowCentre("Bought them a coffee  +" + Mathf.RoundToInt(granted) + "s", Theme.Success);
+            }
         }
 
         private void HandleUpgradePurchased(string upgradeId)
@@ -372,7 +413,8 @@ namespace GarageTycoon.Unity.Platform
             _popup.Show("SELL THE GARAGE?",
                 "You will lose all your cash, upgrades and the cars on the forecourt.\n\n"
                 + "You will keep " + tokens + " Reputation Token" + (tokens == 1 ? "" : "s")
-                + ", worth a permanent +" + Mathf.RoundToInt(tokens * 12f) + "% on every payout from now on.",
+                + " to spend on permanent perks: higher rates, an inherited bay, a trained crew.\n\n"
+                + "Perks survive every future sell-up, which is what makes each run faster than the last.",
                 "SELL UP", PerformPrestige, "NOT YET", null, Theme.Prestige);
         }
 
@@ -383,6 +425,9 @@ namespace GarageTycoon.Unity.Platform
 
             _toasts.ShowCentre("+" + tokens + " Reputation Token" + (tokens == 1 ? "" : "s"), Theme.Prestige);
             Save();
+
+            // Straight into spending them: the choice is the point of the reset.
+            _perkScreen.Show();
         }
 
         private void ApplyOfflineProgress()

@@ -25,6 +25,7 @@ namespace GarageTycoon.Unity.UI
 
         private readonly int _bayIndex;
         private readonly Action<int> _onSelected;
+        private readonly Action<int> _onCalm;
 
         private RectTransform _root;
         private Image _background;
@@ -38,6 +39,10 @@ namespace GarageTycoon.Unity.UI
         private ProgressBar _progressBar;
         private Image _workerBadge;
         private Text _workerText;
+        private Image _moodBadge;
+        private Text _moodText;
+        private Button _calmButton;
+        private Text _calmText;
         private RectTransform _jobRow;
         private Button _button;
 
@@ -64,10 +69,11 @@ namespace GarageTycoon.Unity.UI
             _flashColor = color;
         }
 
-        public BayCardView(int bayIndex, Action<int> onSelected)
+        public BayCardView(int bayIndex, Action<int> onSelected, Action<int> onCalm = null)
         {
             _bayIndex = bayIndex;
             _onSelected = onSelected;
+            _onCalm = onCalm;
         }
 
         public void Build(RectTransform parent)
@@ -114,6 +120,20 @@ namespace GarageTycoon.Unity.UI
                 Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Stretch(_rarityText.rectTransform);
 
+            // ---- who dropped it off (header, next to the rarity ribbon) ----
+            _moodBadge = UIFactory.CreatePanel("Mood", _root, Theme.TextMuted, 6);
+            _moodBadge.raycastTarget = false;
+            RectTransform moodRect = _moodBadge.rectTransform;
+            moodRect.anchorMin = new Vector2(0f, 1f);
+            moodRect.anchorMax = new Vector2(0f, 1f);
+            moodRect.pivot = new Vector2(0f, 1f);
+            moodRect.sizeDelta = new Vector2(120f, 26f);
+            moodRect.anchoredPosition = new Vector2(Theme.PanelPadding + 148f, -12f);
+
+            _moodText = UIFactory.CreateText("MoodText", _moodBadge.transform, string.Empty, Theme.FontTiny,
+                Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Stretch(_moodText.rectTransform);
+
             // ---- name (header, middle) and payout (header, right) ----
             _carName = UIFactory.CreateText("CarName", _root, string.Empty, Theme.FontBody,
                 Theme.TextPrimary, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -121,8 +141,8 @@ namespace GarageTycoon.Unity.UI
             nameRect.anchorMin = new Vector2(0f, 1f);
             nameRect.anchorMax = new Vector2(1f, 1f);
             nameRect.pivot = new Vector2(0.5f, 1f);
-            nameRect.offsetMin = new Vector2(Theme.PanelPadding + 152f, -44f);
-            nameRect.offsetMax = new Vector2(-220f, -10f);
+            nameRect.offsetMin = new Vector2(Theme.PanelPadding + 152f, -78f);
+            nameRect.offsetMax = new Vector2(-220f, -44f);
 
             _payoutText = UIFactory.CreateText("Payout", _root, string.Empty, Theme.FontBody,
                 Theme.Cash, TextAnchor.MiddleRight, FontStyle.Bold);
@@ -144,7 +164,7 @@ namespace GarageTycoon.Unity.UI
             _jobRow.anchorMax = new Vector2(1f, 0f);
             _jobRow.pivot = new Vector2(0.5f, 0f);
             _jobRow.offsetMin = new Vector2(Theme.PanelPadding + 165f, 56f);
-            _jobRow.offsetMax = new Vector2(-Theme.PanelPadding, 114f);
+            _jobRow.offsetMax = new Vector2(-Theme.PanelPadding - 140f, 114f);
             UIFactory.AddHorizontalLayout(_jobRow.gameObject, 8f);
 
             for (int i = 0; i < MaxJobChips; i++)
@@ -175,6 +195,17 @@ namespace GarageTycoon.Unity.UI
                 _jobBars.Add(bar);
             }
 
+            // ---- buy them a coffee ----
+            _calmButton = UIFactory.CreateButton("Calm", _root, "COFFEE", Theme.PanelRaised,
+                Theme.TextPrimary, Theme.FontTiny, () => { if (_onCalm != null) _onCalm(_bayIndex); });
+            RectTransform calmRect = _calmButton.GetComponent<RectTransform>();
+            calmRect.anchorMin = new Vector2(1f, 0f);
+            calmRect.anchorMax = new Vector2(1f, 0f);
+            calmRect.pivot = new Vector2(1f, 0f);
+            calmRect.sizeDelta = new Vector2(132f, 34f);
+            calmRect.anchoredPosition = new Vector2(-Theme.PanelPadding, 56f);
+            _calmText = _calmButton.GetComponentInChildren<Text>();
+
             // ---- bars along the bottom ----
             _progressBar = UIFactory.CreateProgressBar("Progress", _root, Theme.Info, 8);
             UIFactory.AnchorBottom(_progressBar.Rect, 12f, 36f, Theme.PanelPadding);
@@ -197,7 +228,8 @@ namespace GarageTycoon.Unity.UI
         /// <param name="car">The car in this bay, or null if it is empty.</param>
         /// <param name="isPlayerWorking">True if the player is currently working this bay.</param>
         /// <param name="isMechanicWorking">True if a hired mechanic is on this car.</param>
-        public void Refresh(ActiveCar car, bool isPlayerWorking, bool isMechanicWorking)
+        public void Refresh(ActiveCar car, bool isPlayerWorking, bool isMechanicWorking,
+            bool canCalm = false, float calmCooldown = 0f)
         {
             bool hasCar = car != null;
 
@@ -210,13 +242,29 @@ namespace GarageTycoon.Unity.UI
             _timerBar.Rect.gameObject.SetActive(hasCar);
             _emptyText.gameObject.SetActive(!hasCar);
             _workerBadge.gameObject.SetActive(hasCar && (isPlayerWorking || isMechanicWorking));
+            _calmButton.gameObject.SetActive(hasCar);
             _button.interactable = hasCar && !car.AllJobsComplete;
 
             if (!hasCar)
             {
                 _background.color = Theme.Panel;
+                _moodBadge.gameObject.SetActive(false);
                 return;
             }
+
+            // Only the customers worth noticing get a badge; "ordinary" is the silent default.
+            bool showMood = car.Mood != CustomerMood.Ordinary;
+            _moodBadge.gameObject.SetActive(showMood);
+            if (showMood)
+            {
+                _moodBadge.color = Theme.Hex(car.Mood.ColorHex());
+                _moodText.text = car.Mood.DisplayName().ToUpperInvariant();
+            }
+
+            _calmButton.interactable = canCalm;
+            _calmText.text = canCalm ? "COFFEE" : Mathf.CeilToInt(calmCooldown) + "s";
+            _calmButton.GetComponent<Image>().color = canCalm ? Theme.Success : Theme.PanelSunken;
+            _calmText.color = canCalm ? Theme.TextOnAccent : Theme.TextMuted;
 
             // Selected bay gets a brighter card so it is obvious what you are working on,
             // and a recently completed job tints it towards the flash colour as that fades out.

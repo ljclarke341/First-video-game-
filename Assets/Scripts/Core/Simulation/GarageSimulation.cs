@@ -30,6 +30,9 @@ namespace GarageTycoon.Core.Simulation
         public CarSpawner Spawner { get; private set; }
         public GameStats Stats { get; private set; }
 
+        /// <summary>The work streak. Landing rounds back to back pays more.</summary>
+        public ComboTracker Combo { get; private set; }
+
         /// <summary>The random source everything shares, so one seed reproduces an entire session.</summary>
         public XorShiftRandom Random { get; private set; }
 
@@ -108,12 +111,15 @@ namespace GarageTycoon.Core.Simulation
         public GarageSimulation(int seed)
         {
             Random = new XorShiftRandom(seed);
+            // The Opening Float perk is applied by the save loader once perks are known; a fresh
+            // game with no perks simply starts on the base float.
             Wallet = new Wallet(GameBalance.StartingCash);
             Upgrades = new UpgradeState();
             Prestige = new PrestigeState();
             Spawner = new CarSpawner(Random);
             Events = new RandomEventSystem(Random);
             Stats = new GameStats();
+            Combo = new ComboTracker();
 
             Events.EventStarted += HandleEventStarted;
             Events.EventEnded += HandleEventEnded;
@@ -128,7 +134,30 @@ namespace GarageTycoon.Core.Simulation
         public void RefreshEffects()
         {
             Effects = Upgrades.BuildEffects(Prestige.PayoutMultiplier);
+
+            // Permanent perks stack on top of whatever this run has bought.
+            Effects = ApplyPerks(Effects);
+
+            Combo.Cap = ComboTracker.DefaultCap + Prestige.ComboCapBonus;
+
             ResizeBays();
+        }
+
+        /// <summary>Folds the permanent prestige perks into this run's upgrade effects.</summary>
+        private UpgradeEffects ApplyPerks(UpgradeEffects effects)
+        {
+            effects.BayCount = MathUtil.ClampInt(
+                effects.BayCount + Prestige.StartingBayBonus, 1, GameBalance.MaxBayCount);
+
+            effects.PatienceMultiplier += Prestige.PatienceBonus;
+
+            if (effects.MechanicCount > 0)
+            {
+                effects.MechanicSkill = MathUtil.Clamp(
+                    effects.MechanicSkill + Prestige.MechanicSkillBonus, 0f, UpgradeState.MechanicMaxSkill);
+            }
+
+            return effects;
         }
 
         /// <summary>Grows the bay list when an Extra Bay upgrade is bought.</summary>
@@ -170,6 +199,12 @@ namespace GarageTycoon.Core.Simulation
             if (deltaTime > 0.5f) deltaTime = 0.5f;
 
             Stats.PlayTimeSeconds += deltaTime;
+
+            if (CalmCooldownRemaining > 0f)
+            {
+                CalmCooldownRemaining -= deltaTime;
+                if (CalmCooldownRemaining < 0f) CalmCooldownRemaining = 0f;
+            }
 
             Events.Tick(deltaTime);
             TickSpawning(deltaTime);
@@ -429,6 +464,14 @@ namespace GarageTycoon.Core.Simulation
             if (result.Outcome == MinigameOutcome.Perfect) Stats.PerfectRounds++;
             if (result.Outcome == MinigameOutcome.Damage) Stats.DamagedRounds++;
 
+            // Only the player's own hands build the streak. A hired mechanic quietly holding a
+            // 12x chain in a bay you are not even looking at would make the streak meaningless.
+            if (!session.IsMechanic)
+            {
+                Combo.Register(result.Outcome);
+                if (Combo.BestStreak > Stats.BestStreak) Stats.BestStreak = Combo.BestStreak;
+            }
+
             job.ApplyResult(result);
             car.ApplyTimePenalty(result.TimePenaltySeconds);
 
@@ -439,6 +482,10 @@ namespace GarageTycoon.Core.Simulation
             {
                 double payout = job.Payout;
                 if (job.IsFlawless) payout *= GameBalance.PerfectJobCashBonus;
+
+                // The streak pays out on the player's own work, not on a mechanic's.
+                if (!session.IsMechanic) payout *= Combo.Multiplier;
+
                 payout = MathUtil.RoundCash(payout);
 
                 Wallet.Earn(payout);
@@ -472,7 +519,8 @@ namespace GarageTycoon.Core.Simulation
             double basePayout = 0d;
             for (int i = 0; i < car.Jobs.Count; i++) basePayout += car.Jobs[i].Payout;
 
-            double tip = MathUtil.RoundCash(basePayout * GameBalance.SpeedTipFraction * car.RepairSpeedFraction);
+            double tip = MathUtil.RoundCash(
+                basePayout * GameBalance.SpeedTipFraction * car.RepairSpeedFraction * car.Mood.TipMultiplier());
             if (tip > 0d)
             {
                 Wallet.Earn(tip);
@@ -568,6 +616,10 @@ namespace GarageTycoon.Core.Simulation
             car.MarkLeftAngry();
             Stats.CarsLost++;
 
+            // Letting a customer walk breaks the streak. Otherwise the optimal play is to ignore
+            // a dying car entirely and keep chaining rounds on a healthy one.
+            if (PlayerSession != null && PlayerSession.Car == car) Combo.Break();
+
             ReleaseCar(car);
 
             Action<ActiveCar> handler = CarLeftAngry;
@@ -652,6 +704,43 @@ namespace GarageTycoon.Core.Simulation
             }
             PlayerSession = null;
         }
+
+        /// <summary>Seconds that must pass between calming customers.</summary>
+        public const float CalmCooldownSeconds = 40f;
+
+        /// <summary>Seconds left before the player can calm a customer again.</summary>
+        public float CalmCooldownRemaining { get; private set; }
+
+        /// <summary>True when a customer can be calmed right now.</summary>
+        public bool CanCalmCustomer { get { return CalmCooldownRemaining <= 0f; } }
+
+        /// <summary>
+        /// Has a word with a waiting customer, buying back some of the patience they have lost.
+        /// Free, but on a cooldown, so it is a decision about WHICH car to save rather than a
+        /// button to hold down. Returns the seconds granted, or 0 if it did nothing.
+        /// </summary>
+        public float TryCalmCustomer(int bayIndex)
+        {
+            if (!CanCalmCustomer) return 0f;
+            if (bayIndex < 0 || bayIndex >= _bays.Count) return 0f;
+
+            ActiveCar car = _bays[bayIndex];
+            if (car == null || car.State != CarState.InBay) return 0f;
+
+            const float PatienceRestored = 0.35f;
+            float granted = car.CalmCustomer(PatienceRestored);
+            if (granted <= 0f) return 0f;
+
+            CalmCooldownRemaining = CalmCooldownSeconds;
+
+            Action<ActiveCar, float> handler = CustomerCalmed;
+            if (handler != null) handler(car, granted);
+
+            return granted;
+        }
+
+        /// <summary>Raised when a customer is talked round, with the seconds bought back.</summary>
+        public event Action<ActiveCar, float> CustomerCalmed;
 
         /// <summary>Forwards a screen tap / button press into the player's current round.</summary>
         public void PlayerPress()
@@ -755,8 +844,10 @@ namespace GarageTycoon.Core.Simulation
             for (int i = 0; i < _bays.Count; i++) _bays[i] = null;
 
             Upgrades.ResetAll();
-            Wallet.ResetForPrestige(GameBalance.StartingCash);
+            Combo.Reset();
+            Wallet.ResetForPrestige(GameBalance.StartingCash + Prestige.StartingCashBonus);
             Events.ClearActive();
+            CalmCooldownRemaining = 0f;
 
             RefreshEffects();
 
@@ -821,7 +912,9 @@ namespace GarageTycoon.Core.Simulation
             // Offline work is worth less than being there in person.
             if (earned > 0d)
             {
-                double keep = earned * GameBalance.OfflineEfficiency;
+                double efficiency = MathUtil.Clamp(
+                    GameBalance.OfflineEfficiency + Prestige.OfflineBonus, 0f, 1f);
+                double keep = earned * efficiency;
                 double giveBack = earned - keep;
                 if (giveBack > 0d) Wallet.TrySpend(MathUtil.RoundCash(giveBack));
                 report.CashEarned = MathUtil.RoundCash(keep);

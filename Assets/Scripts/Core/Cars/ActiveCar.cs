@@ -16,6 +16,9 @@ namespace GarageTycoon.Core.Cars
         public CarDefinition Definition { get; private set; }
         public CarState State { get; private set; }
 
+        /// <summary>Who is waiting on this car. Changes how patient they are and how well they tip.</summary>
+        public CustomerMood Mood { get; private set; }
+
         /// <summary>The jobs this car needs, in the order they are shown on the card.</summary>
         public IReadOnlyList<RepairJob> Jobs { get { return _jobs; } }
 
@@ -49,10 +52,12 @@ namespace GarageTycoon.Core.Cars
 
         private readonly List<RepairJob> _jobs = new List<RepairJob>();
 
-        public ActiveCar(int instanceId, CarDefinition definition, List<RepairJob> jobs, float patienceSeconds)
+        public ActiveCar(int instanceId, CarDefinition definition, List<RepairJob> jobs,
+            float patienceSeconds, CustomerMood mood = CustomerMood.Ordinary)
         {
             InstanceId = instanceId;
             Definition = definition;
+            Mood = mood;
             _jobs.AddRange(jobs);
 
             TotalTime = patienceSeconds;
@@ -149,6 +154,27 @@ namespace GarageTycoon.Core.Cars
             TimeRemaining += seconds;
             // Let the bar show the bonus rather than silently capping it.
             if (TimeRemaining > TotalTime) TotalTime = TimeRemaining;
+        }
+
+        /// <summary>
+        /// Buys back some of the customer's goodwill - a word with them while they wait.
+        /// Lifted from the time-management genre, where letting the player recover a customer's
+        /// mood is what stops a timer running out from feeling like something that just happened
+        /// to you. Returns the seconds actually granted.
+        /// </summary>
+        public float CalmCustomer(float fractionOfTotal)
+        {
+            if (State == CarState.Completed || State == CarState.LeftAngry) return 0f;
+
+            float granted = TotalTime * MathUtil.Clamp01(fractionOfTotal);
+
+            // Never past what they arrived with: this buys back lost patience, it does not stack.
+            float room = TotalTime - TimeRemaining;
+            if (granted > room) granted = room;
+            if (granted <= 0f) return 0f;
+
+            TimeRemaining += granted;
+            return granted;
         }
 
         public void MoveToBay(int bayIndex)

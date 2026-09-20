@@ -40,8 +40,20 @@ namespace GarageTycoon.Core.Save
             root.Add("relaxedPace", simulation.RelaxedPace);
 
             // --- prestige ---
-            root.Add("prestigeTokens", simulation.Prestige.Tokens);
+            root.Add("prestigeTokens", simulation.Prestige.TokensEarned);
             root.Add("prestigeCount", simulation.Prestige.PrestigeCount);
+
+            JsonValue perks = JsonValue.Object();
+            foreach (KeyValuePair<string, int> pair in simulation.Prestige.PerksToDictionary())
+            {
+                perks.Add(pair.Key, pair.Value);
+            }
+            root.Add("perks", perks);
+
+            // --- the work streak ---
+            root.Add("combo", simulation.Combo.Streak);
+            root.Add("comboBest", simulation.Combo.BestStreak);
+            root.Add("calmCooldown", simulation.CalmCooldownRemaining);
 
             // --- upgrades ---
             JsonValue upgrades = JsonValue.Object();
@@ -74,6 +86,7 @@ namespace GarageTycoon.Core.Save
             statsJson.Add("damagedRounds", stats.DamagedRounds);
             statsJson.Add("bestCarPayout", stats.BestCarPayout);
             statsJson.Add("playTimeSeconds", stats.PlayTimeSeconds);
+            statsJson.Add("bestStreak", stats.BestStreak);
             root.Add("stats", statsJson);
 
             // --- cars on the forecourt ---
@@ -102,6 +115,7 @@ namespace GarageTycoon.Core.Save
             json.Add("id", car.InstanceId);
             json.Add("def", car.Definition.Id);
             json.Add("bay", bayIndex);
+            json.Add("mood", (int)car.Mood);
             json.Add("timeRemaining", car.TimeRemaining);
             json.Add("totalTime", car.TotalTime);
             json.Add("earned", car.EarnedSoFar);
@@ -145,9 +159,18 @@ namespace GarageTycoon.Core.Save
             simulation.RelaxedPace = root["relaxedPace"].AsBool(false);
 
             // --- prestige first: it feeds the payout multiplier used by BuildEffects ---
+            Dictionary<string, int> perkLevels = new Dictionary<string, int>();
+            foreach (KeyValuePair<string, JsonValue> pair in root["perks"].Fields)
+            {
+                perkLevels[pair.Key] = pair.Value.AsInt(0);
+            }
+
             simulation.Prestige.Restore(
                 root["prestigeTokens"].AsInt(0),
-                root["prestigeCount"].AsInt(0));
+                root["prestigeCount"].AsInt(0),
+                perkLevels);
+
+            simulation.Combo.Restore(root["combo"].AsInt(0), root["comboBest"].AsInt(0));
 
             // --- upgrades ---
             Dictionary<string, int> levels = new Dictionary<string, int>();
@@ -195,6 +218,7 @@ namespace GarageTycoon.Core.Save
             simulation.Stats.DamagedRounds = stats["damagedRounds"].AsInt(0);
             simulation.Stats.BestCarPayout = stats["bestCarPayout"].AsDouble(0d);
             simulation.Stats.PlayTimeSeconds = stats["playTimeSeconds"].AsFloat(0f);
+            simulation.Stats.BestStreak = stats["bestStreak"].AsInt(0);
 
             // --- cars ---
             JsonValue cars = root["cars"];
@@ -253,8 +277,8 @@ namespace GarageTycoon.Core.Save
             }
 
             float totalTime = json["totalTime"].AsFloat(30f);
-            ActiveCar car = new ActiveCar(json["id"].AsInt(1), definition, jobs, totalTime);
-            return car;
+            CustomerMood mood = (CustomerMood)json["mood"].AsInt((int)CustomerMood.Ordinary);
+            return new ActiveCar(json["id"].AsInt(1), definition, jobs, totalTime, mood);
         }
     }
 }

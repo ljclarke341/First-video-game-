@@ -108,9 +108,6 @@ namespace GarageTycoon.Core.Balance
         /// </summary>
         public const double LifetimeEarningsPerToken = 100000d;
 
-        /// <summary>Permanent payout bonus granted by each prestige token (0.12 = +12%).</summary>
-        public const float PrestigeBonusPerToken = 0.12f;
-
         // ---------------------------------------------------------------------
         // Idle / offline
         // ---------------------------------------------------------------------

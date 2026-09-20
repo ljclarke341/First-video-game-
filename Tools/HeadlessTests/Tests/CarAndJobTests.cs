@@ -64,9 +64,11 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 Check.AreClose(car.TotalPayout, sum, 0.001d, "Car total payout should equal the sum of its jobs");
 
-                // Rounding each job to whole dollars can drift a little from the blueprint value.
-                Check.InRange(sum, car.Definition.BasePayout - car.Jobs.Count, car.Definition.BasePayout + car.Jobs.Count,
-                    "Job payouts should add up to roughly the car's base value");
+                // A VIP pays over the odds for the same work, so the target is the blueprint value
+                // scaled by who turned up. Rounding each job to whole dollars drifts a little too.
+                double expected = car.Definition.BasePayout * car.Mood.PayoutMultiplier();
+                Check.InRange(sum, expected - car.Jobs.Count, expected + car.Jobs.Count,
+                    "Job payouts should add up to roughly the car's base value for that customer");
             }
         }
 

@@ -120,7 +120,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
             GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 1);
             simulation.Wallet.Earn(12345d);
-            simulation.Prestige.Restore(4, 2);
+            simulation.Prestige.Restore(4, 2, null);
             simulation.RefreshEffects();
 
             string json = GameStateSerializer.Save(simulation, 2000d);
@@ -132,7 +132,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             Check.AreClose(simulation.Wallet.AllTimeEarnings, loaded.Wallet.AllTimeEarnings, 0.001d, "All-time earnings lost");
             Check.AreEqual(3, loaded.Upgrades.GetLevel("precision_window"), "Precision level lost");
             Check.AreEqual(2, loaded.Upgrades.GetLevel("auto_mechanic"), "Mechanic level lost");
-            Check.AreEqual(4, loaded.Prestige.Tokens, "Prestige tokens lost");
+            Check.AreEqual(4, loaded.Prestige.TokensEarned, "Prestige tokens lost");
             Check.AreEqual(2, loaded.Prestige.PrestigeCount, "Prestige count lost");
             Check.AreEqual(simulation.BayCount, loaded.BayCount, "Bay count lost");
             Check.AreEqual(simulation.Effects.MechanicCount, loaded.Effects.MechanicCount, "Mechanic effect lost");
@@ -219,7 +219,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             Check.AreClose(Core.Balance.GameBalance.StartingCash, loaded.Wallet.Cash, 0.001d,
                 "Missing cash should fall back to the starting float");
             Check.AreEqual(0, loaded.Upgrades.TotalLevels, "Missing upgrades should default to none");
-            Check.AreEqual(0, loaded.Prestige.Tokens, "Missing prestige should default to zero");
+            Check.AreEqual(0, loaded.Prestige.TokensEarned, "Missing prestige should default to zero");
             Check.AreEqual(0, GameplayHarness.CarsOnSite(loaded), "Missing cars should default to an empty forecourt");
 
             // And it must be playable.

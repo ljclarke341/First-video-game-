@@ -164,7 +164,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 "Hitting the cap with matching earnings should qualify");
 
             Check.AreEqual(0, prestige.Prestige(0d, 0d), "An ineligible prestige should award nothing");
-            Check.AreEqual(0, prestige.Tokens, "An ineligible prestige must not grant tokens");
+            Check.AreEqual(0, prestige.TokensEarned, "An ineligible prestige must not grant tokens");
         }
 
         private static void PrestigeMultiplier()
@@ -176,9 +176,16 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             Check.AreEqual(3, awarded, "Three tokens' worth of earnings should award three tokens");
             Check.AreEqual(1, prestige.PrestigeCount, "Prestige count should increase");
-            Check.IsTrue(prestige.PayoutMultiplier > 1d, "Tokens should raise the payout multiplier");
-            Check.AreClose(1d + 3d * GameBalance.PrestigeBonusPerToken, prestige.PayoutMultiplier, 0.0001d,
-                "Payout multiplier should match the token bonus");
+            Check.AreEqual(3, prestige.TokensAvailable, "Awarded tokens should be available to spend");
+
+            // Tokens are a currency now: they do nothing until they are spent on something.
+            Check.AreClose(1d, prestige.PayoutMultiplier, 0.0001d,
+                "Unspent tokens should not silently raise payouts");
+
+            PrestigePerk rates = PerkCatalog.FindById("perk_rates");
+            Check.IsTrue(prestige.TryBuyPerk(rates), "Should be able to afford the first Rates level");
+            Check.IsTrue(prestige.PayoutMultiplier > 1d, "Buying the Rates perk should raise payouts");
+            Check.AreEqual(2, prestige.TokensAvailable, "Buying a perk should spend a token");
         }
     }
 }

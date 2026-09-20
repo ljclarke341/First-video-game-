@@ -32,20 +32,30 @@ namespace GarageTycoon.Core.Minigames
             _skill = MathUtil.Clamp01(skill);
             _random = random;
 
-            float missMargin = (1f - _skill) * (1f - _skill) * 0.4f;
-            float error = (_random.NextFloat() * 2f - 1f) * missMargin;
+            // A person's aiming error is a TIMING error, measured in seconds - they press a
+            // fraction too early or too late. It only becomes a positional error once you
+            // multiply it by how fast the thing is moving.
+            //
+            // This used to be modelled as a flat positional error, which meant a slower marker
+            // gave the simulated player no advantage at all. The balance tests therefore scored
+            // the "Slow-Wind Rig" upgrade - whose entire purpose is slowing things down - at 29%
+            // WORSE than not buying it, because all it did in simulation was lengthen the round.
+            float jitterSeconds = (float)System.Math.Pow(1f - _skill, 1.2d) * 0.5f;
+            float signedJitter = (_random.NextFloat() * 2f - 1f) * jitterSeconds;
 
             TimingBarMinigame timing = game as TimingBarMinigame;
             HoldReleaseMinigame hold = game as HoldReleaseMinigame;
 
             if (timing != null)
             {
-                _aimPoint = MathUtil.Clamp(timing.SweetSpotCenter + error, 0f, 1f);
+                // Seconds of error become bar-widths of error at the marker's speed.
+                _aimPoint = MathUtil.Clamp(timing.SweetSpotCenter + signedJitter * timing.Speed, 0f, 1f);
             }
             else if (hold != null)
             {
-                // Note there is no upper clamp at the redline: a clumsy mechanic really can blow the part.
-                _aimPoint = MathUtil.Clamp(hold.TargetCenter + error, 0f, 1.5f);
+                // Same again, converted through how fast the gauge is winding up. No upper clamp
+                // at the redline: a clumsy mechanic really can blow the part.
+                _aimPoint = MathUtil.Clamp(hold.TargetCenter + signedJitter * hold.FillRate, 0f, 1.5f);
             }
             else
             {
