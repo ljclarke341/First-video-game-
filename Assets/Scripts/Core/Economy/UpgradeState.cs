@@ -32,7 +32,9 @@ namespace GarageTycoon.Core.Economy
 
         public bool IsMaxed(UpgradeDefinition definition)
         {
-            return definition != null && GetLevel(definition.Id) >= definition.MaxLevel;
+            if (definition == null) return false;
+            // An unlimited upgrade only "maxes" at its safety cap, which no real save reaches.
+            return GetLevel(definition.Id) >= definition.MaxLevel;
         }
 
         /// <summary>
@@ -129,7 +131,11 @@ namespace GarageTycoon.Core.Economy
             // --- Workshop ---
             effects.BayCount = MathUtil.ClampInt(
                 GameBalance.StartingBayCount + GetLevel("workshop_bays"), 1, GameBalance.MaxBayCount);
-            effects.PayoutMultiplier = (1d + GetLevel("workshop_rates") * Effect("workshop_rates")) * prestigeMultiplier;
+            // Premium Rates adds; Master Tooling multiplies. The compounding one is what keeps
+            // the income curve climbing once every capped upgrade has been bought out.
+            double rates = 1d + GetLevel("workshop_rates") * Effect("workshop_rates");
+            double master = Math.Pow(1d + Effect("workshop_master"), GetLevel("workshop_master"));
+            effects.PayoutMultiplier = rates * master * prestigeMultiplier;
 
             return effects;
         }

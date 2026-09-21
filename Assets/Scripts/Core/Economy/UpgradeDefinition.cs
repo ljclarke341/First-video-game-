@@ -26,6 +26,20 @@ namespace GarageTycoon.Core.Economy
         /// <summary>Levels available. Once reached, the upgrade shows as MAXED.</summary>
         public int MaxLevel { get; private set; }
 
+        /// <summary>
+        /// True for an upgrade with no ceiling.
+        ///
+        /// The game needed exactly one of these. Every other upgrade caps out, and a trace showed
+        /// the whole shop bought out at minute 130 with the prestige unlock still forty minutes
+        /// away - forty minutes with literally nothing to spend on. An unlimited sink means there
+        /// is always something to save for, and it is what turns an almost-linear income curve
+        /// into one that keeps climbing.
+        /// </summary>
+        public bool IsUnlimited { get; private set; }
+
+        /// <summary>Hard stop for an unlimited upgrade, so a tampered save cannot go absurd.</summary>
+        public const int UnlimitedSafetyCap = 500;
+
         /// <summary>Raw effect size granted per level (meaning depends on the upgrade).</summary>
         public float EffectPerLevel { get; private set; }
 
@@ -45,15 +59,17 @@ namespace GarageTycoon.Core.Economy
             int maxLevel,
             float effectPerLevel,
             string effectFormat,
-            float effectDisplayScale)
+            float effectDisplayScale,
+            bool isUnlimited = false)
         {
+            IsUnlimited = isUnlimited;
             Id = id;
             Branch = branch;
             DisplayName = displayName;
             Description = description;
             BaseCost = baseCost;
             CostGrowth = costGrowth <= 1d ? 1.5d : costGrowth;
-            MaxLevel = maxLevel < 1 ? 1 : maxLevel;
+            MaxLevel = isUnlimited ? UnlimitedSafetyCap : (maxLevel < 1 ? 1 : maxLevel);
             EffectPerLevel = effectPerLevel;
             EffectFormat = effectFormat;
             EffectDisplayScale = effectDisplayScale <= 0f ? 1f : effectDisplayScale;

@@ -93,9 +93,37 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>The patience clock is eased off while the player is still reading.</summary>
         public override bool IsShowingPreview { get { return IsPreviewing; } }
 
+        /// <summary>True once a SHUFFLE round has actually swapped the buttons round.</summary>
+        public bool HasShuffled { get; private set; }
+
+        /// <summary>Seconds after the preview at which a SHUFFLE round rearranges the buttons.</summary>
+        public float ShuffleAt { get { return PreviewSeconds + 0.55f; } }
+
         protected override void OnTick(float deltaTime)
         {
-            // Nothing to animate: this game is driven entirely by the preview timer and the player's tap.
+            // SHUFFLE twist: a moment after the labels hide, the tools swap places. Remembering
+            // "it was the third one" stops working; you have to have read the tool itself.
+            if (Modifier == MinigameModifier.Shuffle && !HasShuffled && Elapsed >= ShuffleAt)
+            {
+                ShuffleOptions();
+                HasShuffled = true;
+            }
+        }
+
+        /// <summary>Rearranges the buttons, keeping track of where the right tool ended up.</summary>
+        private void ShuffleOptions()
+        {
+            string correctTool = _options[CorrectIndex];
+
+            for (int i = _options.Count - 1; i > 0; i--)
+            {
+                int j = Random.NextInt(0, i + 1);
+                string swap = _options[i];
+                _options[i] = _options[j];
+                _options[j] = swap;
+            }
+
+            CorrectIndex = _options.IndexOf(correctTool);
         }
 
         /// <summary>The player tapped one of the tool buttons.</summary>

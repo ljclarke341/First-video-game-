@@ -171,6 +171,12 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Rule 2: only drum up more business when there is slack to absorb it.
                 bool forecourtIsBusy = simulation.WaitingCars.Count >= 2;
 
+                // Rule 3: once the sell-up is genuinely in reach, stop feeding the endless sink
+                // and start banking. An upgrade with no ceiling will otherwise absorb every
+                // pound forever, and a real player switches to saving when the goal is close.
+                bool savingForPrestige =
+                    simulation.Wallet.Cash > simulation.Prestige.CashRequirement * 0.55d;
+
                 UpgradeDefinition cheapest = null;
                 double cheapestCost = double.PositiveInfinity;
 
@@ -179,6 +185,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                     UpgradeDefinition definition = UpgradeCatalog.All[i];
                     if (simulation.Upgrades.IsMaxed(definition)) continue;
                     if (forecourtIsBusy && definition.Id == "rep_marketing") continue;
+                    if (savingForPrestige && definition.IsUnlimited) continue;
 
                     double cost = simulation.GetUpgradeCost(definition);
                     if (cost < cheapestCost)

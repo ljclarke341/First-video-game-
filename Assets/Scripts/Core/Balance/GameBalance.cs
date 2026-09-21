@@ -99,7 +99,7 @@ namespace GarageTycoon.Core.Balance
         /// to spend on. The cap is set so prestige unlocks shortly after that - around two and a
         /// half hours - rather than leaving hours of dead time with an empty shop.
         /// </summary>
-        public const double PrestigeCashCap = 150000d;
+        public const double PrestigeCashCap = 120000d;
 
         /// <summary>
         /// Lifetime earnings needed per prestige token awarded. At the pacing above a first reset

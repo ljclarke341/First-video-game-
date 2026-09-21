@@ -33,7 +33,29 @@ namespace GarageTycoon.Core.Minigames
 
         public override MinigameType Type { get { return MinigameType.HoldRelease; } }
 
-        public override string Prompt { get { return "Hold, then release in the green"; } }
+        public override string Prompt
+        {
+            get
+            {
+                return Modifier == MinigameModifier.PreLoaded
+                    ? "Already under pressure - release fast"
+                    : "Hold, then release in the green";
+            }
+        }
+
+        /// <summary>
+        /// PRE-LOADED twist: the gauge starts part way up, so the window between pressing and
+        /// the redline is a fraction of its usual length. Same skill, far less room.
+        /// </summary>
+        protected override void OnModifierSet()
+        {
+            if (Modifier != MinigameModifier.PreLoaded) return;
+
+            // Start below the safe band, never inside it: arriving already in the green would
+            // hand the player a free perfect rather than a harder round.
+            float highestSafeStart = TargetCenter - TargetHalfWidth - 0.06f;
+            Pressure = MathUtil.Clamp(Random.Range(0.18f, highestSafeStart), 0f, 0.7f);
+        }
 
         public HoldReleaseMinigame(float difficulty, MinigameTuning tuning, IRandomSource random)
             : base(difficulty, tuning, random)

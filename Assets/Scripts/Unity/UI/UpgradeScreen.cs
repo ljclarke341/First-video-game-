@@ -223,8 +223,18 @@ namespace GarageTycoon.Unity.UI
                 int level = _simulation.Upgrades.GetLevel(definition.Id);
                 bool maxed = level >= definition.MaxLevel;
 
-                row.Level.text = "LVL " + level + " / " + definition.MaxLevel;
-                row.LevelBar.Fraction = (float)level / definition.MaxLevel;
+                // An unlimited upgrade has no meaningful "of N", so it shows a bare level and
+                // a full bar rather than a progress-to-max that can never complete.
+                if (definition.IsUnlimited)
+                {
+                    row.Level.text = "LVL " + level;
+                    row.LevelBar.Fraction = 1f;
+                }
+                else
+                {
+                    row.Level.text = "LVL " + level + " / " + definition.MaxLevel;
+                    row.LevelBar.Fraction = (float)level / definition.MaxLevel;
+                }
 
                 if (maxed)
                 {

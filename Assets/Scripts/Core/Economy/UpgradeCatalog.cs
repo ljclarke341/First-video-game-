@@ -62,7 +62,14 @@ namespace GarageTycoon.Core.Economy
 
             new UpgradeDefinition("workshop_rates", UpgradeBranch.Workshop,
                 "Premium Labour Rates", "Charge more for every job",
-                390d, 1.9d, 8, 0.07f, "+{0}% payout", 100f)
+                390d, 1.9d, 8, 0.07f, "+{0}% payout", 100f),
+
+            // The one upgrade with no ceiling. Its effect COMPOUNDS rather than adding, which is
+            // what gives the late game a curve instead of a plateau, and it means the shop is
+            // never empty no matter how long someone plays.
+            new UpgradeDefinition("workshop_master", UpgradeBranch.Workshop,
+                "Master Tooling", "Sharper tools and better parts. No limit - each level multiplies.",
+                4000d, 1.26d, 0, 0.05f, "x{0} payout, compounding", 1.05f, true)
         };
 
         public static IReadOnlyList<UpgradeDefinition> All { get { return _all; } }

@@ -28,9 +28,35 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>Bar units travelled per second.</summary>
         public float Speed { get; private set; }
 
+        /// <summary>Centre of the second zone when the TWIN twist is on. Otherwise unused.</summary>
+        public float SecondCenter { get; private set; }
+
+        /// <summary>True when this round has two zones rather than one.</summary>
+        public bool HasTwinZones { get { return Modifier == MinigameModifier.TwinZones; } }
+
         public override MinigameType Type { get { return MinigameType.TimingBar; } }
 
-        public override string Prompt { get { return "Tap inside the green zone"; } }
+        public override string Prompt
+        {
+            get { return HasTwinZones ? "Two zones - hit either one" : "Tap inside the green zone"; }
+        }
+
+        /// <summary>
+        /// TWIN twist: the one wide zone becomes two narrow ones on opposite halves of the bar.
+        /// Easier to reach, much harder to hit dead centre, and it breaks the rhythm of tracking
+        /// a single target - which is the point of a twist.
+        /// </summary>
+        protected override void OnModifierSet()
+        {
+            if (!HasTwinZones) return;
+
+            SweetSpotHalfWidth *= 0.62f;
+            PerfectHalfWidth = SweetSpotHalfWidth * 0.34f;
+
+            float padding = SweetSpotHalfWidth + 0.06f;
+            SweetSpotCenter = Random.Range(padding, 0.45f);
+            SecondCenter = Random.Range(0.55f, 1f - padding);
+        }
 
         public TimingBarMinigame(float difficulty, MinigameTuning tuning, IRandomSource random)
             : base(difficulty, tuning, random)
@@ -77,11 +103,23 @@ namespace GarageTycoon.Core.Minigames
         }
 
         /// <summary>A tap. This is the only input the timing bar cares about.</summary>
+        /// <summary>Distance from the marker to whichever zone is nearest.</summary>
+        public float DistanceToNearestZone()
+        {
+            float distance = MathUtil.Abs(MarkerPosition - SweetSpotCenter);
+            if (HasTwinZones)
+            {
+                float second = MathUtil.Abs(MarkerPosition - SecondCenter);
+                if (second < distance) distance = second;
+            }
+            return distance;
+        }
+
         public override void Press()
         {
             if (IsFinished) return;
 
-            float distance = MathUtil.Abs(MarkerPosition - SweetSpotCenter);
+            float distance = DistanceToNearestZone();
 
             if (distance <= PerfectHalfWidth)
             {

@@ -49,6 +49,23 @@ namespace GarageTycoon.Core.Minigames
         /// </summary>
         public virtual bool IsShowingPreview { get { return false; } }
 
+        /// <summary>The twist on this round, if any. Set once when the round is built.</summary>
+        public MinigameModifier Modifier { get; private set; }
+
+        /// <summary>Applies a twist to this round. Called by the factory before play starts.</summary>
+        public void SetModifier(MinigameModifier modifier)
+        {
+            // Only a twist that belongs to this game can be applied - a shuffled timing bar is
+            // meaningless, and silently accepting one would be a bug that never announced itself.
+            if (modifier != MinigameModifier.None && modifier.AppliesTo() != Type) return;
+
+            Modifier = modifier;
+            OnModifierSet();
+        }
+
+        /// <summary>Hook for a mini-game to reconfigure itself once its twist is known.</summary>
+        protected virtual void OnModifierSet() { }
+
         protected IRandomSource Random { get; private set; }
         protected MinigameTuning Tuning { get; private set; }
 
@@ -102,6 +119,14 @@ namespace GarageTycoon.Core.Minigames
         protected void Finish(MinigameResult result)
         {
             if (IsFinished) return;
+
+            // Landing a twisted round is worth more, so a twist is something to want rather than
+            // a tax on having played for a while.
+            if (Modifier != MinigameModifier.None && result.IsSuccess)
+            {
+                result.ProgressDelta *= MinigameModifierExtensions.SuccessBonus;
+            }
+
             IsFinished = true;
             Result = result;
         }

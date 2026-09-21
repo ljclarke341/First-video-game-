@@ -100,10 +100,21 @@ namespace GarageTycoon.Unity.UI
                 + "pad. One wrong tap ends the round, so take the moment to read it.");
 
             Heading("KEEP A STREAK GOING");
-            Paragraph("Land rounds back to back and the streak bar under your cash climbs. Every job "
-                      + "you finish while it is running pays more, up to half as much again. A miss or "
-                      + "a breakage drops it to zero, and so does letting your own customer walk out. "
-                      + "A scrappy round holds the streak but does not build it.");
+            Paragraph("Land rounds back to back and the streak bar climbs. Every job you finish while "
+                      + "it is running pays more, and the meter shows what it is currently worth on the "
+                      + "job in hand. It takes a couple of minutes of clean work to reach the top.");
+            Paragraph("A miss or a breakage drops it to zero, and so does letting your own customer walk "
+                      + "out. A scrappy round holds it but does not build it. And it SLIPS AWAY if you "
+                      + "stop working: put the tools down for a few seconds and it starts draining.");
+
+            Heading("RANK UP AND THE GAME CHANGES");
+            Paragraph("The bar under your cash is your standing in the trade, earned by everything "
+                      + "you have ever made - so unlike cash and upgrades, it survives selling the garage.");
+            Paragraph("Each rank unlocks a TWIST that starts turning up at random on one of the "
+                      + "mini-games: two narrow zones instead of one wide one, a torque gauge that "
+                      + "starts part-wound, tools that move after they hide, a pattern you repeat "
+                      + "backwards. Landing a twisted round is worth extra progress, so they are "
+                      + "something to want rather than a tax for playing well.");
 
             Heading("KNOW YOUR CUSTOMER");
             Bullet(Theme.Hex(CustomerMood.Impatient.ColorHex()),
@@ -133,6 +144,9 @@ namespace GarageTycoon.Unity.UI
                 UpgradeBranch branch = (UpgradeBranch)i;
                 Bullet(Theme.Hex(branch.ColorHex()), branch.DisplayName() + " - " + branch.Description());
             }
+            Paragraph("One upgrade has NO LIMIT: Master Tooling multiplies every payout and can be "
+                      + "bought forever. It is expensive, it compounds, and it means there is always "
+                      + "something worth saving for however long you play.");
             Paragraph("Once you bank $" + CashFormat.Short(GameBalance.PrestigeCashCap)
                       + " you can sell the garage. You lose your cash and your upgrades, and you keep "
                       + "Reputation Tokens.");

@@ -57,9 +57,28 @@ namespace GarageTycoon.Core.Minigames
 
         public override MinigameType Type { get { return MinigameType.RapidSequence; } }
 
+        /// <summary>True when this round must be entered back to front.</summary>
+        public bool IsReversed { get { return Modifier == MinigameModifier.Reversed; } }
+
         public override string Prompt
         {
-            get { return IsPreviewing ? "Memorise the pattern" : "Repeat the pattern"; }
+            get
+            {
+                if (IsPreviewing) return IsReversed ? "Memorise it - you will repeat it BACKWARDS" : "Memorise the pattern";
+                return IsReversed ? "Repeat it BACKWARDS" : "Repeat the pattern";
+            }
+        }
+
+        /// <summary>
+        /// The step the player owes next, accounting for a BACKWARDS round.
+        /// Exposed so the view can light the right chip without re-deriving the rule.
+        /// </summary>
+        public int ExpectedStepIndex
+        {
+            get
+            {
+                return IsReversed ? _sequence.Count - 1 - ProgressIndex : ProgressIndex;
+            }
         }
 
         public RapidSequenceMinigame(float difficulty, MinigameTuning tuning, IRandomSource random)
@@ -121,7 +140,15 @@ namespace GarageTycoon.Core.Minigames
                 return;
             }
 
-            if ((SequenceInput)optionIndex != _sequence[ProgressIndex])
+            // REVERSED twist: the pattern is owed back to front.
+            int expected = ExpectedStepIndex;
+            if (expected < 0 || expected >= _sequence.Count)
+            {
+                Finish(MinigameResult.FromOutcome(MinigameOutcome.Miss, "Fumbled it!"));
+                return;
+            }
+
+            if ((SequenceInput)optionIndex != _sequence[expected])
             {
                 Finish(MinigameResult.FromOutcome(MinigameOutcome.Miss, "Wrong order!"));
                 return;

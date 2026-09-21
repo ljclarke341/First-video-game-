@@ -31,6 +31,10 @@ namespace GarageTycoon.Unity.UI
         private Image _eventBanner;
         private Text _eventText;
 
+        private Text _rankName;
+        private Text _rankNext;
+        private ProgressBar _rankBar;
+
         private Image _streakPanel;
         private Text _streakCount;
         private Text _streakMultiplier;
@@ -77,6 +81,7 @@ namespace GarageTycoon.Unity.UI
 
             BuildBackground();
             BuildHud();
+            BuildRankMeter();
             BuildStreakMeter();
             BuildEventBanner();
             BuildBays();
@@ -124,13 +129,50 @@ namespace GarageTycoon.Unity.UI
         }
 
         /// <summary>
+        /// The garage's standing. It sits above the streak because it is the slowest-moving thing
+        /// on the screen and the only one that survives selling up.
+        /// </summary>
+        private void BuildRankMeter()
+        {
+            RectTransform row = UIFactory.CreateRect("RankRow", _root);
+            UIFactory.AnchorTop(row, 26f, 180f, Theme.ScreenPadding);
+
+            _rankName = UIFactory.CreateText("RankName", row, "Backstreet Garage", Theme.FontTiny,
+                Theme.TextSecondary, TextAnchor.MiddleLeft, FontStyle.Bold);
+            RectTransform nameRect = _rankName.rectTransform;
+            nameRect.anchorMin = new Vector2(0f, 0f);
+            nameRect.anchorMax = new Vector2(0f, 1f);
+            nameRect.pivot = new Vector2(0f, 0.5f);
+            nameRect.sizeDelta = new Vector2(300f, 0f);
+            nameRect.anchoredPosition = Vector2.zero;
+
+            _rankNext = UIFactory.CreateText("RankNext", row, string.Empty, Theme.FontTiny,
+                Theme.TextMuted, TextAnchor.MiddleRight);
+            RectTransform nextRect = _rankNext.rectTransform;
+            nextRect.anchorMin = new Vector2(1f, 0f);
+            nextRect.anchorMax = new Vector2(1f, 1f);
+            nextRect.pivot = new Vector2(1f, 0.5f);
+            nextRect.sizeDelta = new Vector2(220f, 0f);
+            nextRect.anchoredPosition = Vector2.zero;
+
+            _rankBar = UIFactory.CreateProgressBar("RankBar", row, Theme.TextMuted, 4);
+            RectTransform barRect = _rankBar.Rect;
+            barRect.anchorMin = new Vector2(0f, 0.5f);
+            barRect.anchorMax = new Vector2(1f, 0.5f);
+            barRect.pivot = new Vector2(0.5f, 0.5f);
+            barRect.offsetMin = new Vector2(310f, -3f);
+            barRect.offsetMax = new Vector2(-230f, 3f);
+            _rankBar.SmoothSpeed = 6f;
+        }
+
+        /// <summary>
         /// The work streak, sitting directly under the money because it IS money: while it runs,
         /// every job finished pays more. It needs to be the second thing the eye lands on.
         /// </summary>
         private void BuildStreakMeter()
         {
             _streakPanel = UIFactory.CreatePanel("Streak", _root, Theme.PanelSunken, 12);
-            UIFactory.AnchorTop(_streakPanel.rectTransform, 48f, 182f, Theme.ScreenPadding);
+            UIFactory.AnchorTop(_streakPanel.rectTransform, 48f, 212f, Theme.ScreenPadding);
 
             _streakCount = UIFactory.CreateText("Count", _streakPanel.transform, "0x", Theme.FontHeading,
                 Theme.TextMuted, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -147,7 +189,7 @@ namespace GarageTycoon.Unity.UI
             multRect.anchorMin = new Vector2(1f, 0f);
             multRect.anchorMax = new Vector2(1f, 1f);
             multRect.pivot = new Vector2(1f, 0.5f);
-            multRect.sizeDelta = new Vector2(130f, 0f);
+            multRect.sizeDelta = new Vector2(220f, 0f);
             multRect.anchoredPosition = new Vector2(-Theme.PanelPadding * 0.8f, 0f);
 
             _streakBar = UIFactory.CreateProgressBar("StreakBar", _streakPanel.transform, Theme.Cash, 5);
@@ -156,14 +198,14 @@ namespace GarageTycoon.Unity.UI
             barRect.anchorMax = new Vector2(1f, 0.5f);
             barRect.pivot = new Vector2(0.5f, 0.5f);
             barRect.offsetMin = new Vector2(112f, -5f);
-            barRect.offsetMax = new Vector2(-146f, 5f);
+            barRect.offsetMax = new Vector2(-236f, 5f);
             _streakBar.SmoothSpeed = 12f;
         }
 
         private void BuildEventBanner()
         {
             _eventBanner = UIFactory.CreatePanel("EventBanner", _root, Theme.Success, 12);
-            UIFactory.AnchorTop(_eventBanner.rectTransform, 52f, 236f, Theme.ScreenPadding);
+            UIFactory.AnchorTop(_eventBanner.rectTransform, 52f, 266f, Theme.ScreenPadding);
 
             _eventText = UIFactory.CreateText("EventText", _eventBanner.transform, string.Empty, Theme.FontSmall,
                 Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -186,7 +228,7 @@ namespace GarageTycoon.Unity.UI
         {
             _bayColumn = UIFactory.CreateRect("Bays", _root);
             // Sits below the HUD and banner, above the queue strip.
-            UIFactory.AnchorMiddle(_bayColumn, 296f, 856f, Theme.ScreenPadding);
+            UIFactory.AnchorMiddle(_bayColumn, 326f, 856f, Theme.ScreenPadding);
             UIFactory.AddVerticalLayout(_bayColumn.gameObject, Theme.ElementSpacing);
 
             // Cards for every bay the garage could ever have are built up front and shown as unlocked.
@@ -301,6 +343,7 @@ namespace GarageTycoon.Unity.UI
         public void Refresh()
         {
             RefreshHud();
+            RefreshRank();
             RefreshStreak();
             RefreshEventBanner();
             RefreshBays();
@@ -333,20 +376,57 @@ namespace GarageTycoon.Unity.UI
             _prestigeButton.GetComponentInChildren<Text>().color = canPrestige ? Theme.TextOnAccent : Theme.TextMuted;
         }
 
+        private void RefreshRank()
+        {
+            int level = _simulation.RankLevel;
+            double allTime = _simulation.Wallet.AllTimeEarnings;
+
+            _rankName.text = GarageRank.NameFor(level);
+            _rankBar.Fraction = GarageRank.ProgressToNext(allTime);
+
+            bool topRank = level >= GarageRank.MaxLevel;
+            _rankNext.text = topRank ? "TOP RANK" : "NEXT $" + CashFormat.Short(GarageRank.NextThreshold(level));
+
+            _rankBar.FillColor = topRank ? Theme.Cash : Theme.TextMuted;
+            _rankName.color = topRank ? Theme.Cash : Theme.TextSecondary;
+        }
+
         private void RefreshStreak()
         {
             ComboTracker combo = _simulation.Combo;
             bool hot = combo.IsHot;
+            bool decaying = combo.IsDecaying;
+
+            Color streakColor = decaying ? Theme.Danger : (hot ? Theme.Cash : Theme.TextMuted);
 
             _streakCount.text = combo.Streak + "x";
-            _streakCount.color = hot ? Theme.Cash : Theme.TextMuted;
+            _streakCount.color = streakColor;
 
-            _streakMultiplier.text = combo.Multiplier.ToString("0.00") + "x";
-            _streakMultiplier.color = hot ? Theme.Cash : Theme.TextMuted;
+            // Show what the streak is worth on the job in hand, so dropping it has a visible
+            // price rather than being an abstract multiplier.
+            string worth = string.Empty;
+            if (hot && PlayerJobPayout() > 0d)
+            {
+                worth = "  +$" + CashFormat.Short(combo.BonusOn(PlayerJobPayout()));
+            }
 
-            _streakPanel.color = hot ? Theme.WithAlpha(Theme.Cash, 0.14f) : Theme.PanelSunken;
+            _streakMultiplier.text = combo.Multiplier.ToString("0.00") + "x" + worth;
+            _streakMultiplier.color = streakColor;
+
+            _streakPanel.color = decaying
+                ? Theme.WithAlpha(Theme.Danger, 0.14f)
+                : (hot ? Theme.WithAlpha(Theme.Cash, 0.14f) : Theme.PanelSunken);
+            _streakBar.FillColor = decaying ? Theme.Danger : Theme.Cash;
 
             _streakBar.Fraction = combo.Cap <= 0 ? 0f : (float)combo.Streak / combo.Cap;
+        }
+
+        /// <summary>What the job the player is on is worth, or 0 when they are not working.</summary>
+        private double PlayerJobPayout()
+        {
+            if (_simulation.PlayerSession == null) return 0d;
+            RepairJob job = _simulation.PlayerSession.Job;
+            return job == null ? 0d : job.Payout;
         }
 
         private void RefreshEventBanner()

@@ -254,7 +254,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             int tokens = simulation.Prestige.TokensForReset(simulation.Wallet.LifetimeEarnings);
 
             Console.WriteLine(string.Format("        (first prestige after {0:0} minutes, awarding {1} tokens; shop at {2}/{3} levels)",
-                minutes, tokens, simulation.Upgrades.TotalLevels, TotalUpgradeLevels()));
+                minutes, tokens, CappedLevelsOwned(simulation), TotalUpgradeLevels()));
 
             Check.IsTrue(reached,
                 "A committed player should reach their first prestige within a few hours of play");
@@ -269,12 +269,30 @@ namespace GarageTycoon.HeadlessTests.Tests
                 "A first prestige should award enough tokens to noticeably speed up the next run");
         }
 
-        /// <summary>Total upgrade levels available across the whole shop, for the progress readout.</summary>
+        /// <summary>
+        /// Levels available across the CAPPED upgrades. Master Tooling is deliberately excluded:
+        /// it has no ceiling, so "84 of 567" would say nothing about how bought-out the shop is.
+        /// </summary>
         private static int TotalUpgradeLevels()
         {
             int total = 0;
-            for (int i = 0; i < UpgradeCatalog.All.Count; i++) total += UpgradeCatalog.All[i].MaxLevel;
+            for (int i = 0; i < UpgradeCatalog.All.Count; i++)
+            {
+                if (!UpgradeCatalog.All[i].IsUnlimited) total += UpgradeCatalog.All[i].MaxLevel;
+            }
             return total;
+        }
+
+        /// <summary>Levels owned across the capped upgrades only, to match the total above.</summary>
+        private static int CappedLevelsOwned(GarageSimulation simulation)
+        {
+            int owned = 0;
+            for (int i = 0; i < UpgradeCatalog.All.Count; i++)
+            {
+                UpgradeDefinition definition = UpgradeCatalog.All[i];
+                if (!definition.IsUnlimited) owned += simulation.Upgrades.GetLevel(definition.Id);
+            }
+            return owned;
         }
 
         private static void IdleIsWeakerThanPlaying()

@@ -171,6 +171,7 @@ namespace GarageTycoon.Core.Save
                 perkLevels);
 
             simulation.Combo.Restore(root["combo"].AsInt(0), root["comboBest"].AsInt(0));
+            simulation.CalmCooldownRemaining = root["calmCooldown"].AsFloat(0f);
 
             // --- upgrades ---
             Dictionary<string, int> levels = new Dictionary<string, int>();
@@ -241,6 +242,7 @@ namespace GarageTycoon.Core.Save
                 }
             }
 
+            simulation.SyncRankBaseline();
             return simulation;
         }
 

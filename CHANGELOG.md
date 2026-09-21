@@ -6,6 +6,75 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 9 — Fixing what Stage 8 got wrong, and giving the game somewhere to go
+
+Three problems, all found by tracing a full three-hour run rather than by guessing.
+
+### 1. The streak was not actually a mechanic
+
+The trace was blunt about it: best streak **63 by minute 10, 135 by minute 50, and then flat
+for the next two hours**. The cap was 12, so a competent player hit the ceiling in about thirty
+seconds and held it forever. It was a permanent +48%, not a risk — the opposite of the chain
+bonus it was modelled on.
+
+- **Cap raised 12 → 50, step lowered 0.04 → 0.012.** Same ceiling value, but it now takes a
+  couple of minutes of clean work to reach rather than half a minute.
+- **It decays.** Stop working for seven seconds and it starts draining a step at a time. It
+  previously could not be lost by inaction at all — you could put the phone down mid-chain and
+  come back to the same multiplier. A streak you cannot lose is a discount.
+- **It shows what it is worth.** The meter now reads "+$340" against the job in hand, so
+  dropping it has a visible price instead of being an abstract multiplier.
+
+After the change the streak fluctuates constantly through a run (24, 5, 0, 16, 0, 17, 0, 18…)
+instead of sitting pinned at maximum. That is the mechanic doing its job.
+
+### 2. Hour three played exactly like minute three
+
+Difficulty scaling made the four mini-games faster and tighter, but never *different*.
+
+**Garage rank** is earned by all-time earnings, so it survives selling up, and each rank unlocks
+a **twist** that then turns up at random (30% of rounds) on one mini-game:
+
+| Rank | Twist | What changes |
+|---|---|---|
+| Local Workshop | **Twin zones** | One wide target becomes two narrow ones |
+| Certified Service | **Pre-loaded** | The torque gauge starts part-wound — far less time |
+| Performance Shop | **Shuffle** | The tools swap places after they hide |
+| Concours Specialist | **Backwards** | Repeat the pattern in reverse |
+
+Landing a twisted round is worth **35% extra progress**, so a twist is something to want rather
+than a tax for having played a while. Thresholds were tuned against the trace so the first one
+lands around **minute 20** — an earlier set put it at minute 40, which is far too long to wait
+for the game to change.
+
+One design catch worth recording: **Shuffle was unplayable as first built.** Every button reads
+"?" after the preview, so tools swapping behind them is invisible and the round becomes a coin
+flip. It now flashes the new arrangement for a beat — you get a fraction of the usual time to
+re-find your tool, which is a test of something.
+
+### 3. The economy stopped giving
+
+Income grew only ~6x across three hours — nearly linear, where the genre lives on feeling
+progressively more powerful — and the shop was **bought out at minute 130 with prestige still
+forty minutes away**.
+
+**Master Tooling** is one upgrade with no ceiling whose effect *compounds* rather than adds
+(x1.05 per level, cost x1.26 per level). It is the only multiplicative upgrade in the game.
+
+- Income growth across a run: **6x → 10x**, and still accelerating at the end rather than
+  plateauing.
+- The shop is never empty, at any point, however long someone plays.
+- It also creates the late-game decision the game did not have: keep compounding, or stop
+  spending and bank the cash for a sell-up. The prestige cap moved to $120,000 to keep a first
+  reset near three hours now that the sink competes for the same money.
+
+**18 new tests** (125 total, all passing) covering decay behaviour and its edges, rank
+progression surviving prestige, each twist individually, twists never attaching to the wrong
+mini-game, twisted rounds always terminating, and the endless upgrade compounding without ever
+reporting itself as maxed.
+
+---
+
 ## Stage 8 — Depth pass: streaks, customers and a real prestige
 
 Researched what comparable games do and built against two specific findings.
@@ -309,11 +378,14 @@ I would want a second opinion on.
 9. **Unity has no sound.** The web build synthesises all of its audio; the same trick works in
    Unity (generating AudioClips procedurally) but is not done yet. Worth doing before anyone else
    plays the Unity build, because the difference in feel is large.
-10. **The streak may be too strong.** At 1.5x it is the largest single multiplier in the game and
-   it rewards exactly the skill the mini-games test — which I think is right for a game where the
-   mini-games are the point. If it makes upgrades feel irrelevant by comparison, lower
-   `comboStep` and the balance probe will show the effect immediately.
-11. **There is a web build of this game** (published as an Artifact) used for playtesting, because
+10. **Unity still has no sound**, and now also has no visible-shuffle animation (the web build
+   flashes the tools; Unity shows the same twist but the reveal is plainer). Both are worth
+   closing before anyone plays the Unity build seriously.
+11. **Is the streak decay too harsh?** Seven seconds of grace, then a step every 1.1s. A player
+   who stops to read the shop will lose a long chain. I think that is correct — it is what makes
+   the streak a thing you protect — but it is the single most likely thing to annoy someone, and
+   `comboGrace` moves it.
+12. **There is a web build of this game** (published as an Artifact) used for playtesting, because
    Unity cannot run in a browser. Every fix in Stage 6 was applied to both. It is not in this repo
    yet — keeping two implementations in step is a real cost, so that is your call.
 4. **The UI is built in code, not prefabs.** Deliberate, and explained in `Assets/Prefabs/README.md`.

@@ -62,6 +62,28 @@ namespace GarageTycoon.Core.Minigames
             return MinigameType.TimingBar;
         }
 
+        /// <summary>How often a twist shows up on a mini-game that has one unlocked.</summary>
+        public const float ModifierChance = 0.3f;
+
+        /// <summary>
+        /// Creates a round and, if the garage is ranked high enough, sometimes twists it.
+        /// Passing a rank of 0 always produces an ordinary round, which is what a new player gets.
+        /// </summary>
+        public static MinigameBase CreateRanked(MinigameType type, JobType jobType, float difficulty,
+            MinigameTuning tuning, IRandomSource random, int garageRank)
+        {
+            MinigameBase game = Create(type, jobType, difficulty, tuning, random);
+
+            MinigameModifier available = Economy.GarageRank.ModifierFor(type, garageRank);
+
+            if (available != MinigameModifier.None && random.Chance(ModifierChance))
+            {
+                game.SetModifier(available);
+            }
+
+            return game;
+        }
+
         /// <summary>Creates a fresh, ready-to-play round of the requested mini-game.</summary>
         public static MinigameBase Create(MinigameType type, JobType jobType, float difficulty, MinigameTuning tuning, IRandomSource random)
         {

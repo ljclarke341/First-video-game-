@@ -33,6 +33,17 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>The work streak. Landing rounds back to back pays more.</summary>
         public ComboTracker Combo { get; private set; }
 
+        /// <summary>
+        /// The garage's standing, earned by all-time earnings and therefore surviving a sell-up.
+        /// Each rank unlocks a new twist on one of the mini-games.
+        /// </summary>
+        public int RankLevel { get { return Economy.GarageRank.LevelFor(Wallet.AllTimeEarnings); } }
+
+        /// <summary>Raised when the garage reaches a new rank, with the new level.</summary>
+        public event Action<int> RankedUp;
+
+        private int _lastSeenRank;
+
         /// <summary>The random source everything shares, so one seed reproduces an entire session.</summary>
         public XorShiftRandom Random { get; private set; }
 
@@ -127,7 +138,14 @@ namespace GarageTycoon.Core.Simulation
             RefreshEffects();
             ResizeBays();
 
+            _lastSeenRank = RankLevel;
             _spawnTimer = 2f; // A car is waiting almost immediately so a new player has something to do.
+        }
+
+        /// <summary>Re-syncs the rank baseline, so loading a save does not replay old rank-ups.</summary>
+        public void SyncRankBaseline()
+        {
+            _lastSeenRank = RankLevel;
         }
 
         /// <summary>Recomputes cached upgrade effects. Call after any purchase or prestige.</summary>
@@ -204,6 +222,17 @@ namespace GarageTycoon.Core.Simulation
             {
                 CalmCooldownRemaining -= deltaTime;
                 if (CalmCooldownRemaining < 0f) CalmCooldownRemaining = 0f;
+            }
+
+            Combo.Tick(deltaTime);
+
+            // Ranking up is permanent progression, so it is checked wherever earnings move.
+            int rank = RankLevel;
+            if (rank > _lastSeenRank)
+            {
+                _lastSeenRank = rank;
+                Action<int> rankHandler = RankedUp;
+                if (rankHandler != null) rankHandler(rank);
             }
 
             Events.Tick(deltaTime);
@@ -429,8 +458,8 @@ namespace GarageTycoon.Core.Simulation
             // Start a fresh round if there is not one running.
             if (session.Minigame == null)
             {
-                MinigameBase minigame = MinigameFactory.Create(
-                    job.Minigame, job.Type, job.Difficulty, CurrentTuning(), Random);
+                MinigameBase minigame = MinigameFactory.CreateRanked(
+                    job.Minigame, job.Type, job.Difficulty, CurrentTuning(), Random, RankLevel);
 
                 session.BeginRound(minigame, Random);
 
@@ -709,7 +738,7 @@ namespace GarageTycoon.Core.Simulation
         public const float CalmCooldownSeconds = 40f;
 
         /// <summary>Seconds left before the player can calm a customer again.</summary>
-        public float CalmCooldownRemaining { get; private set; }
+        public float CalmCooldownRemaining { get; set; }
 
         /// <summary>True when a customer can be calmed right now.</summary>
         public bool CanCalmCustomer { get { return CalmCooldownRemaining <= 0f; } }

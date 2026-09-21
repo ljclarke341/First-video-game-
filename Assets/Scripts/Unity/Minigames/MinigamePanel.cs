@@ -20,6 +20,7 @@ namespace GarageTycoon.Unity.Minigames
         private RectTransform _root;
         private RectTransform _viewHost;
         private Text _jobLabel;
+        private Text _twistLabel;
         private Text _carLabel;
         private ProgressBar _jobProgress;
         private ProgressBar _roundTimer;
@@ -57,6 +58,11 @@ namespace GarageTycoon.Unity.Minigames
 
             _roundTimer = UIFactory.CreateProgressBar("RoundTimer", _root, Theme.Warning, 6);
             UIFactory.AnchorTop(_roundTimer.Rect, 8f, 74f, Theme.PanelPadding);
+
+            // A twisted round has to announce itself, or the player just thinks it is broken.
+            _twistLabel = UIFactory.CreateText("Twist", _root, string.Empty, Theme.FontTiny,
+                Theme.Prestige, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.AnchorTop(_twistLabel.rectTransform, 24f, 86f, Theme.PanelPadding);
 
             // ---- the area the mini-game views live in ----
             _viewHost = UIFactory.CreateRect("ViewHost", _root);
@@ -125,6 +131,13 @@ namespace GarageTycoon.Unity.Minigames
                 BindView(minigame);
             }
 
+            bool twisted = minigame.Modifier != MinigameModifier.None;
+            _twistLabel.gameObject.SetActive(twisted);
+            if (twisted)
+            {
+                _twistLabel.text = minigame.Modifier.DisplayName() + "  \u00B7  " + minigame.Modifier.Hint();
+            }
+
             _roundTimer.Fraction = minigame.TimeLimit <= 0f ? 0f : minigame.TimeRemaining / minigame.TimeLimit;
             _roundTimer.FillColor = Theme.TimerColor(_roundTimer.Fraction);
 
@@ -169,6 +182,7 @@ namespace GarageTycoon.Unity.Minigames
             _carLabel.text = string.Empty;
             _jobProgress.Fraction = 0f;
             _roundTimer.Fraction = 0f;
+            if (_twistLabel != null) _twistLabel.gameObject.SetActive(false);
         }
     }
 }
