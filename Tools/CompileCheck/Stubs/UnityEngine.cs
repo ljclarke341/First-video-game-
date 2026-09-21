@@ -36,6 +36,15 @@ namespace UnityEngine
         public static Vector3 one { get { return new Vector3(1f, 1f, 1f); } }
     }
 
+    public struct Quaternion
+    {
+        public float x, y, z, w;
+        public Quaternion(float x, float y, float z, float w) { this.x = x; this.y = y; this.z = z; this.w = w; }
+        public static Quaternion identity { get { return new Quaternion(0f, 0f, 0f, 1f); } }
+        public static Quaternion Euler(float x, float y, float z) { return identity; }
+        public static Quaternion Euler(Vector3 euler) { return identity; }
+    }
+
     public struct Vector4
     {
         public float x, y, z, w;
@@ -72,6 +81,8 @@ namespace UnityEngine
     public static class Mathf
     {
         public const float PI = 3.14159265f;
+        public const float Deg2Rad = 0.0174532924f;
+        public const float Rad2Deg = 57.29578f;
         public static float Clamp01(float v) { return v < 0f ? 0f : (v > 1f ? 1f : v); }
         public static float Clamp(float v, float min, float max) { return v < min ? min : (v > max ? max : v); }
         public static int Clamp(int v, int min, int max) { return v < min ? min : (v > max ? max : v); }
@@ -82,6 +93,7 @@ namespace UnityEngine
         public static int Min(int a, int b) { return Math.Min(a, b); }
         public static float Sqrt(float v) { return (float)Math.Sqrt(v); }
         public static float Sin(float v) { return (float)Math.Sin(v); }
+        public static float Cos(float v) { return (float)Math.Cos(v); }
         public static float Lerp(float a, float b, float t) { return a + (b - a) * Clamp01(t); }
         public static float InverseLerp(float a, float b, float v) { return 0f; }
         public static int RoundToInt(float v) { return (int)Math.Round(v); }
@@ -138,6 +150,10 @@ namespace UnityEngine
     public class Transform : Component
     {
         public Vector3 localScale { get; set; }
+        public Quaternion localRotation { get; set; }
+        public Quaternion rotation { get; set; }
+        public Vector3 localEulerAngles { get; set; }
+        public Vector3 eulerAngles { get; set; }
         public Transform parent { get; set; }
         public int childCount { get { return 0; } }
         public void SetParent(Transform parent, bool worldPositionStays) { }
@@ -234,6 +250,7 @@ namespace UnityEngine
         public static float deltaTime { get { return 0.016f; } }
         public static float unscaledDeltaTime { get { return 0.016f; } }
         public static float time { get { return 0f; } }
+        public static float unscaledTime { get { return 0f; } }
     }
 
     public static class PlayerPrefs

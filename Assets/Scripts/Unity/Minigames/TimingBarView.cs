@@ -52,7 +52,7 @@ namespace GarageTycoon.Unity.Minigames
 
             _hint = UIFactory.CreateText("Hint", Root, "TAP ANYWHERE", Theme.FontSmall,
                 Theme.TextMuted, TextAnchor.MiddleCenter);
-            UIFactory.AnchorBottom(_hint.rectTransform, 50f, 18f, Theme.PanelPadding);
+            UIFactory.AnchorBottom(_hint.rectTransform, 40f, 10f, Theme.PanelPadding);
 
             // A transparent button over the whole panel: the tap target is the entire area.
             Image tapArea = UIFactory.CreateImage("TapArea", Root, new Color(1f, 1f, 1f, 0f));

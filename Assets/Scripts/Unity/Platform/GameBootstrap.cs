@@ -279,6 +279,9 @@ namespace GarageTycoon.Unity.Platform
             // would otherwise bury the screen in messages.
             if (session.IsMechanic) return;
 
+            // Land the round on the car itself: a bolt goes tight, or the car takes a knock.
+            _garageScreen.NotifyRoundResolved(session, result);
+
             Color color;
             switch (result.Outcome)
             {
@@ -309,6 +312,7 @@ namespace GarageTycoon.Unity.Platform
 
             _toasts.Show(message, car.IsFlawless ? Theme.PerfectZone : Theme.Success, new Vector2(0f, 60f));
             _garageScreen.FlashCar(car, car.IsFlawless ? Theme.PerfectZone : Theme.Success);
+            _garageScreen.NotifyCarCompleted(car);
         }
 
         private void HandleCarLeft(ActiveCar car)

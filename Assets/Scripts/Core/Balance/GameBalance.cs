@@ -43,6 +43,13 @@ namespace GarageTycoon.Core.Balance
         // Repair jobs
         // ---------------------------------------------------------------------
 
+        /// <summary>
+        /// Hard cap on jobs per car, so the UI always has room to draw them - the job chips on a
+        /// bay card and the fastener clusters on the repair view both size themselves from this.
+        /// A test checks no car definition asks for more.
+        /// </summary>
+        public const int MaxJobsPerCar = 4;
+
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const float PerfectProgress = 0.45f;
 

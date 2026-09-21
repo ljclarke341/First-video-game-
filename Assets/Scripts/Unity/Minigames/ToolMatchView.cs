@@ -43,7 +43,7 @@ namespace GarageTycoon.Unity.Minigames
             // One row of tool buttons, laid out automatically.
             RectTransform rowRect = UIFactory.CreateRect("OptionRow", Root);
             _optionRow = rowRect;
-            UIFactory.AnchorMiddle(rowRect, 150f, 40f, Theme.PanelPadding);
+            UIFactory.AnchorMiddle(rowRect, 140f, 24f, Theme.PanelPadding);
             UIFactory.AddHorizontalLayout(rowRect.gameObject, Theme.ElementSpacing);
 
             for (int i = 0; i < MaxOptions; i++)

@@ -15,6 +15,12 @@ namespace GarageTycoon.Unity.Minigames
     /// </summary>
     public sealed class MinigamePanel
     {
+        /// <summary>Where the car band starts, just under the header strip.</summary>
+        private const float RepairBandTop = 92f;
+
+        /// <summary>How tall the car band is. Everything below is left to the mini-game.</summary>
+        private const float RepairBandHeight = 150f;
+
         private GarageSimulation _simulation;
 
         private RectTransform _root;
@@ -27,6 +33,9 @@ namespace GarageTycoon.Unity.Minigames
 
         private RectTransform _idlePanel;
         private Text _idleText;
+
+        /// <summary>The car on the ramp, showing the repair actually happening.</summary>
+        private readonly RepairView _repairView = new RepairView();
 
         private readonly List<MinigameView> _views = new List<MinigameView>();
         private MinigameView _activeView;
@@ -64,9 +73,16 @@ namespace GarageTycoon.Unity.Minigames
                 Theme.Prestige, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.AnchorTop(_twistLabel.rectTransform, 24f, 86f, Theme.PanelPadding);
 
+            // ---- the car, sitting above the controls ----
+            // The band is deliberately shallow: the car is the reward for winning a round, not the
+            // thing you interact with, so the mini-game keeps the bulk of the panel.
+            RectTransform repairBand = UIFactory.CreateRect("RepairBand", _root);
+            UIFactory.AnchorTop(repairBand, RepairBandHeight, RepairBandTop, Theme.PanelPadding);
+            _repairView.Build(repairBand);
+
             // ---- the area the mini-game views live in ----
             _viewHost = UIFactory.CreateRect("ViewHost", _root);
-            UIFactory.AnchorMiddle(_viewHost, 92f, 0f, 0f);
+            UIFactory.AnchorMiddle(_viewHost, RepairBandTop + RepairBandHeight + 6f, 0f, 0f);
 
             _views.Add(new TimingBarView());
             _views.Add(new ToolMatchView());
@@ -107,6 +123,9 @@ namespace GarageTycoon.Unity.Minigames
                 ShowIdle("All jobs done on this car");
                 return;
             }
+
+            // ---- the car on the ramp ----
+            _repairView.Refresh(car, car.ActiveJobIndex);
 
             // ---- header ----
             _jobLabel.text = job.Type.DisplayName();
@@ -156,6 +175,23 @@ namespace GarageTycoon.Unity.Minigames
             if (_activeView != null) _activeView.Bind(minigame);
         }
 
+        /// <summary>
+        /// Called when a round finishes so the car reacts: a bolt goes tight, a wheel turns, or
+        /// the whole thing gets a knock if the round was missed.
+        /// </summary>
+        public void NotifyRoundResolved(WorkSession session, MinigameResult result)
+        {
+            if (session == null || session.Car == null || session.Job == null) return;
+
+            _repairView.Pulse(session.Car, session.Job.Type, result.Outcome);
+        }
+
+        /// <summary>Called when a car is finished, for the final flourish.</summary>
+        public void NotifyCarCompleted(ActiveCar car)
+        {
+            _repairView.Finish();
+        }
+
         private MinigameView FindView(MinigameType type)
         {
             for (int i = 0; i < _views.Count; i++)
@@ -174,6 +210,8 @@ namespace GarageTycoon.Unity.Minigames
             }
 
             _boundMinigame = null;
+
+            _repairView.Clear();
 
             _idlePanel.gameObject.SetActive(true);
             _idleText.text = message;

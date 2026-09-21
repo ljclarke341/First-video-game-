@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Events;
+using GarageTycoon.Core.Minigames;
 using GarageTycoon.Core.Simulation;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Unity.Minigames;
@@ -498,6 +499,21 @@ namespace GarageTycoon.Unity.UI
         }
 
         /// <summary>The bay card for a given bay, so toasts can be popped over the right car.</summary>
+        /// <summary>
+        /// Passes a finished round down to the workbench, so the car on the ramp reacts to it.
+        /// The bootstrap owns the event wiring, so it forwards rather than the panel subscribing.
+        /// </summary>
+        public void NotifyRoundResolved(WorkSession session, MinigameResult result)
+        {
+            if (_minigamePanel != null) _minigamePanel.NotifyRoundResolved(session, result);
+        }
+
+        /// <summary>Passes a finished car down to the workbench for its final flourish.</summary>
+        public void NotifyCarCompleted(ActiveCar car)
+        {
+            if (_minigamePanel != null) _minigamePanel.NotifyCarCompleted(car);
+        }
+
         public RectTransform GetBayRect(int bayIndex)
         {
             if (bayIndex < 0 || bayIndex >= _bayCards.Count) return null;

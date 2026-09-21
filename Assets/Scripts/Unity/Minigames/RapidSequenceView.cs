@@ -36,7 +36,7 @@ namespace GarageTycoon.Unity.Minigames
 
             // The pattern, shown as a row of chips.
             _stepRow = UIFactory.CreateRect("StepRow", Root);
-            UIFactory.AnchorTop(_stepRow, 90f, 74f, Theme.PanelPadding);
+            UIFactory.AnchorTop(_stepRow, 76f, 66f, Theme.PanelPadding);
             UIFactory.AddHorizontalLayout(_stepRow.gameObject, 10f);
 
             for (int i = 0; i < MaxSteps; i++)
@@ -53,7 +53,7 @@ namespace GarageTycoon.Unity.Minigames
             // A four-button pad. Up on top, left/right in the middle, down at the bottom, which is
             // the layout a thumb expects.
             RectTransform pad = UIFactory.CreateRect("DirectionPad", Root);
-            UIFactory.AnchorMiddle(pad, 180f, 20f, Theme.PanelPadding);
+            UIFactory.AnchorMiddle(pad, 152f, 16f, Theme.PanelPadding);
 
             CreateDirectionButton(pad, 0, new Vector2(0.33f, 0.62f), new Vector2(0.67f, 1f));   // UP
             CreateDirectionButton(pad, 1, new Vector2(0.68f, 0.31f), new Vector2(1f, 0.69f));   // RIGHT

@@ -6,6 +6,77 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Stage 10 — You can now see the repair happening
+
+**What you asked for:** an animation showing the car, the wheels and everything getting tightened
+as you complete the mini-games.
+
+### The problem with a progress bar
+
+Up to now, finishing a round moved a bar. A bar tells you a number, but it never shows you the
+work — you could play a whole car without ever looking at it. The job was invisible.
+
+### What is there now
+
+A car sits on the ramp above the mini-game, in the car's own colour, and the job happens **on it**.
+
+- **Fasteners are the through-line.** Every job type has a cluster of bolts somewhere sensible on
+  the car — wheel nuts on the front wheel for a tyre change, caliper bolts on the rear for brakes,
+  bonnet bolts for an engine rebuild, a cluster up in the cabin for diagnostics. As a job
+  progresses, they go tight one at a time, newest one popping and turning as it lands. So "I
+  finished a round" always reads as "another bolt just went tight", whichever mini-game it was.
+- **The wheels actually turn.** Wheel work spins the wheel it belongs to by 120 degrees, eased
+  rather than snapped, so it looks like a wheel being spun back on.
+- **A ring marks where you are working**, breathing slowly so your eye finds it without it being
+  noisy.
+- **A spark where the spanner lands** — gold for a perfect round, green for a good one.
+- **A miss knocks the car** instead of turning a bolt, because a miss moves nothing.
+- **The finished car swells once**, as a small "done, and looking good".
+- Underneath, a plain count (`7 / 17 fasteners torqued`) for anyone who wants the number too.
+
+### The rule that makes it honest, and the bug the tests caught
+
+The number of turned bolts is read directly from the job's progress every frame — never a counter
+that ticks up on its own, because that is exactly how an animation drifts out of step with the
+game underneath it.
+
+The first version rounded: `round(progress × bolts)`. Writing the test for that found a real bug.
+A five-bolt job at 90% progress rounds to **five out of five** — the car claims to be finished
+while the progress bar plainly is not. The other end is just as bad: 1% of real work shows nothing
+at all, so the round you just won looks like it did nothing. Both are now clamped, and both are
+pinned by tests:
+
+- `An unfinished job never shows a finished car`
+- `Any progress at all shows at least one fastener turned`
+- `Fasteners only ever go one way as a job progresses` (200 steps, each job type)
+- `A played car's fasteners track its jobs all the way through` — the virtual player works real
+  cars and every single round is checked against the car's own numbers
+
+The same bug was in the web build. Fixed there too, and verified in a browser: a five-bolt tyre
+job now reads 0.2→1, 0.5→3, 0.8→4, 0.9→4, 0.999→4, 1.0→5.
+
+### Where the layout lives
+
+The map of "which job happens where on the car, and how many bolts it gets" is in
+`Assets/Scripts/Core/Cars/RepairLayout.cs` — in **Core**, not in the Unity view. Two reasons: the
+tests can check it without Unity being involved, and if a second front end ever draws the same car
+they read the same table instead of drifting apart. The tests check every job type has a spot,
+that no spot sits off the car, and that no two clusters would draw on top of each other.
+
+### Also in this stage
+
+- `GameBalance.MaxJobsPerCar` now exists as a real constant (4). The view sizes its bolt pool from
+  it, and a test checks no car in the catalogue asks for more than the UI can draw.
+- The mini-game area lost 156px to make room for the car, so all four games were re-fitted to the
+  shorter panel. Every touch target is still comfortably above the 108px minimum — the hold button
+  is 130px.
+- Four gaps in the Unity API stubs turned up (`Quaternion`, `Transform.localRotation`,
+  `Mathf.Cos`, `Time.unscaledTime`) and were added to match the real API.
+
+**Tests: 135 passing** (up from 125). Compile check clean.
+
+---
+
 ## Stage 9 — Fixing what Stage 8 got wrong, and giving the game somewhere to go
 
 Three problems, all found by tracing a full three-hour run rather than by guessing.
@@ -381,6 +452,14 @@ I would want a second opinion on.
 10. **Unity still has no sound**, and now also has no visible-shuffle animation (the web build
    flashes the tools; Unity shows the same twist but the reveal is plainer). Both are worth
    closing before anyone plays the Unity build seriously.
+13. **The Unity repair car is simpler than the web one.** Both show the bolts going tight, the
+   wheels turning, the active-job ring and the spark. The web build additionally draws the
+   *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
+   finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
+   work for something the bolts already communicate. Say the word if you want parity.
+14. **The mini-games are 156px shorter now.** I think the trade is clearly worth it — the car is
+   the best feedback in the game — but if any of the four now feels cramped on your actual phone,
+   tell me which and I will give it the space back by shrinking the car band instead.
 11. **Is the streak decay too harsh?** Seven seconds of grace, then a step every 1.1s. A player
    who stops to read the shop will lose a long chain. I think that is correct — it is what makes
    the streak a thing you protect — but it is the single most likely thing to annoy someone, and

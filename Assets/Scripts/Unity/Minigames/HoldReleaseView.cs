@@ -11,7 +11,7 @@ namespace GarageTycoon.Unity.Minigames
     /// </summary>
     public sealed class HoldReleaseView : MinigameView
     {
-        private const float GaugeHeight = 110f;
+        private const float GaugeHeight = 90f;
 
         private Text _prompt;
         private RectTransform _gauge;
@@ -34,7 +34,7 @@ namespace GarageTycoon.Unity.Minigames
 
             Image gaugeImage = UIFactory.CreatePanel("Gauge", Root, Theme.PanelSunken, 16);
             _gauge = gaugeImage.rectTransform;
-            UIFactory.AnchorTop(_gauge, GaugeHeight, 86f, Theme.PanelPadding * 2f);
+            UIFactory.AnchorTop(_gauge, GaugeHeight, 70f, Theme.PanelPadding * 2f);
 
             // Danger stretch first so the bands paint on top of it.
             _dangerBand = UIFactory.CreatePanel("DangerBand", _gauge, Theme.WithAlpha(Theme.DangerZone, 0.35f), 12);
@@ -54,7 +54,7 @@ namespace GarageTycoon.Unity.Minigames
 
             // The hold button is deliberately huge: it is the only thing the player touches.
             _holdButton = UIFactory.CreateButton("HoldButton", Root, "HOLD", Theme.Info, Theme.TextOnAccent, Theme.FontTitle);
-            UIFactory.AnchorBottom(_holdButton.GetComponent<RectTransform>(), 190f, 30f, Theme.PanelPadding * 2f);
+            UIFactory.AnchorBottom(_holdButton.GetComponent<RectTransform>(), 130f, 16f, Theme.PanelPadding * 2f);
             _holdLabel = _holdButton.GetComponentInChildren<Text>();
 
             // Button handles the visuals; PointerButton gives us the press/release timing.
