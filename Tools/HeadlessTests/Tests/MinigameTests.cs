@@ -289,7 +289,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 for (int rarity = 0; rarity < 5; rarity++)
                 {
-                    float difficulty = ((CarRarity)rarity).DifficultyScale();
+                    float difficulty = (float)((CarRarity)rarity).DifficultyScale();
                     MinigameBase game = MinigameFactory.Create(
                         (MinigameType)typeIndex, JobType.Engine, difficulty, MinigameTuning.Default, random);
 
@@ -310,8 +310,8 @@ namespace GarageTycoon.HeadlessTests.Tests
         {
             const int Rounds = 400;
 
-            float expertScore = ScoreAutoPlayer(0.95f, Rounds, 5001);
-            float noviceScore = ScoreAutoPlayer(0.2f, Rounds, 5001);
+            double expertScore = ScoreAutoPlayer(0.95f, Rounds, 5001);
+            double noviceScore = ScoreAutoPlayer(0.2f, Rounds, 5001);
 
             Check.IsTrue(expertScore > noviceScore * 1.5f,
                 string.Format("An expert mechanic should clearly out-score a novice (expert {0:0.000}, novice {1:0.000})",
@@ -321,10 +321,10 @@ namespace GarageTycoon.HeadlessTests.Tests
         }
 
         /// <summary>Average progress per round for a mechanic of the given skill across all four games.</summary>
-        private static float ScoreAutoPlayer(float skill, int rounds, int seed)
+        private static double ScoreAutoPlayer(float skill, int rounds, int seed)
         {
             XorShiftRandom random = new XorShiftRandom(seed);
-            float total = 0f;
+            double total = 0d;
 
             for (int i = 0; i < rounds; i++)
             {
@@ -347,18 +347,18 @@ namespace GarageTycoon.HeadlessTests.Tests
             const int Rounds = 500;
             const float MediocreSkill = 0.55f;
 
-            float baseScore = ScoreWithTuning(MinigameTuning.Default, MediocreSkill, Rounds, 6001);
-            float upgradedScore = ScoreWithTuning(upgraded, MediocreSkill, Rounds, 6001);
+            double baseScore = ScoreWithTuning(MinigameTuning.Default, MediocreSkill, Rounds, 6001);
+            double upgradedScore = ScoreWithTuning(upgraded, MediocreSkill, Rounds, 6001);
 
             Check.IsTrue(upgradedScore > baseScore,
                 string.Format("Precision upgrades should raise the average result ({0:0.000} -> {1:0.000})",
                     baseScore, upgradedScore));
         }
 
-        private static float ScoreWithTuning(MinigameTuning tuning, float skill, int rounds, int seed)
+        private static double ScoreWithTuning(MinigameTuning tuning, float skill, int rounds, int seed)
         {
             XorShiftRandom random = new XorShiftRandom(seed);
-            float total = 0f;
+            double total = 0d;
 
             for (int i = 0; i < rounds; i++)
             {

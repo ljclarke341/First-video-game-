@@ -11,10 +11,10 @@ namespace GarageTycoon.Core.Minigames
         public MinigameOutcome Outcome;
 
         /// <summary>Repair progress earned, as a fraction of a whole job (negative when something breaks).</summary>
-        public float ProgressDelta;
+        public double ProgressDelta;
 
         /// <summary>Multiplier folded into the job's payout. 1.0 is normal.</summary>
-        public float CashMultiplier;
+        public double CashMultiplier;
 
         /// <summary>Seconds taken off the customer's patience as a punishment.</summary>
         public float TimePenaltySeconds;
@@ -37,7 +37,7 @@ namespace GarageTycoon.Core.Minigames
             MinigameResult result = new MinigameResult();
             result.Outcome = outcome;
             result.Message = message;
-            result.CashMultiplier = 1f;
+            result.CashMultiplier = 1d;
             result.TimePenaltySeconds = 0f;
 
             switch (outcome)
@@ -53,7 +53,7 @@ namespace GarageTycoon.Core.Minigames
                     result.ProgressDelta = GameBalance.WeakProgress;
                     break;
                 case MinigameOutcome.Miss:
-                    result.ProgressDelta = 0f;
+                    result.ProgressDelta = 0d;
                     result.TimePenaltySeconds = GameBalance.MissTimePenaltySeconds;
                     break;
                 case MinigameOutcome.Damage:

@@ -181,11 +181,11 @@ namespace GarageTycoon.Core.Cars
         /// Average completion across the work the customer agreed to, 0..1.
         /// Declined jobs are left out entirely, so quoting for less does not leave the bar short.
         /// </summary>
-        public float OverallProgress
+        public double OverallProgress
         {
             get
             {
-                float sum = 0f;
+                double sum = 0d;
                 int counted = 0;
 
                 for (int i = 0; i < _jobs.Count; i++)
@@ -195,7 +195,7 @@ namespace GarageTycoon.Core.Cars
                     counted++;
                 }
 
-                if (counted == 0) return 1f;
+                if (counted == 0) return 1d;
                 return MathUtil.Clamp01(sum / counted);
             }
         }

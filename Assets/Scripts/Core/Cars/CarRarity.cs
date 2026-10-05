@@ -19,16 +19,16 @@ namespace GarageTycoon.Core.Cars
         /// Difficulty multiplier applied to every mini-game on this car.
         /// 1.0 = baseline, higher = faster markers, smaller windows, longer sequences.
         /// </summary>
-        public static float DifficultyScale(this CarRarity rarity)
+        public static double DifficultyScale(this CarRarity rarity)
         {
             switch (rarity)
             {
-                case CarRarity.Common: return 1.0f;
-                case CarRarity.Uncommon: return 1.15f;
-                case CarRarity.Rare: return 1.35f;
-                case CarRarity.Epic: return 1.6f;
-                case CarRarity.Legendary: return 1.9f;
-                default: return 1.0f;
+                case CarRarity.Common: return 1.0d;
+                case CarRarity.Uncommon: return 1.15d;
+                case CarRarity.Rare: return 1.35d;
+                case CarRarity.Epic: return 1.6d;
+                case CarRarity.Legendary: return 1.9d;
+                default: return 1.0d;
             }
         }
 

@@ -71,7 +71,7 @@ namespace GarageTycoon.Core.Cars
         /// makes the animation mean something: it is a direct read of progress, never a counter
         /// that could drift out of step with the simulation.
         /// </summary>
-        public static int TightFasteners(JobType jobType, float progress)
+        public static int TightFasteners(JobType jobType, double progress)
         {
             RepairSpot spot = For(jobType);
 

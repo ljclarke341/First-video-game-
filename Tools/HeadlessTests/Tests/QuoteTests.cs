@@ -180,8 +180,8 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             suite.Add("Guessing the customer right helps, guessing wrong costs", () =>
             {
-                float right = Quote.SatisfactionModifier(CustomerMood.Vip, QuoteOption.Everything);
-                float wrong = Quote.SatisfactionModifier(CustomerMood.Vip, QuoteOption.EssentialOnly);
+                double right = Quote.SatisfactionModifier(CustomerMood.Vip, QuoteOption.Everything);
+                double wrong = Quote.SatisfactionModifier(CustomerMood.Vip, QuoteOption.EssentialOnly);
 
                 Check.IsTrue(right > 0f, "matching the customer should be worth something");
                 Check.IsTrue(wrong < 0f, "missing the customer should cost something");

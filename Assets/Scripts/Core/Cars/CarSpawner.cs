@@ -134,14 +134,16 @@ namespace GarageTycoon.Core.Cars
 
             List<JobType> chosenTypes = PickDistinctJobs(definition, jobCount);
 
-            float difficulty = definition.Rarity.DifficultyScale();
+            // Narrowed once, here: difficulty is a float on the job because the mini-games tick
+            // on Unity's float deltaTime. Everything upstream of this line stays in double.
+            float difficulty = (float)definition.Rarity.DifficultyScale();
 
             // Work per job also grows with rarity, so a supercar is not just faster-paced but longer.
             float baseWork = 1f + ((int)definition.Rarity) * 0.22f;
 
             List<RepairJob> jobs = new List<RepairJob>();
-            List<float> weights = new List<float>();
-            float weightTotal = 0f;
+            List<double> weights = new List<double>();
+            double weightTotal = 0d;
 
             MinigameType? previousType = null;
 
@@ -153,7 +155,9 @@ namespace GarageTycoon.Core.Cars
                 MinigameType minigame = MinigameFactory.ChooseType(jobType, _random, previousType);
                 previousType = minigame;
 
-                float weight = jobType.PayoutWeight() * work;
+                // Double all the way through: this weight divides the payout pool, so a float's
+                // last bit here is pennies on every job in the game.
+                double weight = jobType.PayoutWeight() * work;
                 weights.Add(weight);
                 weightTotal += weight;
 

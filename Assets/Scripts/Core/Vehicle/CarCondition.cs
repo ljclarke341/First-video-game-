@@ -22,17 +22,19 @@ namespace GarageTycoon.Core.Vehicle
     public sealed class CarCondition
     {
         /// <summary>At or below this, a system is bad enough to be worth repairing.</summary>
-        public const float FaultThreshold = 0.62f;
+        // A double: this is a threshold the two builds compare against, and 0.62f widened is
+        // 0.6200000047683716, which is on the other side of a reading that lands exactly on it.
+        public const double FaultThreshold = 0.62d;
 
-        private readonly float[] _health = new float[VehicleSystemExtensions.Count];
+        private readonly double[] _health = new double[VehicleSystemExtensions.Count];
 
         private CarCondition() { }
 
         /// <summary>Health of one system, 0..1.</summary>
-        public float Get(VehicleSystem system)
+        public double Get(VehicleSystem system)
         {
             int index = (int)system;
-            if (index < 0 || index >= _health.Length) return 1f;
+            if (index < 0 || index >= _health.Length) return 1d;
             return _health[index];
         }
 
@@ -49,11 +51,11 @@ namespace GarageTycoon.Core.Vehicle
         }
 
         /// <summary>Average health across every system - the single number for a card or a sale price.</summary>
-        public float Overall
+        public double Overall
         {
             get
             {
-                float total = 0f;
+                double total = 0d;
                 for (int i = 0; i < _health.Length; i++) total += _health[i];
                 return total / _health.Length;
             }
@@ -135,9 +137,9 @@ namespace GarageTycoon.Core.Vehicle
                 int index = (int)SystemFor(job.Type);
 
                 // Bigger jobs mean worse condition. WorkAmount runs about 1.0 to 1.9.
-                float severity = MathUtil.Clamp01((job.WorkAmount - 1f) / 0.9f);
-                float health = MathUtil.Lerp(0.52f, 0.14f, severity) + random.Range(-0.07f, 0.07f);
-                health = MathUtil.Clamp(health, 0.06f, FaultThreshold);
+                double severity = MathUtil.Clamp01((job.WorkAmount - 1d) / 0.9d);
+                double health = MathUtil.Lerp(0.52d, 0.14d, severity) + random.Range(-0.07f, 0.07f);
+                health = MathUtil.Clamp(health, 0.06d, FaultThreshold);
 
                 // Two jobs on one system (panels AND paint) means the worse of the two shows.
                 if (health < condition._health[index]) condition._health[index] = health;

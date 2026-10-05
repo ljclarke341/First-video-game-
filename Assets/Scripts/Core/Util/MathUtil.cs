@@ -8,6 +8,32 @@ namespace GarageTycoon.Core.Util
     /// </summary>
     public static class MathUtil
     {
+/// <summary>
+        /// The double overloads exist because the shared arithmetic in this project is double.
+        ///
+        /// Without them every widened calculation has to narrow to float just to clamp and then
+        /// widen again, which is precisely the round trip that has produced five separate parity
+        /// failures here. The float overloads below stay for frame timing, which really is float.
+        /// </summary>
+        public static double Clamp01(double value)
+        {
+            if (value < 0d) return 0d;
+            if (value > 1d) return 1d;
+            return value;
+        }
+
+        public static double Clamp(double value, double min, double max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return value;
+        }
+
+        public static double Lerp(double a, double b, double t)
+        {
+            return a + (b - a) * Clamp01(t);
+        }
+
         public static float Clamp01(float value)
         {
             if (value < 0f) return 0f;

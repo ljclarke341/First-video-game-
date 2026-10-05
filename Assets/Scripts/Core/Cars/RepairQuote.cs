@@ -45,7 +45,8 @@ namespace GarageTycoon.Core.Cars
     public sealed class Quote
     {
         /// <summary>At or below this a system is bad enough that the repair is not optional.</summary>
-        public const float EssentialThreshold = 0.34f;
+        // A double, like FaultThreshold: a threshold both builds compare against.
+        public const double EssentialThreshold = 0.34d;
 
         private readonly List<QuoteLine> _lines = new List<QuoteLine>();
 
@@ -139,7 +140,7 @@ namespace GarageTycoon.Core.Cars
         /// Brakes get a lower bar than everything else, because brakes are brakes - a garage that
         /// sends a car out with soft ones has a bigger problem than a thin margin.
         /// </summary>
-        public static bool IsEssential(JobType jobType, float systemHealth)
+        public static bool IsEssential(JobType jobType, double systemHealth)
         {
             if (jobType == JobType.Brakes) return systemHealth <= CarCondition.FaultThreshold;
 
@@ -283,15 +284,15 @@ namespace GarageTycoon.Core.Cars
         /// Kept small on purpose. This should make the player think about who they are talking to,
         /// not punish them for guessing wrong - the repair itself still matters far more.
         /// </summary>
-        public static float SatisfactionModifier(CustomerMood mood, QuoteOption chosen)
+        public static double SatisfactionModifier(CustomerMood mood, QuoteOption chosen)
         {
             QuoteOption preferred = PreferenceOf(mood);
 
-            if (chosen == QuoteOption.Custom) return 0f;     // no strong feelings either way
-            if (chosen == preferred) return 0.08f;
+            if (chosen == QuoteOption.Custom) return 0d;     // no strong feelings either way
+            if (chosen == preferred) return 0.08d;
 
             // A VIP told "we only did the bare minimum" takes it worse than most.
-            return mood == CustomerMood.Vip ? -0.12f : -0.06f;
+            return mood == CustomerMood.Vip ? -0.12d : -0.06d;
         }
 
         /// <summary>

@@ -228,7 +228,7 @@ namespace GarageTycoon.Unity.UI
             {
                 VehicleSystem system = (VehicleSystem)i;
                 bool known = _car.Diagnosis.IsRevealed(system);
-                float health = _car.Condition.Get(system);
+                float health = (float)(_car.Condition.Get(system));
 
                 SystemRow row = _rows[i];
 

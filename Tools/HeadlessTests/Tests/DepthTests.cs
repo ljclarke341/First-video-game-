@@ -204,15 +204,15 @@ namespace GarageTycoon.HeadlessTests.Tests
         {
             XorShiftRandom random = new XorShiftRandom(11004);
 
-            float plain = ProgressFromPerfectTap(random, false);
-            float twisted = ProgressFromPerfectTap(random, true);
+            double plain = ProgressFromPerfectTap(random, false);
+            double twisted = ProgressFromPerfectTap(random, true);
 
             Check.IsTrue(twisted > plain,
                 string.Format("A twisted round should earn more progress ({0:0.000} vs {1:0.000})", twisted, plain));
         }
 
         /// <summary>Plays a timing bar to a deliberate perfect hit and returns the progress earned.</summary>
-        private static float ProgressFromPerfectTap(IRandomSource random, bool twisted)
+        private static double ProgressFromPerfectTap(IRandomSource random, bool twisted)
         {
             TimingBarMinigame game = new TimingBarMinigame(1f, MinigameTuning.Default, random);
             if (twisted) game.SetModifier(MinigameModifier.TwinZones);
@@ -351,7 +351,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 for (int rarity = 0; rarity < 5; rarity++)
                 {
-                    float difficulty = ((CarRarity)rarity).DifficultyScale();
+                    float difficulty = (float)((CarRarity)rarity).DifficultyScale();
                     MinigameBase game = MinigameFactory.Create(
                         twist.AppliesTo(), JobType.Engine, difficulty, MinigameTuning.Default, random);
                     game.SetModifier(twist);

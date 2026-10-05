@@ -6,6 +6,40 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2c — The shared float/double audit
+
+Cleanup only. **No value changed, and nothing about the game moved**: the 505 parity cases are
+still identical, the 290 tests still pass, and `probe inspect` prints the same session income to
+the dollar ($13,845 for never-inspecting, before and after).
+
+Five separate parity failures in this project have had the same shape: a number both builds use,
+held as a float on one side and a double on the other. `1.3f` is really 1.2999999523162842 and
+JavaScript's `1.3` is not. Each time it was found by parity rather than by reading the code, and
+each time it was fixed alone. This converts the six Group A items in one pass.
+
+| # | what | now |
+|---|---|---|
+| 1 | `Quote.SatisfactionModifier()` | double - 0.08/-0.12/-0.06 feed a double satisfaction, and did not survive the trip |
+| 2 | `JobType.PayoutWeight()` | double - divides the payout pool, so it prices every job |
+| 3 | `DiagnosisAction.Thoroughness()`, `CarDiagnosis.Accuracy` | double - a running average that multiplies into the payout bonus |
+| 4 | `GameBalance` progress constants, `PerfectJobCashBonus` | double, and with them `MinigameResult.ProgressDelta`/`CashMultiplier` and `RepairJob.Progress` |
+| 5 | `CarRarity.DifficultyScale()` | double, narrowed once where a mini-game needs a float |
+| 6 | `FaultThreshold`, `EssentialThreshold`, `DiagnosisActions.DifficultyScale` | double, and with them `CarCondition`'s readings |
+
+Items 4 and 6 pulled their chains with them, which is the point: a double constant assigned
+straight into a float field buys nothing. So progress and the condition readings are now double
+end to end, and `MathUtil` gained double overloads of `Clamp01`, `Clamp` and `Lerp` so widened
+arithmetic no longer has to round-trip through float just to clamp.
+
+Group B - `TimeRemaining`, `TotalTime`, `TimeUntilNextCar`, `CalmCooldownRemaining`, the combo
+timers and the `*Seconds` constants - was left alone deliberately. Those are driven by Unity's
+`deltaTime`, which is a float; widening them would add a cast per frame and improve nothing.
+
+The narrowing now happens in exactly one place per chain, at the edge where Unity genuinely needs
+a float: a progress bar's `Fraction`, a mini-game's difficulty. Everything upstream is double.
+
+---
+
 ## Phase B.2b — Diagnosis becomes an information gate
 
 The fix for the measurement in the previous entry. **One rule changed**: the quote may only list
@@ -1318,11 +1352,9 @@ I would want a second opinion on.
    "should I inspect this urgent car?" cannot be a real decision yet, because the answer is already
    "no" for every car.
 
-18. **Every shared number should be a double from the start.** Four separate float-vs-double bugs
-   now (the tip multiplier, the quality score, the part quality modifier, and now the patience
-   chain), all the same shape, all found only by parity. I have been fixing them one at a time as
-   parity catches them. Say the word and I will sweep the remaining shared floats in one pass
-   rather than waiting for the fifth.
+18. ~~**Every shared number should be a double from the start.**~~ **Done** in Phase B.2c - all six
+   Group A items converted in one pass, no behaviour change, parity still identical. Group B frame
+   timing stays float on purpose.
 
 17. **The web build is still not in the repo**, and V2 makes that cost much higher than it was.
    Every system now has to be written twice by hand - once in C#, once in JavaScript - and the two

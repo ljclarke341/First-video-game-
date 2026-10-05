@@ -157,7 +157,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             string sampleId = sample.Definition.Id;
             int sampleJobCount = sample.Jobs.Count;
-            float sampleProgress = sample.OverallProgress;
+            double sampleProgress = sample.OverallProgress;
             float sampleTime = sample.TimeRemaining;
 
             string json = GameStateSerializer.Save(simulation, 3000d);

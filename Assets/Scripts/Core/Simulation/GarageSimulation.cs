@@ -842,7 +842,9 @@ namespace GarageTycoon.Core.Simulation
             // Inspecting is hands-on, so it takes the place of whatever was being worked.
             ClearPlayerSession();
 
-            float difficulty = car.Definition.Rarity.DifficultyScale() * DiagnosisActions.DifficultyScale;
+            // Worked out in double, narrowed once for the mini-game, which runs on float time.
+            float difficulty = (float)(car.Definition.Rarity.DifficultyScale()
+                                       * DiagnosisActions.DifficultyScale);
 
             MinigameBase minigame = MinigameFactory.Create(
                 action.MinigameFor(), JobType.Diagnostics, difficulty, CurrentTuning(), Random);

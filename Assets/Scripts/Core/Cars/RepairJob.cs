@@ -15,7 +15,14 @@ namespace GarageTycoon.Core.Cars
         public MinigameType Minigame { get; private set; }
 
         /// <summary>0 = untouched, 1 = finished.</summary>
-        public float Progress { get; private set; }
+        /// <summary>
+        /// How far through this repair the garage is, 0..1.
+        ///
+        /// A double because it is SHARED arithmetic, not frame timing: the bolt count on screen is
+        /// read off it, and both builds have to land on the same bolt. Progress accumulates over
+        /// many rounds, which is exactly where a float's last bit compounds.
+        /// </summary>
+        public double Progress { get; private set; }
 
         /// <summary>
         /// How much work this job represents. A value of 2 means every mini-game round counts for half
@@ -112,7 +119,7 @@ namespace GarageTycoon.Core.Cars
         /// Folds the verdict of one mini-game round into this job's progress.
         /// Returns the cash multiplier the round earned, so the car can track overall quality.
         /// </summary>
-        public float ApplyResult(MinigameResult result)
+        public double ApplyResult(MinigameResult result)
         {
             RoundsPlayed++;
 

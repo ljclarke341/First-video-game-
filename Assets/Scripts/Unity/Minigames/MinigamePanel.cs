@@ -268,7 +268,7 @@ namespace GarageTycoon.Unity.Minigames
             // ---- header ----
             _jobLabel.text = job.Type.DisplayName();
             _carLabel.text = car.Definition.DisplayName;
-            _jobProgress.Fraction = job.Progress;
+            _jobProgress.Fraction = (float)(job.Progress);
             _jobProgress.Rect.gameObject.SetActive(true);
 
             MinigameBase minigame = session.Minigame;

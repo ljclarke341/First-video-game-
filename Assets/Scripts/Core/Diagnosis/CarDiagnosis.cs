@@ -41,13 +41,16 @@ namespace GarageTycoon.Core.Diagnosis
         public bool WasSkipped { get; private set; }
 
         /// <summary>
-        /// How well the inspection went, 0..1. Driven by how the diagnosis rounds were played,
-        /// not by how many checks were run - thrashing through every check badly is not skill.
+        /// How well the inspection went, 0..1. Driven by how the rounds were PLAYED, not by how
+        /// many were run - thrashing through every check badly is not skill.
+        ///
+        /// A double: this multiplies into the payout bonus, so it is money arithmetic, and it is a
+        /// running average, which is where a float's last bit compounds fastest.
         /// </summary>
-        public float Accuracy { get; private set; }
+        public double Accuracy { get; private set; }
 
         private int _scoredRounds;
-        private float _scoreTotal;
+        private double _scoreTotal;
 
         /// <summary>Whether a given system's true condition is known.</summary>
         public bool IsRevealed(VehicleSystem system)
@@ -100,7 +103,7 @@ namespace GarageTycoon.Core.Diagnosis
 
             if (!_actionsRun.Contains(action)) _actionsRun.Add(action);
 
-            float quality = QualityOf(outcome) * action.Thoroughness();
+            double quality = QualityOf(outcome) * action.Thoroughness();
 
             _scoredRounds++;
             _scoreTotal += QualityOf(outcome);
@@ -148,15 +151,15 @@ namespace GarageTycoon.Core.Diagnosis
             return 1d + 0.12d * Accuracy;
         }
 
-        private static float QualityOf(MinigameOutcome outcome)
+        private static double QualityOf(MinigameOutcome outcome)
         {
             switch (outcome)
             {
-                case MinigameOutcome.Perfect: return 1f;
-                case MinigameOutcome.Good: return 0.75f;
-                case MinigameOutcome.Weak: return 0.4f;
-                case MinigameOutcome.Miss: return 0.1f;
-                default: return 0f;                       // a broken check tells you nothing
+                case MinigameOutcome.Perfect: return 1d;
+                case MinigameOutcome.Good: return 0.75d;
+                case MinigameOutcome.Weak: return 0.4d;
+                case MinigameOutcome.Miss: return 0.1d;
+                default: return 0d;                       // a broken check tells you nothing
             }
         }
 
@@ -172,7 +175,7 @@ namespace GarageTycoon.Core.Diagnosis
             return mask;
         }
 
-        public void Restore(int revealedMask, bool hasStarted, bool skipped, float accuracy,
+        public void Restore(int revealedMask, bool hasStarted, bool skipped, double accuracy,
             IEnumerable<int> actionsRun)
         {
             for (int i = 0; i < _revealed.Length; i++) _revealed[i] = (revealedMask & (1 << i)) != 0;

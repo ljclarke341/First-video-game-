@@ -128,9 +128,9 @@ namespace GarageTycoon.Core.Diagnosis
         /// A broad check is less likely to pin down any one fault, so the test drive has to be
         /// worth taking rather than strictly better than doing the job properly.
         /// </summary>
-        public static float Thoroughness(this DiagnosisAction action)
+        public static double Thoroughness(this DiagnosisAction action)
         {
-            return action == DiagnosisAction.TestDrive ? 0.55f : 1f;
+            return action == DiagnosisAction.TestDrive ? 0.55d : 1f;
         }
 
         /// <summary>Which mini-game this check is played as.</summary>
@@ -156,6 +156,7 @@ namespace GarageTycoon.Core.Diagnosis
         /// happens several times per customer, and a diagnosis that is as punishing as the repair
         /// would make every car feel like it starts with a tax.
         /// </summary>
-        public const float DifficultyScale = 0.75f;
+        // A double, so the difficulty chain stays in double until it reaches the mini-game.
+        public const double DifficultyScale = 0.75d;
     }
 }

@@ -59,20 +59,20 @@ namespace GarageTycoon.Core.Cars
         /// How much of the car's payout this job is worth, relative to the other jobs on the car.
         /// An engine rebuild pays far more than a paint touch-up.
         /// </summary>
-        public static float PayoutWeight(this JobType jobType)
+        public static double PayoutWeight(this JobType jobType)
         {
             switch (jobType)
             {
-                case JobType.Engine: return 1.6f;
-                case JobType.Electrics: return 1.3f;
-                case JobType.Suspension: return 1.2f;
-                case JobType.Brakes: return 1.1f;
-                case JobType.Panels: return 1.0f;
-                case JobType.Exhaust: return 1.0f;
-                case JobType.Diagnostics: return 0.9f;
-                case JobType.Tires: return 0.8f;
-                case JobType.Paint: return 0.7f;
-                default: return 1.0f;
+                case JobType.Engine: return 1.6d;
+                case JobType.Electrics: return 1.3d;
+                case JobType.Suspension: return 1.2d;
+                case JobType.Brakes: return 1.1d;
+                case JobType.Panels: return 1.0d;
+                case JobType.Exhaust: return 1.0d;
+                case JobType.Diagnostics: return 0.9d;
+                case JobType.Tires: return 0.8d;
+                case JobType.Paint: return 0.7d;
+                default: return 1.0d;
             }
         }
     }

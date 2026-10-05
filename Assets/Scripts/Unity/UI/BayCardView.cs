@@ -335,7 +335,7 @@ namespace GarageTycoon.Unity.UI
                 _workerText.text = "MECHANIC";
             }
 
-            _progressBar.Fraction = car.OverallProgress;
+            _progressBar.Fraction = (float)(car.OverallProgress);
 
             _timerBar.Fraction = car.TimeFraction;
             _timerBar.FillColor = Theme.TimerColor(car.TimeFraction);
@@ -397,7 +397,7 @@ namespace GarageTycoon.Unity.UI
                     _jobLabels[i].color = Theme.TextSecondary;
                 }
 
-                _jobBars[i].Fraction = job.Progress;
+                _jobBars[i].Fraction = (float)(job.Progress);
                 _jobBars[i].FillColor = job.IsComplete ? Theme.Success : Theme.Info;
             }
         }

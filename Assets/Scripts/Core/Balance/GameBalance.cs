@@ -148,16 +148,16 @@ namespace GarageTycoon.Core.Balance
         public const float SpecialJobChance = 0.12f;
 
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
-        public const float PerfectProgress = 0.45f;
+        public const double PerfectProgress = 0.45d;
 
         /// <summary>Progress granted by a solid-but-not-perfect step.</summary>
-        public const float GoodProgress = 0.3f;
+        public const double GoodProgress = 0.3d;
 
         /// <summary>Progress granted by a scrappy, barely-acceptable step.</summary>
-        public const float WeakProgress = 0.15f;
+        public const double WeakProgress = 0.15d;
 
         /// <summary>Progress LOST when the player over-torques a bolt or grabs the wrong tool.</summary>
-        public const float DamageProgressPenalty = 0.12f;
+        public const double DamageProgressPenalty = 0.12d;
 
         /// <summary>Seconds knocked off the customer's patience for a missed input.</summary>
         public const float MissTimePenaltySeconds = 1.25f;
@@ -166,7 +166,7 @@ namespace GarageTycoon.Core.Balance
         public const float DamageTimePenaltySeconds = 2.5f;
 
         /// <summary>Cash multiplier applied to a job finished with only perfect steps.</summary>
-        public const float PerfectJobCashBonus = 1.25f;
+        public const double PerfectJobCashBonus = 1.25d;
 
         // ---------------------------------------------------------------------
         // Economy
