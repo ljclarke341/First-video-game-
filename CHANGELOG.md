@@ -6,6 +6,62 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2g — Special jobs: FLEET
+
+The fourth of the five, and the first that is not about the car in front of you.
+
+### Exact Core rules added
+
+Three fields on `SpecialJobDefinition` and three integers on `GarageSimulation`. No new economy,
+no new currency, no contract object.
+
+- **`FleetSize`** - how many vehicles the customer is bringing (8). Non-zero makes it a run.
+- **`MaximumJobs`** - a ceiling on job count (2), so a fleet van is a routine service rather than
+  a rebuild. The mirror of Restoration's `MinimumJobs`.
+- **`SpawnParameters.ForcedSpecial`** - the second and later vans are the same customer rather than
+  a fresh roll.
+- **`_fleetBatchId` / `_fleetRemaining` / `_fleetSize`** on the simulation, plus `TickFleet()`,
+  which keeps exactly one van of the run on the forecourt, never when the queue is full.
+- **`ActiveCar.FleetBatchId` / `FleetIndex` / `FleetSize`** so a van knows its account.
+
+Declining a van calls `CancelFleet()` - you are not refusing one van, you are refusing the account.
+Save version 5; the run is three numbers in the save and absent ones read as "no run".
+
+Fleet: 8 vans, 2 repairs each, **0.72x** payout, everything else ordinary. Rank 4.
+
+### What the first measurement killed
+
+The original design was "extra arrivals are free money when your bays are idle". Measured, it was
+worth ±1% at every garage size - because **the queue is 4.3 to 5.4 cars deep out of 6 in every
+configuration**. The garage is permanently arrival-saturated, so extra arrivals can never be worth
+anything. The premise was wrong, not the tuning.
+
+What works instead is the *shape* of the work: eight quick cheap jobs. Roughly 70% of the work for
+72% of the pay is nearly rate-neutral, so the question becomes whether your garage can swallow the
+volume.
+
+### The decision, measured (120 seeds x 15 min)
+
+| garage | accept | decline | accepting is |
+|---|---|---|---|
+| 1 bay, no crew | $799/min | $787/min | **+1.5%** |
+| 3 bays, no crew | $770/min | $781/min | **-1.4%** |
+| 3 bays, crew of 2 | $1,027/min | $1,009/min | **+1.7%** |
+| 4 bays, crew of 4 | $1,191/min | $1,173/min | **+1.5%** |
+
+The sign flips on garage state, which is what was asked for. Three bays with nobody to help is the
+one case where a fleet hurts: you are already over-subscribed and the vans starve the rest.
+
+### Verified
+
+- **352 tests pass** (20 new).
+- **548 cross-build parity cases, all identical.**
+- Compile check clean, 20-minute soak clean, saves round-trip, pre-fleet saves load.
+- Browser: badge reads "Fleet 1/8", the ramp warns that declining ends the account, and pressing
+  "Turn it down" cancelled the run and sent the rest of the vans away.
+
+---
+
 ## Phase B.2f — Special jobs: RESTORATION
 
 The third of the five, and the first whose decision is about **capacity** rather than money.
@@ -1486,6 +1542,18 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+27. **The garage is permanently arrival-saturated, and that limits what any job can do.** The
+   queue sits at 4.3-5.4 of 6 in every configuration I measured, from one bay to four bays with
+   four mechanics. Arrivals outrun throughput at every stage of the game, which is why Fleet's
+   original "extra work when you are idle" premise measured at ±1% - there is no idle. If you ever
+   want capacity to feel like a resource the player manages, the spawn rate is the lever, and it is
+   a whole-economy change rather than a job-level one.
+
+26. **Fleet's decision is real but, like Restoration's, small.** ±1.5%, flipping sign on garage
+   state. Both of the capacity-shaped jobs land in the same place: genuinely load-dependent, but
+   not by enough that a player would feel it without the numbers in front of them. That is a
+   consequence of the point above, not of their own tuning.
+
 25. **Restoration's decision is real but low-stakes.** Taking one beats refusing by 0.2-2.5%
    depending on the garage. It is never a trap and never obvious, which is what you asked for - but
    a player who always refuses loses about 1%, which is close to "does not matter". If you want it

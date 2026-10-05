@@ -69,6 +69,24 @@ namespace GarageTycoon.Core.Special
         /// </summary>
         public int MinimumJobs { get; private set; }
 
+        /// <summary>
+        /// How many vehicles this customer is bringing, or 0 if they are bringing one like anybody
+        /// else.
+        ///
+        /// A fleet is the only job that is not really about the car in front of you. The vehicles
+        /// themselves are ordinary - ordinary faults, ordinary length, ordinary parts, ordinary
+        /// quality. What is different is that accepting one commits the garage to a RUN of them,
+        /// and the run arrives on top of the normal trickle of customers rather than instead of it.
+        ///
+        /// That is where the decision comes from, and why it needs no new economy: extra cars at a
+        /// thinner margin are free money when your bays are idle and a queue-blocking nuisance when
+        /// they are not.
+        /// </summary>
+        public int FleetSize { get; private set; }
+
+        /// <summary>The most repairs this job may turn up with, or 0 for no cap.</summary>
+        public int MaximumJobs { get; private set; }
+
         /// <summary>The grade this customer expects. Fitting below it disappoints them.</summary>
 /// <summary>
         /// The grade of part this customer turned up expecting, or null if they do not care.
@@ -95,7 +113,7 @@ namespace GarageTycoon.Core.Special
             string colorHex, double patienceMultiplier, double payoutMultiplier,
             double speedTipMultiplier, double qualityWeight, int extraJobs,
             PartGrade? expectedGrade, float spawnWeight, int minRankLevel,
-            double workMultiplier = 1d, int minimumJobs = 0)
+            double workMultiplier = 1d, int minimumJobs = 0, int fleetSize = 0, int maximumJobs = 0)
         {
             Type = type;
             DisplayName = displayName;
@@ -108,6 +126,8 @@ namespace GarageTycoon.Core.Special
             ExtraJobs = extraJobs;
             WorkMultiplier = workMultiplier <= 0d ? 1d : workMultiplier;
             MinimumJobs = minimumJobs;
+            FleetSize = fleetSize;
+            MaximumJobs = maximumJobs;
             ExpectedGrade = expectedGrade;
             SpawnWeight = spawnWeight;
             MinRankLevel = minRankLevel;

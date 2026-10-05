@@ -42,7 +42,10 @@ namespace GarageTycoon.HeadlessTests.Tests
                         || Math.Abs(definition.SpeedTipMultiplier - 1d) > 0.001d
                         || Math.Abs(definition.QualityWeight - 1d) > 0.001d
                         || definition.ExtraJobs != 0
-                        || definition.ExpectedGrade.HasValue;
+                        || definition.ExpectedGrade.HasValue
+                        || Math.Abs(definition.WorkMultiplier - 1d) > 0.001d
+                        || definition.MinimumJobs != 0
+                        || definition.FleetSize != 0;
 
                     Check.IsTrue(changesSomethingElse,
                         definition.DisplayName + " only changes the payout, which makes it a bigger "

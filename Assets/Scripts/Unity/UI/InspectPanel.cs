@@ -232,6 +232,12 @@ namespace GarageTycoon.Unity.UI
                 _complaintHeading.color = accent;
                 _complaintPanel.color = Theme.WithAlpha(accent, 0.14f);
                 _complaint.text = _car.Complaint + "  (" + _car.Special.Tagline + ")";
+
+                if (_car.FleetBatchId != 0)
+                {
+                    _complaintHeading.text = "VAN " + _car.FleetIndex + " OF " + _car.FleetSize
+                        + " - " + _car.Special.DisplayName.ToUpperInvariant();
+                }
             }
 
             for (int i = 0; i < _rows.Count; i++)

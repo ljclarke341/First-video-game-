@@ -98,11 +98,28 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>How many bays the garage currently has.</summary>
         public int BayCount { get { return _bays.Count; } }
 
+        /// <summary>Vehicles still to come on the current fleet run, 0 when none is running.</summary>
+        public int FleetRemaining { get { return _fleetRemaining; } }
+
+        /// <summary>How many vehicles the current run was for.</summary>
+        public int FleetSize { get { return _fleetSize; } }
+
+        /// <summary>The id of the run in progress, 0 when none is.</summary>
+        public int FleetBatchId { get { return _fleetBatchId; } }
+
         private readonly List<ActiveCar> _waiting = new List<ActiveCar>();
         private readonly List<ActiveCar> _bays = new List<ActiveCar>();
         private readonly List<WorkSession> _mechanicSessions = new List<WorkSession>();
 
         private float _spawnTimer;
+
+        // A fleet run, in its entirety. Three integers, deliberately: the brief for this was a
+        // batch, not a contract system, and anything more would have to be saved, migrated and
+        // reasoned about during offline catch-up for no gain.
+        private int _fleetBatchId;
+        private int _fleetRemaining;
+        private int _fleetSize;
+        private int _nextFleetBatchId = 1;
 
         // ------------------------------------------------------------------
         // Events for the UI layer to subscribe to
@@ -243,6 +260,7 @@ namespace GarageTycoon.Core.Simulation
 
             Events.Tick(deltaTime);
             TickSpawning(deltaTime);
+            TickFleet();
             AssignCarsToBays();
             AssignMechanics();
 
@@ -290,6 +308,61 @@ namespace GarageTycoon.Core.Simulation
             SpawnCar();
         }
 
+        /// <summary>
+        /// Keeps one vehicle of the current fleet run on the forecourt.
+        ///
+        /// This is the whole upside of a fleet, and the whole cost of one. The run's vehicles come
+        /// ON TOP of the ordinary trickle rather than instead of it, so a garage with bays going
+        /// spare gets work it would not otherwise have had. A garage that is already full gets a
+        /// queue it cannot serve, and the ordinary customers behind it drive past.
+        ///
+        /// Only ever one at a time, so a run can never flood the forecourt, and never when the
+        /// queue is full - a fleet customer waits their turn like anybody else.
+        /// </summary>
+        private void TickFleet()
+        {
+            if (_fleetRemaining <= 0) return;
+            if (_waiting.Count >= GameBalance.MaxQueuedCars) return;
+
+            for (int i = 0; i < _waiting.Count; i++)
+            {
+                if (_waiting[i].FleetBatchId == _fleetBatchId) return;      // one is already here
+            }
+
+            Special.SpecialJobDefinition fleet =
+                Special.SpecialJobCatalog.FindByType(Special.SpecialJobType.Fleet);
+            if (fleet == null) { _fleetRemaining = 0; return; }
+
+            SpawnCar(fleet);
+        }
+
+        /// <summary>
+        /// Puts a fleet run back after a load. The vehicles themselves are restored separately,
+        /// like any other car; this is only the "and there are two more to come" part.
+        /// </summary>
+        public void RestoreFleet(int batchId, int remaining, int size)
+        {
+            _fleetBatchId = batchId < 0 ? 0 : batchId;
+            _fleetRemaining = remaining < 0 ? 0 : remaining;
+            _fleetSize = size < 0 ? 0 : size;
+
+            // Ids must never be handed out twice, or a reloaded run and a new one would share one.
+            if (_fleetBatchId >= _nextFleetBatchId) _nextFleetBatchId = _fleetBatchId + 1;
+        }
+
+        /// <summary>
+        /// Ends the current fleet run. The customer takes the rest of their vehicles elsewhere.
+        ///
+        /// Called when one of the run's vehicles is turned down, which is what makes declining a
+        /// fleet mean something: you are not refusing one van, you are refusing the account.
+        /// </summary>
+        public void CancelFleet()
+        {
+            _fleetRemaining = 0;
+            _fleetBatchId = 0;
+            _fleetSize = 0;
+        }
+
         /// <summary>Seconds between arrivals right now, including upgrades and any active event.</summary>
         public float CurrentSpawnInterval()
         {
@@ -301,7 +374,13 @@ namespace GarageTycoon.Core.Simulation
         }
 
         /// <summary>Rolls and queues one new customer. Public so tests can force arrivals.</summary>
-        public ActiveCar SpawnCar()
+        public ActiveCar SpawnCar() { return SpawnCar(null); }
+
+        /// <param name="forcedSpecial">
+        /// Used for the second and later vehicles of a fleet run, which are the same customer
+        /// rather than a fresh roll.
+        /// </param>
+        public ActiveCar SpawnCar(Special.SpecialJobDefinition forcedSpecial)
         {
             EventModifiers modifiers = Events.CurrentModifiers;
             SpawnParametersBundle bundle = Effects.ToSpawnValues();
@@ -312,8 +391,36 @@ namespace GarageTycoon.Core.Simulation
             parameters.PayoutMultiplier = bundle.PayoutMultiplier * modifiers.PayoutMultiplier;
             parameters.ExtraJobChance = modifiers.ExtraJobChance;
             parameters.RankLevel = RankLevel;
+            parameters.ForcedSpecial = forcedSpecial;
 
             ActiveCar car = Spawner.Spawn(parameters);
+
+            // A fleet customer who turns up while a run is already going is just an ordinary
+            // customer: one account at a time keeps the decision legible and the queue sane.
+            if (car.Special != null && car.Special.FleetSize > 0)
+            {
+                // No "and this was not forced" guard here: TickFleet only ever forces a van
+                // while a run is already in progress, so the open-a-run branch cannot be reached
+                // by a continuation. Guarding on it as well meant a deliberately started run
+                // never opened, and a ninth van could then arrive on a run of eight.
+                if (_fleetRemaining <= 0)
+                {
+                    _fleetBatchId = _nextFleetBatchId++;
+                    _fleetSize = car.Special.FleetSize;
+                    _fleetRemaining = _fleetSize;
+                }
+
+                if (_fleetRemaining > 0)
+                {
+                    car.SetFleet(_fleetBatchId, _fleetSize - _fleetRemaining + 1, _fleetSize);
+                    _fleetRemaining--;
+                }
+                else
+                {
+                    car.SetSpecial(null);
+                }
+            }
+
             _waiting.Add(car);
 
             Action<ActiveCar> handler = CarSpawned;
@@ -599,6 +706,15 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>Pays the finishing tips, frees the bay and tells the UI the customer drove off happy.</summary>
         private void CompleteCar(ActiveCar car)
         {
+            // Turning a fleet vehicle down is not refusing one van - it ends the account, and the
+            // rest of the run never turns up. That is what gives declining a fleet real weight:
+            // the choice is about the whole run, taken at the first vehicle.
+            if (car.FleetBatchId != 0 && car.FleetBatchId == _fleetBatchId
+                && car.QuotedAs == Cars.QuoteOption.Declined)
+            {
+                CancelFleet();
+            }
+
             // Finishing early earns a tip proportional to the car's value, which is what makes
             // speed worth chasing without letting the tip eclipse the repair itself.
             // Only the work the customer agreed to counts towards the tip. Declining a repair

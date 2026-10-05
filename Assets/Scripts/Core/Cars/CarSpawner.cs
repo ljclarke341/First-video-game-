@@ -121,8 +121,10 @@ namespace GarageTycoon.Core.Cars
 
         public ActiveCar SpawnSpecific(CarDefinition definition, SpawnParameters parameters)
         {
-            // Rolled before the jobs, because a special job can add work to the car.
-            Special.SpecialJobDefinition special = Special.SpecialJobCatalog.Roll(_random, parameters.RankLevel);
+            // Rolled before the jobs, because a special job can add work to the car. A forced one
+            // is the next vehicle of a fleet run, which is the same customer rather than a new roll.
+            Special.SpecialJobDefinition special = parameters.ForcedSpecial
+                ?? Special.SpecialJobCatalog.Roll(_random, parameters.RankLevel);
 
             int jobCount = _random.NextInt(definition.MinJobs, definition.MaxJobs + 1);
 
@@ -135,6 +137,12 @@ namespace GarageTycoon.Core.Cars
                 // A floor as well as a bonus. The roll above starts from the car's own minimum, so
                 // a restoration could otherwise turn up with two jobs on it and not be one.
                 if (jobCount < special.MinimumJobs) jobCount = special.MinimumJobs;
+
+                // And a ceiling, for a fleet van in for a routine service rather than a rebuild.
+                if (special.MaximumJobs > 0 && jobCount > special.MaximumJobs)
+                {
+                    jobCount = special.MaximumJobs;
+                }
             }
 
             // Never ask for more distinct jobs than the car actually has on its list.

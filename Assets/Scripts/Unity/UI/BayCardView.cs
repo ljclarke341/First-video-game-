@@ -290,7 +290,10 @@ namespace GarageTycoon.Unity.UI
             if (showSpecial)
             {
                 _specialBadge.color = Theme.Hex(car.Special.ColorHex);
-                _specialText.text = car.Special.DisplayName.ToUpperInvariant();
+                // A fleet van says which one it is, because "one of eight" is the decision.
+                _specialText.text = car.FleetBatchId == 0
+                    ? car.Special.DisplayName.ToUpperInvariant()
+                    : car.Special.DisplayName.ToUpperInvariant() + " " + car.FleetIndex + "/" + car.FleetSize;
             }
 
             _calmButton.interactable = canCalm;

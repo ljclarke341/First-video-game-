@@ -24,6 +24,14 @@ namespace GarageTycoon.Core.Cars
         /// </summary>
         public int RankLevel;
 
+        /// <summary>
+        /// A special job to use instead of rolling for one, or null to roll as usual.
+        ///
+        /// This exists for fleet runs: the second and later vehicles of a run are not a fresh roll,
+        /// they are the same customer bringing the next van round.
+        /// </summary>
+        public Special.SpecialJobDefinition ForcedSpecial;
+
         /// <summary>Sensible defaults for a brand new save.</summary>
         public static SpawnParameters Default
         {

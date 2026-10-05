@@ -61,8 +61,8 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 double share = seen / (double)Samples;
 
-                // Three kinds share the 12% roll, so each should be around 4%.
-                Check.IsTrue(share > 0.02d && share < 0.08d,
+                // Every unlocked kind shares the 12% roll between them, so roughly 3% each.
+                Check.IsTrue(share > 0.015d && share < 0.08d,
                     "restorations are " + (share * 100d).ToString("0.0") + "% of cars");
             });
 

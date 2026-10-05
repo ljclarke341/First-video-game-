@@ -350,6 +350,8 @@ namespace GarageTycoon.HeadlessTests
                     .Append(",\"grade\":").Append(definition.ExpectedGrade.HasValue ? (int)definition.ExpectedGrade.Value : -1)
                     .Append(",\"work\":").Append(D(definition.WorkMultiplier))
                     .Append(",\"minJobs\":").Append(definition.MinimumJobs)
+                    .Append(",\"maxJobs\":").Append(definition.MaximumJobs)
+                    .Append(",\"fleet\":").Append(definition.FleetSize)
                     .Append(",\"weight\":").Append(F(definition.SpawnWeight))
                     .Append(",\"minRank\":").Append(definition.MinRankLevel)
                     .Append('}');

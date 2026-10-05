@@ -18,7 +18,7 @@ namespace GarageTycoon.Core.Save
     public static class GameStateSerializer
     {
         /// <summary>Bumped whenever the save shape changes, so old files can be migrated or discarded.</summary>
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 5;
 
         /// <summary>
         /// The oldest save this build can still read. Anything older is refused rather than loaded
@@ -92,6 +92,12 @@ namespace GarageTycoon.Core.Save
             root.Add("randomState", simulation.Random.State);
             root.Add("nextCarId", simulation.Spawner.NextInstanceId);
             root.Add("spawnTimer", simulation.SpawnTimer);
+
+            // The fleet run in progress, as three numbers. Without these a reload would drop the
+            // rest of an account the player had already committed to.
+            root.Add("fleetId", simulation.FleetBatchId);
+            root.Add("fleetLeft", simulation.FleetRemaining);
+            root.Add("fleetOf", simulation.FleetSize);
 
             // --- events ---
             JsonValue events = JsonValue.Object();
@@ -192,6 +198,9 @@ namespace GarageTycoon.Core.Save
 
             json.Add("diagnosis", diagnosis);
             json.Add("special", (int)car.SpecialType);
+            json.Add("fleetId", car.FleetBatchId);
+            json.Add("fleetIndex", car.FleetIndex);
+            json.Add("fleetSize", car.FleetSize);
             json.Add("quoted", car.Quoted);
             json.Add("quotedAs", (int)car.QuotedAs);
 
@@ -283,6 +292,11 @@ namespace GarageTycoon.Core.Save
             }
             simulation.Spawner.NextInstanceId = root["nextCarId"].AsInt(1);
             simulation.SpawnTimer = root["spawnTimer"].AsFloat(2f);
+
+            // Absent in a save from before fleets, and zeroes are exactly right for those: no run
+            // was in progress, because runs did not exist.
+            simulation.RestoreFleet(
+                root["fleetId"].AsInt(0), root["fleetLeft"].AsInt(0), root["fleetOf"].AsInt(0));
 
             // --- events ---
             JsonValue events = root["events"];
@@ -437,6 +451,9 @@ namespace GarageTycoon.Core.Save
             // cars were ordinary customers and must come back as ordinary customers.
             car.SetSpecial(Special.SpecialJobCatalog.FindByType(
                 (Special.SpecialJobType)json["special"].AsInt((int)Special.SpecialJobType.None)));
+
+            // No entry means a save from before fleets, where every car was its own customer.
+            car.SetFleet(json["fleetId"].AsInt(0), json["fleetIndex"].AsInt(0), json["fleetSize"].AsInt(0));
 
             car.RestoreQuote(json["quoted"].AsBool(false),
                 (QuoteOption)json["quotedAs"].AsInt((int)QuoteOption.Everything));

@@ -430,7 +430,8 @@ namespace GarageTycoon.HeadlessTests.Tests
                 {
                     (int)SpecialJobType.Urgent,
                     (int)SpecialJobType.Performance,
-                    (int)SpecialJobType.Restoration
+                    (int)SpecialJobType.Restoration,
+                    (int)SpecialJobType.Fleet
                 };
 
                 Check.AreEqual(expected.Length, SpecialJobCatalog.All.Count,
@@ -494,6 +495,26 @@ namespace GarageTycoon.HeadlessTests.Tests
                     "restoration unlocks at a different rank in the web build");
                 Check.IsFalse(restoration.ExpectedGrade.HasValue,
                     "a restoration customer has no opinion about part grades, as in the web build");
+            });
+
+            suite.Add("Fleet's dials match the web build", () =>
+            {
+                // web: SPECIAL_JOBS.fleet
+                SpecialJobDefinition fleet = SpecialJobCatalog.FindByType(SpecialJobType.Fleet);
+                Check.IsTrue(fleet != null, "the web build has a fleet job and this one does not");
+
+                Check.IsTrue(Math.Abs(fleet.PayoutMultiplier - 0.72d) < 0.0001d,
+                    "fleet payout is " + fleet.PayoutMultiplier + ", the web build has 0.72");
+                Check.AreEqual(8, fleet.FleetSize, "fleet size differs from the web build");
+                Check.AreEqual(2, fleet.MaximumJobs, "fleet job cap differs from the web build");
+                Check.AreEqual(4, fleet.MinRankLevel, "fleet unlocks at a different rank in the web build");
+
+                // Everything else is deliberately ordinary - a fleet van is a van.
+                Check.IsTrue(Math.Abs(fleet.PatienceMultiplier - 1d) < 0.0001d, "fleet patience should be ordinary");
+                Check.IsTrue(Math.Abs(fleet.QualityWeight - 1d) < 0.0001d, "fleet quality weight should be ordinary");
+                Check.IsTrue(Math.Abs(fleet.WorkMultiplier - 1d) < 0.0001d, "fleet work length should be ordinary");
+                Check.AreEqual(0, fleet.ExtraJobs, "fleet should not add jobs");
+                Check.IsFalse(fleet.ExpectedGrade.HasValue, "fleet should have no grade expectation");
             });
 
             return suite;

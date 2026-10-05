@@ -60,8 +60,9 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 double share = seen / (double)Samples;
 
-                // Two kinds share the 12% roll, so each should be around 6%.
-                Check.IsTrue(share > 0.03d && share < 0.1d,
+                // Every unlocked kind shares the 12% roll between them, so the share per kind
+                // falls as more are added - four kinds means roughly 3% each.
+                Check.IsTrue(share > 0.015d && share < 0.08d,
                     "performance jobs are " + (share * 100d).ToString("0.0") + "% of cars");
             });
 

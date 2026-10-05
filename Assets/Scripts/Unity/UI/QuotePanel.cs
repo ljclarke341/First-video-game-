@@ -267,6 +267,18 @@ namespace GarageTycoon.Unity.UI
         /// </summary>
         private void RefreshExpectation()
         {
+            // The fleet decision takes priority on this line, because it is the bigger one: a
+            // grade expectation is about this car, a fleet is about the next eight.
+            if (_car.FleetBatchId != 0)
+            {
+                _expectation.gameObject.SetActive(true);
+                _expectation.text = "Fleet - van " + _car.FleetIndex + " of " + _car.FleetSize
+                    + ", lower margin, steady work. "
+                    + _simulation.FleetRemaining + " more after this";
+                _expectation.color = Theme.Info;
+                return;
+            }
+
             Core.Parts.PartGrade? expected = _car.ExpectedPartGrade;
 
             _expectation.gameObject.SetActive(expected.HasValue);

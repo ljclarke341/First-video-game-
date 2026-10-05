@@ -87,6 +87,29 @@ namespace GarageTycoon.Core.Cars
         /// as falling short. A performance job expects performance parts, and anything cheaper
         /// shows in the finished work.
         /// </summary>
+        /// <summary>
+        /// Which fleet run this vehicle belongs to, or 0 for an ordinary customer.
+        ///
+        /// Just an id. The run itself is three integers on the simulation; nothing about a fleet
+        /// vehicle's repair, parts, quality or patience differs from any other car, which is the
+        /// point - the fleet is a business arrangement, not a different kind of motoring.
+        /// </summary>
+        public int FleetBatchId { get; private set; }
+
+        /// <summary>Which vehicle of the run this is, 1-based, for the badge.</summary>
+        public int FleetIndex { get; private set; }
+
+        /// <summary>How many vehicles the run was for, so the player can see what they took on.</summary>
+        public int FleetSize { get; private set; }
+
+        /// <summary>Tags this car as part of a fleet run.</summary>
+        public void SetFleet(int batchId, int index, int size)
+        {
+            FleetBatchId = batchId;
+            FleetIndex = index;
+            FleetSize = size;
+        }
+
         public Parts.PartGrade? ExpectedPartGrade
         {
             get { return Special == null ? null : Special.ExpectedGrade; }

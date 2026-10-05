@@ -106,7 +106,50 @@ namespace GarageTycoon.Core.Special
                 spawnWeight: 1f,
                 minRankLevel: 3,
                 workMultiplier: 1.5d,
-                minimumJobs: 3)
+                minimumJobs: 3),
+
+            // FLEET: a thin margin on work you would not otherwise have had.
+            //
+            // The vehicles are ordinary. Ordinary faults, ordinary length, ordinary parts, ordinary
+            // quality, ordinary patience - deliberately, because the fleet is a business
+            // arrangement rather than a different kind of motoring, and making the vans harder to
+            // fix would just be Restoration again.
+            //
+            // What is different is the shape of the work. Accepting commits the garage to a RUN of
+            // eight vehicles, each in for a routine service - capped at two repairs rather than the
+            // usual two-to-four - at 0.72x the money. Roughly 70% of the work for 72% of the pay,
+            // which is very nearly rate-neutral by design: this is a volume business, not a
+            // lucrative one.
+            //
+            // The run also arrives ON TOP of the normal trickle rather than instead of it (see
+            // GarageSimulation.TickFleet), so it is extra work rather than different work.
+            //
+            // Measured, which way that lands depends on who is holding the spanners:
+            //
+            //   one bay, no crew     +1.5%  quick cheap turnover suits a garage with one pair of hands
+            //   three bays, no crew  -1.4%  you are already over-subscribed; the vans starve the rest
+            //   three bays, crew 2   +1.7%  the crew absorbs the volume
+            //   four bays, crew 4    +1.5%  likewise, more so
+            //
+            // So the question is not "does this pay" - it nearly doesn't - but "can my garage
+            // actually swallow eight more vans". See "probe fleet".
+            //
+            // Declining is not refusing one van - it ends the account, and the rest of the run
+            // never arrives.
+            new SpecialJobDefinition(
+                SpecialJobType.Fleet,
+                "Fleet",
+                "Eight vans, same owner. Routine servicing, thin margin, steady work.",
+                "#4D9DE0",
+                patienceMultiplier: 1d,
+                payoutMultiplier: 0.72d,
+                speedTipMultiplier: 1d,
+                qualityWeight: 1d,
+                extraJobs: 0,
+                expectedGrade: null,
+                spawnWeight: 1f,
+                minRankLevel: 4,
+                fleetSize: 8, maximumJobs: 2)
         };
 
         /// <summary>The definitions as shipped, so a measurement run can always put them back.</summary>
