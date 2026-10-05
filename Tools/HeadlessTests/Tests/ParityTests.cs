@@ -313,9 +313,9 @@ namespace GarageTycoon.HeadlessTests.Tests
             suite.Add("Grade multipliers match the web build", () =>
             {
                 // web: PART_GRADES[].cost and .quality
-                CheckGrade(PartGrade.Budget, 0.55d, -0.1f);
-                CheckGrade(PartGrade.Standard, 1d, 0f);
-                CheckGrade(PartGrade.Performance, 1.9d, 0.08f);
+                CheckGrade(PartGrade.Budget, 0.8d, -0.1d);
+                CheckGrade(PartGrade.Standard, 1d, 0d);
+                CheckGrade(PartGrade.Performance, 1.3d, 0.08d);
             });
 
             suite.Add("The job to part map matches the web build", () =>
@@ -362,6 +362,21 @@ namespace GarageTycoon.HeadlessTests.Tests
                     "four mechanics should give 14 / (1 + 4 x 0.45) seconds");
             });
 
+            suite.Add("The quality pay curve matches the web build", () =>
+            {
+                // web: QUALITY_BASE and QUALITY_SLOPE
+                Check.IsTrue(Math.Abs(RepairQuality.QualityBase - 0.55d) < 0.0001d,
+                    "QualityBase is " + RepairQuality.QualityBase + "; the web's QUALITY_BASE is 0.55");
+                Check.IsTrue(Math.Abs(RepairQuality.QualitySlope - 0.5d) < 0.0001d,
+                    "QualitySlope is " + RepairQuality.QualitySlope + "; the web's QUALITY_SLOPE is 0.5");
+
+                // The four points the curve was specified by.
+                CheckCurve(0d, 0.55d);
+                CheckCurve(0.5d, 0.8d);
+                CheckCurve(0.9d, 1d);
+                CheckCurve(1d, 1.05d);
+            });
+
             suite.Add("Standard parts are economically invisible, in both builds", () =>
             {
                 // The single most important property of the whole parts system: fitting Standard
@@ -384,11 +399,18 @@ namespace GarageTycoon.HeadlessTests.Tests
 
         // ------------------------------------------------------------------
 
-        private static void CheckGrade(PartGrade grade, double cost, float quality)
+        private static void CheckCurve(double score, double expected)
+        {
+            double actual = RepairQuality.QualityBase + score * RepairQuality.QualitySlope;
+            Check.IsTrue(Math.Abs(actual - expected) < 0.0001d,
+                "a score of " + score + " should pay " + expected + "x, the curve gives " + actual);
+        }
+
+        private static void CheckGrade(PartGrade grade, double cost, double quality)
         {
             Check.IsTrue(Math.Abs(grade.CostMultiplier() - cost) < 0.0001d,
                 grade + " costs " + grade.CostMultiplier() + "x; the web's PART_GRADES has " + cost);
-            Check.IsTrue(Math.Abs(grade.QualityModifier() - quality) < 0.0001f,
+            Check.IsTrue(Math.Abs(grade.QualityModifier() - quality) < 0.0001d,
                 grade + " shifts quality by " + grade.QualityModifier() + "; the web has " + quality);
         }
 

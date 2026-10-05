@@ -6,6 +6,92 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1f — Both measured balance levers applied
+
+| | Was | Now |
+|---|---|---|
+| Budget part cost | 0.55x | **0.80x** |
+| Standard part cost | 1.00x | 1.00x |
+| Performance part cost | 1.90x | **1.30x** |
+| Quality pay curve | 0.75 + score x 0.50 | **0.55 + score x 0.50** |
+
+Slope untouched at 0.50. The score, its calculation, its thresholds and the part-quality modifiers
+are all unchanged.
+
+### The pay curve, as specified
+
+| Score | Multiplier |
+|---|---|
+| 0.00 | 0.55x |
+| 0.50 | 0.80x |
+| **0.90** (measured median) | **1.00x** |
+| 1.00 | 1.05x |
+
+### No grade dominates any more
+
+Six seeds x 30 minutes per policy, ~5,300 jobs each:
+
+| | Budget | Standard | Performance | Mixed |
+|---|---|---|---|---|
+| **Profit / car** | 242 -> **190** | 230 -> **186** | 183 -> **184** | 224 -> **187** |
+| Profit / min | 620 -> 480 | 598 -> 474 | 457 -> 461 | 574 -> 475 |
+| Avg quality score | 0.808 -> 0.816 | 0.891 -> 0.896 | 0.915 | 0.837 -> 0.836 |
+| Avg quality mult | 1.154 -> **0.958** | 1.196 -> **0.998** | 1.208 -> **1.008** | 1.169 -> **0.968** |
+| Part cost / job | 6.8 -> 9.3 | 11.7 -> 11.3 | 21.5 -> 14.8 | 11.8 -> 11.0 |
+| Labour / job | 49.6 -> 47.1 | 45.9 -> 44.7 | 37.1 -> 43.3 | 45.5 -> 45.4 |
+| Final payout / job | 75.7 -> 59.1 | 73.3 -> 58.6 | 58.9 -> 57.9 | 71.4 -> 58.6 |
+| Off the van % | 26.3 -> 25.1 | 26.0 -> 25.8 | 25.1 | 25.2 -> 25.6 |
+| Surcharge total | 816 -> 1095 | 1495 -> 1414 | 2722 -> **1813** | 1665 -> 1398 |
+| Flawless job pays | 70.6 -> 55.4 | 68.1 -> 55.1 | 53.0 -> 52.5 | 67.1 -> 54.6 |
+| Imperfect job pays | 85.8 -> 67.2 | 83.8 -> 66.2 | 71.6 -> **69.6** | 80.4 -> 67.3 |
+| **Rare car keeps** | 751 -> 622 | 738 -> 611 | 601 -> 606 | 664 -> 616 |
+| **Common car keeps** | 154 -> 123 | 145 -> 122 | 117 -> 115 | 150 -> 122 |
+
+**The spread between best and worst policy falls from 32% to 3.3%.** Budget 190, Mixed 187,
+Standard 186, Performance 184. Nothing dominates, and the per-grade character survives: Budget
+still leads on common cars, Performance now wins outright on **imperfect** jobs (69.6 against
+Budget's 67.2), and the average multipliers land where the curve says they should - 0.958, 0.998,
+1.008.
+
+### Honest reading: possibly over-corrected
+
+Three percent is a very small gap. The choice has gone from "Budget, obviously" to "it barely
+matters", and the reason is the saturation already measured: **68% of jobs come out flawless**, so
+quality cannot differentiate much however it is paid. The grades are now nearly interchangeable
+because the thing meant to separate them has almost no range left.
+
+Not addressed, as instructed - Special Jobs may well create the harder, longer jobs that give the
+score somewhere to go, and this is worth re-measuring then rather than guessing now.
+
+### Economy: the multiplier now sorts by skill, not by default
+
+| | Pre-quality | Quality at 0.75 | **Now (0.55)** |
+|---|---|---|---|
+| Opening income (80% skill, no upgrades) | $504/min | $550/min | **$459/min** |
+| Half hour, upgrading | $17,420 | $20,638 | **$22,084** |
+| Kept per car | $405 | $421 | **$470** |
+| Cars served | 43 | 49 | 47 |
+
+These move in opposite directions and that is the point rather than a fault. The curve is centred
+on a measured median of 0.90, which came from 85%-skill play. An unupgraded 80%-skill player scores
+below that and now earns **0.92x** - about 9% under the old baseline. A player who has bought
+precision upgrades scores above it and earns more. Quality pays by how well you actually play,
+which it did not before.
+
+Off-the-van exposure is unchanged by either lever: 15% / 9% / 17% / 16% across the four garage
+sizes, against 15% / 10% / 17% / 19% before.
+
+### Verified
+
+- **257 C# tests**, including the four curve points pinned by name
+- **364 cross-build cases identical**
+- **Compile check clean** across the Unity and Editor layers
+- **Web soak, four garage sizes, 20 minutes each**: 55/54/72/84 cars, no errors, no bay stuck
+- **Saves**: policy, stock and delivery survive; pre-parts saves open with a full shelf; version 1
+  saves return every job accepted with no part recorded
+
+---
+
 ## Phase B.1e — Quality is paid on
 
 `QualityReport.PayMultiplier` was computed, parity-tested and never applied. It is now applied to

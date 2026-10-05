@@ -25,16 +25,21 @@ namespace GarageTycoon.HeadlessTests.Tests
             suite.Add("The multiplier is the existing formula, untouched", () =>
             {
                 // 0.75 + score * 0.5. Deliberately not redesigned here - only connected.
-                Check.IsTrue(Math.Abs(Multiplier(0f) - 0.75d) < 0.0001d, "a 0% job should pay 0.75x");
-                Check.IsTrue(Math.Abs(Multiplier(0.5f) - 1d) < 0.0001d, "a 50% job should pay exactly 1x");
-                Check.IsTrue(Math.Abs(Multiplier(1f) - 1.25d) < 0.0001d, "a 100% job should pay 1.25x");
+                Check.IsTrue(Math.Abs(Multiplier(0f) - 0.55d) < 0.0001d, "a 0% job should pay 0.55x");
+                Check.IsTrue(Math.Abs(Multiplier(0.5f) - 0.8d) < 0.0001d, "a 50% job should pay 0.80x");
+
+                // 0.90 is the measured median score, and the point the curve is centred on.
+                Check.IsTrue(Math.Abs(Multiplier(0.9f) - 1d) < 0.0001d,
+                    "a typical job should pay exactly 1x");
+                Check.IsTrue(Math.Abs(Multiplier(1f) - 1.05d) < 0.0001d, "a 100% job should pay 1.05x");
             });
 
-            suite.Add("A 50% repair is exactly neutral", () =>
+            suite.Add("A typical repair is exactly neutral", () =>
             {
-                // The baseline case the formula is built around: at the midpoint, the multiplier
-                // changes nothing, so Standard parts at a middling repair pay what they always did.
-                double paid = PayFor(PartGrade.Standard, perfect: 0, good: 0, weak: 0, custom: 0.5f, gross: 1000d);
+                // The curve is centred on the MEASURED median score of 0.90, not on the midpoint
+                // of the scale - so a typical job pays exactly the untouched labour, and the
+                // multiplier is a differentiator rather than a raise.
+                double paid = PayFor(PartGrade.Standard, perfect: 0, good: 0, weak: 0, custom: 0.9f, gross: 1000d);
                 double labour = 1000d / GameBalance.PartsPayoutCompensation;
 
                 Check.IsTrue(Math.Abs(paid - labour) < 0.51d,
@@ -104,9 +109,11 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // the quality bonus on the supplier's margin too.
                 double paid = PayFor(PartGrade.Standard, perfect: 3, good: 0, weak: 0, gross: 1000d);
 
+                // A flawless Standard job scores 1.0, so the curve pays its ceiling.
+                double ceiling = RepairQuality.QualityBase + RepairQuality.QualitySlope;
                 double labour = 1000d / GameBalance.PartsPayoutCompensation;
-                double expected = labour * 1.25d * GameBalance.PerfectJobCashBonus;
-                double wrong = 1000d * 1.25d * GameBalance.PerfectJobCashBonus;
+                double expected = labour * ceiling * GameBalance.PerfectJobCashBonus;
+                double wrong = 1000d * ceiling * GameBalance.PerfectJobCashBonus;
 
                 Check.IsTrue(Math.Abs(paid - expected) < 1d,
                     "expected " + expected + " (labour x quality x flawless), got " + paid);
@@ -119,9 +126,10 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Squared would be 1.5625x on a perfect job rather than 1.25x.
                 double paid = PayFor(PartGrade.Standard, perfect: 3, good: 0, weak: 0, gross: 1000d);
 
+                double ceiling = RepairQuality.QualityBase + RepairQuality.QualitySlope;
                 double labour = 1000d / GameBalance.PartsPayoutCompensation;
-                double once = labour * 1.25d * GameBalance.PerfectJobCashBonus;
-                double twice = labour * 1.25d * 1.25d * GameBalance.PerfectJobCashBonus;
+                double once = labour * ceiling * GameBalance.PerfectJobCashBonus;
+                double twice = labour * ceiling * ceiling * GameBalance.PerfectJobCashBonus;
 
                 Check.IsTrue(Math.Abs(paid - once) < 1d, "expected one application, got " + paid);
                 Check.IsTrue(Math.Abs(paid - twice) > 1d, "the multiplier was applied twice");
@@ -172,7 +180,8 @@ namespace GarageTycoon.HeadlessTests.Tests
                 GameplayHarness.Play(simulation, 400f, 0.85f);
 
                 Check.IsTrue(jobs > 5, "expected a mechanic to finish some jobs");
-                Check.IsTrue(scored / jobs > 0.75d && scored / jobs < 1.25d,
+                Check.IsTrue(scored / jobs > RepairQuality.QualityBase
+                             && scored / jobs < RepairQuality.QualityBase + RepairQuality.QualitySlope,
                     "average multiplier of " + (scored / jobs) + " is outside the formula's range");
             });
 
@@ -230,8 +239,11 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                     // Respects quality: the multiplier stays inside the formula's range.
                     QualityReport report = RepairQuality.ForJob(job, c.Mood);
-                    Check.IsTrue(report.PayMultiplier >= 0.75d && report.PayMultiplier <= 1.25d,
-                        "the multiplier escaped 0.75-1.25 at " + report.PayMultiplier);
+                    double floor = RepairQuality.QualityBase;
+                    double ceiling = RepairQuality.QualityBase + RepairQuality.QualitySlope;
+
+                    Check.IsTrue(report.PayMultiplier >= floor && report.PayMultiplier <= ceiling,
+                        "the multiplier escaped " + floor + "-" + ceiling + " at " + report.PayMultiplier);
                 };
 
                 double tipPaid = 0d;
@@ -279,7 +291,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             job.RestoreProgress(1f, 0, 0, 0);
 
             // RoundsPlayed 0 gives the automated-work score; drive the formula directly instead.
-            return 0.75d + score * 0.5d;
+            return RepairQuality.QualityBase + score * RepairQuality.QualitySlope;
         }
 
         /// <summary>Builds a played-out job with a part fitted, exactly as ResolveRound would.</summary>
@@ -308,7 +320,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             if (custom >= 0f)
             {
-                payout *= 0.75d + custom * 0.5d;
+                payout *= RepairQuality.QualityBase + custom * RepairQuality.QualitySlope;
             }
             else
             {

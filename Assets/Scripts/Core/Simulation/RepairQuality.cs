@@ -76,6 +76,15 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>Breaking something costs more than merely missing, so it is priced separately.</summary>
         private const double DamagePenalty = 0.7d;
 
+        /// <summary>
+        /// Where the pay curve starts, and how steeply it climbs.
+        ///
+        /// Named rather than inlined because both builds have to agree on them and the parity
+        /// suite pins them by name. The base is set from the measured median score, not chosen.
+        /// </summary>
+        public const double QualityBase = 0.55d;
+        public const double QualitySlope = 0.5d;
+
         /// <summary>Meeting a customer's expectation exactly lands here, not at 100%.</summary>
         private const double SatisfactionAtExpectation = 0.8d;
 
@@ -199,9 +208,17 @@ namespace GarageTycoon.Core.Simulation
             report.Satisfaction = Clamp01(
                 SatisfactionAtExpectation + (report.Score - expectation) * 0.8d);
 
-            // Centred so that typical work pays what it always did: only genuinely good or
-            // genuinely poor work moves the number.
-            report.PayMultiplier = 0.75d + report.Score * 0.5d;
+            // Centred on what players ACTUALLY score, not on the midpoint of the scale.
+            //
+            // The base was 0.75, which pays 1.0x at a score of 0.50 - and measured across 5,330
+            // real jobs, the median score is 0.90, so typical play was collecting 1.20x and
+            // opening income had risen from $504 to $550 a minute. 0.55 puts the median back at
+            // 1.00x. The SLOPE is untouched at 0.50, so quality is rewarded exactly as steeply as
+            // before; only the point the curve passes through 1.0 has moved.
+            //
+            //   score 0.00 -> 0.55x     score 0.50 -> 0.80x
+            //   score 0.90 -> 1.00x     score 1.00 -> 1.05x
+            report.PayMultiplier = QualityBase + report.Score * QualitySlope;
 
             return report;
         }

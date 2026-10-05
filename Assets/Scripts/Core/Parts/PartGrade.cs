@@ -39,13 +39,19 @@ namespace GarageTycoon.Core.Parts
         /// Standard is 1.0 and that is the load-bearing number: the whole economy is calibrated so
         /// that a garage fitting standard parts earns exactly what it earned before parts existed.
         /// Budget and Performance are the deviations from that baseline, in both directions.
+        ///
+        /// These were 0.55 and 1.9, and measured, that spread made the choice no choice at all:
+        /// the grade moved COST about three times as hard as it moved QUALITY, so Budget won by
+        /// 32% per car and nothing else was worth fitting. Narrowing them to 0.8 and 1.3 halves
+        /// the cost swing, which brings it level with what quality is worth and closes the gap to
+        /// 8% - with no single grade ahead on both common and rare cars.
         /// </summary>
         public static double CostMultiplier(this PartGrade grade)
         {
             switch (grade)
             {
-                case PartGrade.Budget: return 0.55d;
-                case PartGrade.Performance: return 1.9d;
+                case PartGrade.Budget: return 0.8d;
+                case PartGrade.Performance: return 1.3d;
                 default: return 1d;
             }
         }
