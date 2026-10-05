@@ -8,6 +8,13 @@ namespace GarageTycoon.HeadlessTests
         public static int Main(string[] args)
         {
             // "probe" prints balance measurements instead of running the pass/fail suite.
+            // "lab" is the detailed parts/quality balance rig. It changes nothing.
+            if (args != null && args.Length > 0 && args[0] == "lab")
+            {
+                BalanceLab.Run();
+                return 0;
+            }
+
             if (args != null && args.Length > 1 && args[0] == "probe" && args[1] == "grades")
             {
                 BalanceProbe.MeasureGrades();
