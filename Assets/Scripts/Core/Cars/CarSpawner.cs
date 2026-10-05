@@ -177,6 +177,13 @@ namespace GarageTycoon.Core.Cars
             patience *= parameters.PatienceMultiplier <= 0f ? 1f : parameters.PatienceMultiplier;
 
             ActiveCar car = new ActiveCar(_nextInstanceId, definition, finalJobs, patience, mood);
+
+            // The inspection reading is read OFF the jobs just chosen, so the two can never
+            // disagree - the car's condition always explains the work it needs. See CarCondition
+            // for why it is derived this way round rather than driving the job roll.
+            Vehicle.CarCondition condition = Vehicle.CarCondition.ForCar(_nextInstanceId, finalJobs);
+            car.SetCondition(condition, Vehicle.CustomerComplaint.For(condition));
+
             _nextInstanceId++;
             return car;
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Events;
 using GarageTycoon.Core.Minigames;
@@ -240,6 +241,7 @@ namespace GarageTycoon.Core.Simulation
             AssignCarsToBays();
             AssignMechanics();
 
+            TickDiagnosis(deltaTime);
             TickSession(PlayerSession, deltaTime);
 
             for (int i = _mechanicSessions.Count - 1; i >= 0; i--)
@@ -378,6 +380,10 @@ namespace GarageTycoon.Core.Simulation
 
                 int jobIndex = car.FirstIncompleteJobIndex();
                 if (jobIndex < 0) continue;
+
+                // A mechanic works out what is wrong themselves. Without this the player could
+                // watch someone repair a car whose faults the card still showed as unknown.
+                if (!car.Diagnosis.FoundEverything(car.Condition)) car.Diagnosis.RevealAll(true);
 
                 WorkSession session = new WorkSession(car, jobIndex, true, mechanicIndex);
                 session.Skill = skill;
@@ -545,8 +551,14 @@ namespace GarageTycoon.Core.Simulation
         {
             // Finishing early earns a tip proportional to the car's value, which is what makes
             // speed worth chasing without letting the tip eclipse the repair itself.
+            // Only the work the customer agreed to counts towards the tip. Declining a repair
+            // and still being tipped on it would make quoting small strictly better than quoting
+            // honestly, which is the opposite of a decision.
             double basePayout = 0d;
-            for (int i = 0; i < car.Jobs.Count; i++) basePayout += car.Jobs[i].Payout;
+            for (int i = 0; i < car.Jobs.Count; i++)
+            {
+                if (car.Jobs[i].IsAccepted) basePayout += car.Jobs[i].Payout;
+            }
 
             double tip = MathUtil.RoundCash(
                 basePayout * GameBalance.SpeedTipFraction * car.RepairSpeedFraction * car.Mood.TipMultiplier());
@@ -554,6 +566,19 @@ namespace GarageTycoon.Core.Simulation
             {
                 Wallet.Earn(tip);
                 car.AddEarnings(tip);
+            }
+
+            // What a thorough inspection was worth. Small on purpose: diagnosis should be worth
+            // doing, not compulsory-by-economics.
+            double diagnosisBonus = car.Diagnosis.PayoutBonus(car.Condition);
+            if (diagnosisBonus > 1d)
+            {
+                double extra = MathUtil.RoundCash(basePayout * (diagnosisBonus - 1d));
+                if (extra > 0d)
+                {
+                    Wallet.Earn(extra);
+                    car.AddEarnings(extra);
+                }
             }
 
             car.MarkCompleted();
@@ -695,6 +720,15 @@ namespace GarageTycoon.Core.Simulation
 
             if (PlayerSession != null && PlayerSession.Car == car) return true;
 
+            // THE SAFETY VALVE. Starting work on a car nobody inspected properly reveals the lot,
+            // for free, with no diagnosis bonus. This is what keeps diagnosis from ever being a
+            // gate: there is no sequence of inputs that leaves a car with work the player cannot
+            // reach, and a player who ignores the whole system has the game they had before.
+            if (!car.Diagnosis.FoundEverything(car.Condition))
+            {
+                car.Diagnosis.RevealAll(true);
+            }
+
             int jobIndex = car.FirstIncompleteJobIndex();
             if (jobIndex < 0) return false;
 
@@ -717,11 +751,106 @@ namespace GarageTycoon.Core.Simulation
 
             ActiveCar car = PlayerSession.Car;
             if (car == null || jobIndex < 0 || jobIndex >= car.Jobs.Count) return false;
-            if (car.Jobs[jobIndex].IsComplete) return false;
+
+            // Declined work is not yours to do. Without this the player could tap a job the
+            // customer refused and spend real time on something nobody is going to pay for.
+            if (!car.Jobs[jobIndex].NeedsWork) return false;
 
             PlayerSession.SetJobIndex(jobIndex);
             car.SetActiveJob(jobIndex);
             return true;
+        }
+
+        // ------------------------------------------------------------------
+        // Diagnosis
+        // ------------------------------------------------------------------
+
+        /// <summary>The inspection round the player is currently playing, or null.</summary>
+        public DiagnosisSession DiagnosisSession { get; private set; }
+
+        public event Action<ActiveCar, DiagnosisAction, MinigameResult> DiagnosisResolved;
+
+        /// <summary>
+        /// Starts an inspection on the car in a bay. Returns false when that check has already
+        /// been run on this car, or there is nothing there to look at.
+        /// </summary>
+        public bool StartDiagnosis(int bayIndex, DiagnosisAction action)
+        {
+            if (bayIndex < 0 || bayIndex >= _bays.Count) return false;
+
+            ActiveCar car = _bays[bayIndex];
+            if (car == null || car.State != CarState.InBay || car.AllJobsComplete) return false;
+            if (!car.Diagnosis.CanRun(action)) return false;
+
+            // Inspecting is hands-on, so it takes the place of whatever was being worked.
+            ClearPlayerSession();
+
+            float difficulty = car.Definition.Rarity.DifficultyScale() * DiagnosisActions.DifficultyScale;
+
+            MinigameBase minigame = MinigameFactory.Create(
+                action.MinigameFor(), JobType.Diagnostics, difficulty, CurrentTuning(), Random);
+
+            DiagnosisSession = new DiagnosisSession(car, action, minigame);
+            return true;
+        }
+
+        /// <summary>Advances the inspection round and applies it once it finishes.</summary>
+        private void TickDiagnosis(float deltaTime)
+        {
+            DiagnosisSession session = DiagnosisSession;
+            if (session == null) return;
+
+            ActiveCar car = session.Car;
+
+            // The customer left, or the car finished some other way.
+            if (car == null || car.State != CarState.InBay)
+            {
+                DiagnosisSession = null;
+                return;
+            }
+
+            session.Minigame.Tick(deltaTime);
+            if (!session.Minigame.IsFinished) return;
+
+            MinigameResult result = session.Minigame.Result;
+            car.Diagnosis.Record(session.Action, result.Outcome, car.Condition);
+
+            // An inspection does not count as repair work: it must not build the streak, and it
+            // must not start the speed-tip clock, or looking at a car would be its own penalty.
+            Stats.DiagnosisRoundsPlayed++;
+
+            DiagnosisSession = null;
+
+            Action<ActiveCar, DiagnosisAction, MinigameResult> handler = DiagnosisResolved;
+            if (handler != null) handler(car, session.Action, result);
+        }
+
+        /// <summary>Feeds a tap through to the inspection round, if one is running.</summary>
+        public bool DiagnosisPress()
+        {
+            if (DiagnosisSession == null) return false;
+            DiagnosisSession.Minigame.Press();
+            return true;
+        }
+
+        public bool DiagnosisRelease()
+        {
+            if (DiagnosisSession == null) return false;
+            DiagnosisSession.Minigame.Release();
+            return true;
+        }
+
+        public bool DiagnosisSelectOption(int optionIndex)
+        {
+            if (DiagnosisSession == null) return false;
+            DiagnosisSession.Minigame.SelectOption(optionIndex);
+            return true;
+        }
+
+        /// <summary>Abandons the inspection without crediting it.</summary>
+        public void CancelDiagnosis()
+        {
+            DiagnosisSession = null;
         }
 
         /// <summary>Puts the tools down. The car stays in its bay and mechanics may pick it up.</summary>

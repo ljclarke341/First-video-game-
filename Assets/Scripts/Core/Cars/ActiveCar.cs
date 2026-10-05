@@ -19,6 +19,49 @@ namespace GarageTycoon.Core.Cars
         /// <summary>Who is waiting on this car. Changes how patient they are and how well they tip.</summary>
         public CustomerMood Mood { get; private set; }
 
+        /// <summary>
+        /// How healthy each of the car's systems is. Never null: a car built without one starts
+        /// as-new, and the spawner or the save file replaces it with the real reading.
+        /// </summary>
+        public Vehicle.CarCondition Condition { get; private set; }
+
+        /// <summary>
+        /// What the customer said was wrong when they dropped it off, in their words.
+        /// This is what the player reads BEFORE diagnosing, so it hints without naming the faults.
+        /// </summary>
+        public string Complaint { get; private set; }
+
+        /// <summary>
+        /// What the garage has worked out about this car. Never null - a car that has never been
+        /// looked at simply has nothing revealed yet.
+        /// </summary>
+        public Diagnosis.CarDiagnosis Diagnosis { get; private set; }
+
+        /// <summary>
+        /// Whether the player can see a given job yet.
+        ///
+        /// A job is visible once its SYSTEM has been diagnosed. The job itself always existed -
+        /// diagnosis only decides whether the garage knows about it, which is what keeps the
+        /// system from ever creating work that cannot be reached.
+        /// </summary>
+        public bool IsJobRevealed(int jobIndex)
+        {
+            if (jobIndex < 0 || jobIndex >= _jobs.Count) return false;
+
+            return Diagnosis.IsRevealed(Vehicle.CarCondition.SystemFor(_jobs[jobIndex].Type));
+        }
+
+        /// <summary>How many of this car's jobs the player currently knows about.</summary>
+        public int RevealedJobCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < _jobs.Count; i++) if (IsJobRevealed(i)) count++;
+                return count;
+            }
+        }
+
         /// <summary>The jobs this car needs, in the order they are shown on the card.</summary>
         public IReadOnlyList<RepairJob> Jobs { get { return _jobs; } }
 
@@ -58,6 +101,9 @@ namespace GarageTycoon.Core.Cars
             InstanceId = instanceId;
             Definition = definition;
             Mood = mood;
+            Condition = Vehicle.CarCondition.FromPercents(null);
+            Complaint = string.Empty;
+            Diagnosis = new Diagnosis.CarDiagnosis();
             _jobs.AddRange(jobs);
 
             TotalTime = patienceSeconds;
@@ -77,41 +123,74 @@ namespace GarageTycoon.Core.Cars
             get { return TotalTime <= 0f ? 0f : MathUtil.Clamp01(TimeRemaining / TotalTime); }
         }
 
-        /// <summary>Average completion across all jobs, 0..1. Drives the big progress bar.</summary>
+        /// <summary>
+        /// Average completion across the work the customer agreed to, 0..1.
+        /// Declined jobs are left out entirely, so quoting for less does not leave the bar short.
+        /// </summary>
         public float OverallProgress
         {
             get
             {
-                if (_jobs.Count == 0) return 1f;
                 float sum = 0f;
-                for (int i = 0; i < _jobs.Count; i++) sum += _jobs[i].Progress;
-                return MathUtil.Clamp01(sum / _jobs.Count);
+                int counted = 0;
+
+                for (int i = 0; i < _jobs.Count; i++)
+                {
+                    if (_jobs[i].IsDeclined) continue;
+                    sum += _jobs[i].Progress;
+                    counted++;
+                }
+
+                if (counted == 0) return 1f;
+                return MathUtil.Clamp01(sum / counted);
             }
         }
 
-        /// <summary>True once every job on the car is finished.</summary>
+        /// <summary>How many repairs the customer actually agreed to pay for.</summary>
+        public int AcceptedJobCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < _jobs.Count; i++) if (_jobs[i].IsAccepted) count++;
+                return count;
+            }
+        }
+
+        /// <summary>
+        /// True once every job the customer agreed to is finished.
+        ///
+        /// Declined work is not waited for - that is the whole point of quoting small. A car with
+        /// NOTHING accepted is finished the moment it is quoted, which is correct: the customer
+        /// turned the work down and wants their keys back.
+        /// </summary>
         public bool AllJobsComplete
         {
             get
             {
                 for (int i = 0; i < _jobs.Count; i++)
                 {
-                    if (!_jobs[i].IsComplete) return false;
+                    if (_jobs[i].NeedsWork) return false;
                 }
                 return true;
             }
         }
 
-        /// <summary>True when every job was finished without a single dropped round.</summary>
+        /// <summary>True when every job taken on was finished without a single dropped round.</summary>
         public bool IsFlawless
         {
             get
             {
+                int counted = 0;
+
                 for (int i = 0; i < _jobs.Count; i++)
                 {
+                    if (_jobs[i].IsDeclined) continue;
                     if (!_jobs[i].IsFlawless) return false;
+                    counted++;
                 }
-                return _jobs.Count > 0;
+
+                return counted > 0;
             }
         }
 
@@ -120,7 +199,7 @@ namespace GarageTycoon.Core.Cars
         {
             for (int i = 0; i < _jobs.Count; i++)
             {
-                if (!_jobs[i].IsComplete) return i;
+                if (_jobs[i].NeedsWork) return i;
             }
             return -1;
         }
@@ -175,6 +254,16 @@ namespace GarageTycoon.Core.Cars
 
             TimeRemaining += granted;
             return granted;
+        }
+
+        /// <summary>
+        /// Attaches the inspection reading and the customer's own description of the problem.
+        /// Called by the spawner for a new car and by the save loader for a restored one.
+        /// </summary>
+        public void SetCondition(Vehicle.CarCondition condition, string complaint)
+        {
+            if (condition != null) Condition = condition;
+            Complaint = complaint ?? string.Empty;
         }
 
         public void MoveToBay(int bayIndex)

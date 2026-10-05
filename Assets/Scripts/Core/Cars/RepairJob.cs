@@ -40,6 +40,21 @@ namespace GarageTycoon.Core.Cars
 
         public bool IsComplete { get { return Progress >= 1f; } }
 
+        /// <summary>
+        /// Whether the customer agreed to pay for this repair.
+        ///
+        /// DEFAULTS TO TRUE, and that is deliberate rather than lazy: every car built before
+        /// quotes existed - including every car sitting in an old save - behaves exactly as it
+        /// always did, which is "do the lot". Declining work is something the player opts into.
+        /// </summary>
+        public bool IsAccepted { get; private set; }
+
+        /// <summary>A job the customer declined: not worked on, not paid for, not waited for.</summary>
+        public bool IsDeclined { get { return !IsAccepted; } }
+
+        /// <summary>True when this job still needs work AND was actually quoted for.</summary>
+        public bool NeedsWork { get { return IsAccepted && !IsComplete; } }
+
         /// <summary>True when every single round on this job was perfect (and at least one was played).</summary>
         public bool IsFlawless { get { return RoundsPlayed > 0 && PerfectRounds == RoundsPlayed; } }
 
@@ -51,6 +66,7 @@ namespace GarageTycoon.Core.Cars
             Payout = payout;
             Difficulty = difficulty;
             Progress = 0f;
+            IsAccepted = true;
         }
 
         /// <summary>
@@ -70,9 +86,23 @@ namespace GarageTycoon.Core.Cars
             return result.CashMultiplier;
         }
 
-        /// <summary>Used by the save system to restore a part-finished job.</summary>
-        public void RestoreProgress(float progress, int roundsPlayed, int perfectRounds, int damagedRounds)
+        /// <summary>
+        /// Records the customer's answer on this line of the quote.
+        ///
+        /// Work already done cannot be un-done: declining a job that is finished would mean the
+        /// player had been paid for work that then vanished off the car.
+        /// </summary>
+        public void SetAccepted(bool accepted)
         {
+            if (!accepted && IsComplete) return;
+            IsAccepted = accepted;
+        }
+
+        /// <summary>Used by the save system to restore a part-finished job.</summary>
+        public void RestoreProgress(float progress, int roundsPlayed, int perfectRounds, int damagedRounds,
+            bool accepted = true)
+        {
+            IsAccepted = accepted;
             Progress = MathUtil.Clamp01(progress);
             RoundsPlayed = roundsPlayed < 0 ? 0 : roundsPlayed;
             PerfectRounds = perfectRounds < 0 ? 0 : perfectRounds;

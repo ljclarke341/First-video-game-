@@ -6,6 +6,106 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## V2 Phase A — The garage becomes a business
+
+**What you asked for:** turn `CAR ARRIVES → PLAY MINI-GAMES → GET MONEY` into
+`CUSTOMER ARRIVES → DIAGNOSE → QUOTE → REPAIR → QUALITY → PAY`, without rebuilding anything.
+
+**Tests: 195 passing, up from 135.** 60 new tests, 0 failures, 0 regressions.
+**Economy: byte-for-byte unchanged.** The balance probe reports the same $503/min opening income,
+the same 31 cars served, the same $17,422 over half an hour, the same 27 upgrade levels bought.
+That is not "close enough" - it is identical, and it is the main thing I was protecting.
+
+### 1. Car condition
+
+Every car now arrives with a readout across seven systems: Engine, Brakes, Suspension, Electrical,
+Body, Cooling, Transmission.
+
+**The condition is derived FROM the jobs, not the other way round.** The obvious design is to roll
+a condition and then decide what repairs it needs - but that changes which jobs cars arrive with,
+which changes payouts, which changes an economy that was measured rather than guessed. So the
+spawner still picks jobs exactly as it always did, and the condition is read off them. A car that
+needs a brake service has bad brakes; one that does not has good ones. Same fiction, no drift.
+
+The first version of this did draw from the simulation's random source, and the balance test caught
+it immediately - the shifted stream moved the measured economy. Condition is now seeded from each
+car's own id, which also means a car's readout never changes between redraws, and a save written
+before conditions existed derives exactly the reading it would have had on the day it spawned.
+
+### 2. Diagnosis
+
+A car arrives with a complaint rather than a job list - *"The engine's making a knocking noise, and
+the brakes feel soft."* Seven checks find out more: Visual Inspection, OBD Scan, Brake Inspection,
+Battery Test, Engine Test, Suspension Check, Test Drive. Each is played as one of the four
+mini-games, chosen to fit (reading a fault code back is a sequence; listening to an engine under
+load is a hold-and-release), at 75% of repair difficulty.
+
+A well-played check reveals what it looked at. A botched one finds nothing - so sloppy inspection
+leaves you quoting on a car you only half understand, which is a more interesting failure than
+losing progress. The test drive covers five systems but is only 55% as thorough, so there is always
+a reason to do it properly instead.
+
+**Diagnosis can never become a gate.** Picking up a car nobody inspected reveals everything, free,
+instantly - it just earns no bonus. Mechanics work the faults out themselves. A player who ignores
+the entire system has exactly the game they had before. Six of the eighteen diagnosis tests exist
+only to guard that.
+
+### 3. Customer quotes
+
+After diagnosis the player chooses what to recommend: **everything**, **essentials only**, or a
+custom pick. Essentials are the systems that are genuinely bad; brakes get a lower bar than
+everything else because brakes are brakes; paint is never essential however rough it looks.
+
+Declined work is not done, not paid for, **and not tipped on** - a tip on work nobody did would
+make quoting small a free win rather than a trade. The trade as built: more money for more time in
+the bay, against a patience clock that does not care how much you are earning.
+
+Each customer type now has a quote they were hoping for. A VIP wants the job done properly; someone
+in a hurry wants the short version. Guessing right is worth +8% satisfaction, wrong costs 6-12% -
+enough to make you think about who you are talking to, not enough to decide the outcome.
+
+### 4. Repair quality
+
+Every finished job is scored out of five stars, from accuracy (share of perfect rounds), efficiency
+(how close it came to the fewest rounds it could have taken) and damage, then judged against what
+that particular customer expected. The same piece of work genuinely pleases a relaxed customer and
+disappoints a VIP.
+
+This is a **pure observer** - it reads data the simulation already tracked and adds nothing to it.
+`GarageSimulation` needed zero changes; the existing `JobCompleted` and `CarCompleted` events
+already carry everything. One of the tests proves it: running a full session with scoring attached
+produces the identical cash, cars and rounds as running it without.
+
+**Quality does not yet affect payment, deliberately.** Paying on quality replaces the existing flat
+flawless bonus, which moves average income - a balance change that deserves to be made on purpose
+and measured, not smuggled in alongside a scoring system. `QualityReport.PayMultiplier` is computed
+and ready; wiring it to the wallet is one line once the probe says what it costs.
+
+### Save compatibility
+
+The save format is now version 2, and the version number is **read** on load for the first time -
+it was being written and ignored, which left no migration hook. A save from a newer build is now
+refused rather than half-read.
+
+Every version 1 save still loads, and each of the three gaps is tested rather than hoped for:
+
+- **No condition** → derived from the car's jobs, seeded from its id
+- **No accepted flags** → every job comes back accepted, exactly as it behaved then
+- **No diagnosis** → fully revealed and marked skipped (those jobs *were* all visible in the build
+  that wrote the save, so hiding them would be a nasty surprise - and marking them skipped means
+  nobody is retroactively paid a bonus they never earned)
+
+### What Phase A has NOT got yet
+
+**No UI.** All four systems are built, saved and tested in Core, but nothing draws them - not in
+Unity, not in the web build. The player cannot see a condition readout, run a check or pick a quote
+yet. That is the next chunk and it is a big one: two separate front ends, by hand.
+
+I stopped here rather than rushing screens into both builds badly. Everything underneath is proven
+and the economy is untouched, which is the right place to pause.
+
+---
+
 ## Stage 10 — You can now see the repair happening
 
 **What you asked for:** an animation showing the car, the wheels and everything getting tightened
@@ -457,6 +557,14 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+15. **Quality is scored but not paid on.** See V2 Phase A. One line turns it on; it needs a
+   balance measurement first, and I would rather you knew that was a pending decision than find
+   your income had quietly moved.
+16. **New customer personalities are still pending.** You asked for Budget, Enthusiast, Taxi Driver
+   and Collector. Adding them to the spawn pool changes the patience and payout distribution, and
+   therefore the measured economy - so I mapped quote preferences onto the five customer types that
+   already exist instead. Adding the new ones is a deliberate balance change, worth doing with the
+   probe open.
 14. **The mini-games are 156px shorter now.** I think the trade is clearly worth it — the car is
    the best feedback in the game — but if any of the four now feels cramped on your actual phone,
    tell me which and I will give it the space back by shrinking the car band instead.

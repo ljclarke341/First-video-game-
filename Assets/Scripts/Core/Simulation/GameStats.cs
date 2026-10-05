@@ -7,6 +7,9 @@ namespace GarageTycoon.Core.Simulation
         public int CarsLost;
         public int JobsCompleted;
         public int RoundsPlayed;
+        
+        /// <summary>Inspection rounds played. Tracked separately: looking is not repairing.</summary>
+        public int DiagnosisRoundsPlayed;
         public int PerfectRounds;
         public int DamagedRounds;
         public double BestCarPayout;

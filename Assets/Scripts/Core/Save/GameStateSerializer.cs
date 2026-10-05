@@ -18,7 +18,16 @@ namespace GarageTycoon.Core.Save
     public static class GameStateSerializer
     {
         /// <summary>Bumped whenever the save shape changes, so old files can be migrated or discarded.</summary>
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
+
+        /// <summary>
+        /// The oldest save this build can still read. Anything older is refused rather than loaded
+        /// half-wrong, which is the kinder failure: a fresh garage beats a corrupted one.
+        ///
+        /// Version 1 saves ARE still readable - they simply have no condition data, and the loader
+        /// derives it from the jobs each car already carries.
+        /// </summary>
+        public const int MinimumReadableVersion = 1;
 
         // ------------------------------------------------------------------
         // Saving
@@ -119,6 +128,14 @@ namespace GarageTycoon.Core.Save
             json.Add("timeRemaining", car.TimeRemaining);
             json.Add("totalTime", car.TotalTime);
             json.Add("earned", car.EarnedSoFar);
+            json.Add("complaint", car.Complaint);
+
+            // Condition is SAVED rather than re-derived: a car whose engine read 41% before you
+            // closed the app has to still read 41% when you come back.
+            JsonValue condition = JsonValue.Array();
+            int[] percents = car.Condition.ToPercents();
+            for (int i = 0; i < percents.Length; i++) condition.Append(JsonValue.Number(percents[i]));
+            json.Add("condition", condition);
 
             JsonValue jobs = JsonValue.Array();
             for (int i = 0; i < car.Jobs.Count; i++)
@@ -134,9 +151,26 @@ namespace GarageTycoon.Core.Save
                 jobJson.Add("rounds", job.RoundsPlayed);
                 jobJson.Add("perfect", job.PerfectRounds);
                 jobJson.Add("damaged", job.DamagedRounds);
+                jobJson.Add("accepted", job.IsAccepted);
                 jobs.Append(jobJson);
             }
             json.Add("jobs", jobs);
+
+            // --- what the garage has worked out about this car ---
+            JsonValue diagnosis = JsonValue.Object();
+            diagnosis.Add("mask", car.Diagnosis.RevealedMask());
+            diagnosis.Add("started", car.Diagnosis.HasStarted);
+            diagnosis.Add("skipped", car.Diagnosis.WasSkipped);
+            diagnosis.Add("accuracy", car.Diagnosis.Accuracy);
+
+            JsonValue actions = JsonValue.Array();
+            for (int i = 0; i < car.Diagnosis.ActionsRun.Count; i++)
+            {
+                actions.Append(JsonValue.Number((int)car.Diagnosis.ActionsRun[i]));
+            }
+            diagnosis.Add("actions", actions);
+
+            json.Add("diagnosis", diagnosis);
 
             return json;
         }
@@ -153,6 +187,12 @@ namespace GarageTycoon.Core.Save
         {
             JsonValue root = JsonValue.Parse(json);
             if (root == null || root.Type != JsonType.Object) return null;
+
+            // A save with no version at all is treated as version 1, which is what the first
+            // builds wrote. One written by a NEWER build than this is refused: guessing at a shape
+            // we have never seen is how saves get silently mangled.
+            int version = root["version"].AsInt(1);
+            if (version < MinimumReadableVersion || version > CurrentVersion) return null;
 
             GarageSimulation simulation = new GarageSimulation(fallbackSeed);
 
@@ -246,6 +286,56 @@ namespace GarageTycoon.Core.Save
             return simulation;
         }
 
+        /// <summary>
+        /// Reads a car's condition back, or invents a believable one for a save written before
+        /// conditions existed.
+        ///
+        /// The fallback goes through CarCondition.ForCar, which seeds itself from the car's id.
+        /// So an old car gets back exactly the reading it would have been given on the day it
+        /// spawned, and the simulation's own random stream is left untouched.
+        /// </summary>
+        private static Vehicle.CarCondition LoadCondition(JsonValue json, int instanceId, List<RepairJob> jobs)
+        {
+            JsonValue stored = json["condition"];
+
+            if (stored.Count > 0)
+            {
+                int[] percents = new int[stored.Count];
+                for (int i = 0; i < stored.Count; i++) percents[i] = stored[i].AsInt(100);
+                return Vehicle.CarCondition.FromPercents(percents);
+            }
+
+            return Vehicle.CarCondition.ForCar(instanceId, jobs);
+        }
+
+        /// <summary>
+        /// Restores what had been worked out about a car.
+        ///
+        /// A save written before diagnosis existed has no entry here. Those cars are marked fully
+        /// revealed and skipped: the player could already see all their jobs in the build that
+        /// wrote the save, so hiding them now would be a nasty surprise on load - and marking
+        /// them skipped means nobody is retroactively paid a diagnosis bonus they never earned.
+        /// </summary>
+        private static void LoadDiagnosis(ActiveCar car, JsonValue json)
+        {
+            if (json.Type != JsonType.Object)
+            {
+                car.Diagnosis.RevealAll(true);
+                return;
+            }
+
+            List<int> actions = new List<int>();
+            JsonValue actionsJson = json["actions"];
+            for (int i = 0; i < actionsJson.Count; i++) actions.Add(actionsJson[i].AsInt(-1));
+
+            car.Diagnosis.Restore(
+                json["mask"].AsInt(0),
+                json["started"].AsBool(false),
+                json["skipped"].AsBool(false),
+                json["accuracy"].AsFloat(0f),
+                actions);
+        }
+
         private static ActiveCar LoadCar(JsonValue json)
         {
             CarDefinition definition = CarCatalog.FindById(json["def"].AsString(string.Empty));
@@ -273,14 +363,30 @@ namespace GarageTycoon.Core.Save
                     jobJson["progress"].AsFloat(0f),
                     jobJson["rounds"].AsInt(0),
                     jobJson["perfect"].AsInt(0),
-                    jobJson["damaged"].AsInt(0));
+                    jobJson["damaged"].AsInt(0),
+                    // Defaults to accepted, so every job in a save written before quotes existed
+                    // comes back as work the customer wants doing - exactly as it behaved then.
+                    jobJson["accepted"].AsBool(true));
 
                 jobs.Add(job);
             }
 
             float totalTime = json["totalTime"].AsFloat(30f);
             CustomerMood mood = (CustomerMood)json["mood"].AsInt((int)CustomerMood.Ordinary);
-            return new ActiveCar(json["id"].AsInt(1), definition, jobs, totalTime, mood);
+            int instanceId = json["id"].AsInt(1);
+
+            ActiveCar car = new ActiveCar(instanceId, definition, jobs, totalTime, mood);
+            car.SetCondition(LoadCondition(json, instanceId, jobs), json["complaint"].AsString(string.Empty));
+            LoadDiagnosis(car, json["diagnosis"]);
+
+            // A version 1 save has no complaint either, so write one from the condition we just
+            // derived. Without this an old car shows a blank line where its problem should be.
+            if (string.IsNullOrEmpty(car.Complaint))
+            {
+                car.SetCondition(car.Condition, Vehicle.CustomerComplaint.For(car.Condition));
+            }
+
+            return car;
         }
     }
 }
