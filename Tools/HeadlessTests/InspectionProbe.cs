@@ -57,7 +57,26 @@ namespace GarageTycoon.HeadlessTests
                 // What the player can actually tell at the counter: the complaint names a second
                 // symptom. Read off the sentence itself, not off the hidden condition.
                 new Strategy("6 only multi-symptom complaints", car =>
-                    ComplaintNamesTwo(car) ? DiagnosisActions.Count : 0)
+                    ComplaintNamesTwo(car) ? DiagnosisActions.Count : 0),
+
+                // ---- the strategies the gate is supposed to make possible ----
+
+                // Read the complaint, test what it points at, stop. This is the move the whole
+                // redesign exists to reward: targeted, cheap, and informed by a free clue.
+                Strategy.Targeted("7 only what the complaint points at", ComplaintDirectedCheck),
+
+                // One look, then commit. The fastest strategy that is not simply blind.
+                Strategy.Targeted("8 one likely check, then quote", car =>
+                    car.Diagnosis.ActionsRun.Count > 0 ? (DiagnosisAction?)null
+                        : ComplaintDirectedCheck(car)),
+
+                // Keep going until nothing is left hidden that matters.
+                Strategy.Targeted("9 until every fault is known", car =>
+                    car.Diagnosis.FoundEverything(car.Condition) ? (DiagnosisAction?)null
+                        : FirstUnrunCheck(car)),
+
+                // The explicit "just get stuck in" button, as opposed to never touching the car.
+                new Strategy("10 skip (just get stuck in)", car => 0, skip: true)
             };
 
             List<Result> results = new List<Result>();
@@ -97,6 +116,14 @@ namespace GarageTycoon.HeadlessTests
                 new Column("checks run", r => r.ChecksPerCar.ToString("0.00"))
             }, results[0]);
 
+            PrintTable("WHAT LOOKING BOUGHT", results, new[]
+            {
+                new Column("quotes written", r => r.Quotes.ToString()),
+                new Column("decision moved", r => r.DecisionsChangedPct.ToString("0.0") + "%"),
+                new Column("work declined", r => r.UnnecessaryAvoidedPct.ToString("0.0") + "%"),
+                new Column("work found", r => r.ExtraWorkFoundPct.ToString("0.0") + "%")
+            }, results[0]);
+
             InformationValue.Run(Seeds);
         }
 
@@ -117,6 +144,50 @@ namespace GarageTycoon.HeadlessTests
         }
 
         /// <summary>
+        /// The check a player would run after reading the complaint.
+        ///
+        /// The complaint names the car's worst systems, so this picks the first unrun check that
+        /// covers one of them, and returns null once they are all covered. No hidden information
+        /// is used that the player does not have: the complaint names these systems out loud.
+        /// </summary>
+        private static DiagnosisAction? ComplaintDirectedCheck(ActiveCar car)
+        {
+            List<VehicleSystem> named = car.Condition.FaultySystems();
+
+            // CustomerComplaint names at most the first two.
+            int namedCount = named.Count < 2 ? named.Count : 2;
+
+            for (int i = 0; i < namedCount; i++)
+            {
+                if (car.Diagnosis.IsRevealed(named[i])) continue;
+
+                for (int a = 0; a < DiagnosisActions.Count; a++)
+                {
+                    DiagnosisAction action = (DiagnosisAction)a;
+                    if (!car.Diagnosis.CanRun(action)) continue;
+
+                    VehicleSystem[] covers = action.Covers();
+                    for (int c = 0; c < covers.Length; c++)
+                    {
+                        if (covers[c] == named[i]) return action;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>The next check that has not been run yet, in order.</summary>
+        private static DiagnosisAction? FirstUnrunCheck(ActiveCar car)
+        {
+            for (int a = 0; a < DiagnosisActions.Count; a++)
+            {
+                if (car.Diagnosis.CanRun((DiagnosisAction)a)) return (DiagnosisAction)a;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Does the drop-off line name more than one symptom?
         ///
         /// Read off the sentence rather than the condition on purpose: this strategy is meant to
@@ -133,11 +204,26 @@ namespace GarageTycoon.HeadlessTests
         {
             public readonly string Name;
             public readonly Func<ActiveCar, int> ChecksWanted;
+            public readonly Func<ActiveCar, DiagnosisAction?> NextCheck;
+            public readonly bool Skip;
 
-            public Strategy(string name, Func<ActiveCar, int> checksWanted)
+            public Strategy(string name, Func<ActiveCar, int> checksWanted, bool skip = false)
             {
                 Name = name;
                 ChecksWanted = checksWanted;
+                Skip = skip;
+            }
+
+            private Strategy(string name, Func<ActiveCar, DiagnosisAction?> nextCheck)
+            {
+                Name = name;
+                NextCheck = nextCheck;
+            }
+
+            /// <summary>A strategy that chooses WHICH check to run, not just how many.</summary>
+            public static Strategy Targeted(string name, Func<ActiveCar, DiagnosisAction?> nextCheck)
+            {
+                return new Strategy(name, nextCheck);
             }
         }
 
@@ -166,7 +252,19 @@ namespace GarageTycoon.HeadlessTests
             public double UrgentProfit;
             public int UrgentCars;
 
+            // What the inspection actually bought, decision by decision.
+            public int Quotes;
+            public int DecisionsChanged;
+            public int UnnecessaryAvoided;
+            public int ExtraWorkFound;
+
             public double IncomeVsBaseline;
+
+            public double DecisionsChangedPct { get { return Pct(DecisionsChanged); } }
+            public double UnnecessaryAvoidedPct { get { return Pct(UnnecessaryAvoided); } }
+            public double ExtraWorkFoundPct { get { return Pct(ExtraWorkFound); } }
+
+            private double Pct(int part) { return Quotes == 0 ? 0d : part * 100d / Quotes; }
 
             public double IncomePerSession { get { return Per(Income); } }
             public double CompletedPerSession { get { return Per(Completed); } }
@@ -268,8 +366,18 @@ namespace GarageTycoon.HeadlessTests
 
                 simulation.CarLeftAngry += car => { result.Lost++; };
 
+                // The explicit skip button, rather than relying on the safety valve that fires
+                // when a spanner is picked up. The two should come out the same; measuring both
+                // is how that stays true.
+                if (strategy.Skip)
+                {
+                    simulation.CarEnteredBay += (car, bay) => { car.Diagnosis.RevealAll(true); };
+                }
+
                 SessionReport report = GameplayHarness.Play(simulation, SessionSeconds, Skill,
-                    checksWanted: strategy.ChecksWanted);
+                    checksWanted: strategy.ChecksWanted,
+                    nextCheck: strategy.NextCheck,
+                    onInspectionDone: car => RecordQuoteDecision(result, car));
 
                 result.Income += report.CashEarned;
                 result.Surcharge += simulation.Inventory.TotalSpent - surchargeBefore;
@@ -277,6 +385,44 @@ namespace GarageTycoon.HeadlessTests
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The player has decided they know enough. Writes the quote they would write, and records
+        /// what that inspection bought them against the quote they would have written blind.
+        ///
+        /// The comparison is against a ZERO-knowledge quote on the same car, which is what this
+        /// player would have had if they had walked straight past the ramp. That is the only
+        /// honest baseline: "what did looking at it change?"
+        /// </summary>
+        private static void RecordQuoteDecision(Result result, ActiveCar car)
+        {
+            if (car == null || car.Quoted) return;
+
+            Quote known = Quote.For(car);
+            if (known.LineCount == 0) return;      // nothing found, nothing to quote
+
+            result.Quotes++;
+
+            // Essentials only: the player declines the work the car does not actually need. That
+            // is the decision inspecting is supposed to inform.
+            int optional = known.LineCount - known.EssentialCount;
+            if (optional > 0) result.UnnecessaryAvoided++;
+
+            // Work that would have been invisible without looking. Every quoted line qualifies,
+            // because a car nobody inspected quotes nothing at all.
+            if (known.EssentialCount > 0) result.ExtraWorkFound++;
+
+            // Did looking change the bill? Against doing the lot blind, which is the alternative.
+            double blindTotal = 0d;
+            for (int i = 0; i < car.Jobs.Count; i++)
+            {
+                if (!car.Jobs[i].IsComplete) blindTotal += car.Jobs[i].Payout;
+            }
+
+            if (Math.Abs(known.EssentialPrice - blindTotal) > 0.01d) result.DecisionsChanged++;
+
+            known.Apply(car, QuoteOption.EssentialOnly);
         }
 
         // ------------------------------------------------------------------

@@ -253,7 +253,16 @@ namespace GarageTycoon.Unity.UI
             }
 
             bool found = _car.Diagnosis.FoundEverything(_car.Condition);
-            _quoteLabel.text = found ? "WRITE THE QUOTE" : "QUOTE WHAT I FOUND";
+            // With nothing found there is nothing to quote for, so the button says so rather than
+            // opening an empty bill. "Just get stuck in" is still right there, so the player is
+            // never stuck - they just cannot write a quote for work nobody has looked at.
+            bool anythingFound = _car.Diagnosis.RevealedCount > 0;
+
+            _quoteButton.interactable = anythingFound;
+            _quoteLabel.text = !anythingFound ? "NOTHING FOUND YET"
+                : found ? "WRITE THE QUOTE" : "QUOTE WHAT I FOUND";
+            _quoteLabel.color = anythingFound ? Theme.TextOnAccent : Theme.TextMuted;
+            _quoteButton.GetComponent<Image>().color = anythingFound ? Theme.Info : Theme.PanelSunken;
         }
 
         /// <summary>Red is a real fault, amber is worn, green is fine - the timer bar's language.</summary>

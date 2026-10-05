@@ -6,6 +6,68 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2b — Diagnosis becomes an information gate
+
+The fix for the measurement in the previous entry. **One rule changed**: the quote may only list
+work the garage has actually found. Condition values, faults, mini-games, difficulty and the bonus
+formula are all untouched - the only difference is WHEN the player is allowed to see a reading.
+
+`Quote.For()` now skips any job whose system is unrevealed, in both builds. The ramp's quote button
+reads "Nothing found yet" and is disabled until something has been found; "Just get stuck in" is
+untouched and still right there, so nobody is ever stuck.
+
+### What it bought
+
+The same six strategies as before, plus four the gate was meant to make possible:
+
+| strategy | profit/min | session income | vs never | cars done | lost % | checks/car |
+|---|---|---|---|---|---|---|
+| 1 never inspect | $915 | $13,845 | — | 36.7 | 12.8% | 0.00 |
+| 2 inspect every car fully | $539 | $8,084 | -41.6% | 30.7 | 14.2% | 7.00 |
+| 3 stop at the first fault | $751 | $11,277 | -18.5% | 29.3 | 20.6% | 1.87 |
+| 4 only urgent jobs | $877 | $13,230 | -4.4% | 36.1 | 13.2% | 0.71 |
+| 5 only rare and above | $830 | $12,502 | -9.7% | 35.4 | 14.0% | 1.18 |
+| 6 only multi-symptom complaints | $539 | $8,082 | -41.6% | 31.4 | 13.1% | 6.82 |
+| **7 only what the complaint points at** | $845 | $12,688 | -8.4% | **45.4** | **4.4%** | 2.06 |
+| 8 one likely check, then quote | $846 | $12,747 | -7.9% | 33.8 | 15.2% | 1.00 |
+| 9 until every fault is known | $646 | $9,692 | -30.0% | 39.4 | 6.2% | 5.02 |
+| **10 skip, then quote** | **$1,275** | **$19,295** | **+39.4%** | **81.4** | 0.2% | 0.00 |
+
+And the information measurement, which was five zeroes before:
+
+| | before | after |
+|---|---|---|
+| prevents an unnecessary repair | 0.0% | **93.0%** |
+| finds an additional repair | 0.0% | **100.0%** |
+| changes the quote decision | 0.0% | **100.0%** |
+| changes the chosen parts grade | 0.0% | 0.0% |
+| changes the repair outcome | 0.0% | 0.0% |
+
+Diagnosis is now a real information system. Targeted inspection (strategy 7) went from impossible to
+the best inspection strategy in the game: 45.4 cars a session against 36.7 for not looking at all,
+and a 4.4% loss rate against 12.8%.
+
+### But the gate has a hole, and it is the one you specified
+
+Strategy 10 is the new dominant strategy by a distance. "Just get stuck in" reveals every reading
+for free, so a player can press skip, read the complete quote, decline the optional work and carry
+on - collecting all of the information value while paying none of the time. The only thing they
+give up is the diagnosis bonus, which caps at 1.12x.
+
+This is exactly the behaviour the brief asked for ("when the player skips: reveal all condition
+information"), so I have implemented it as specified and measured it rather than quietly changing
+it. See the open question below - it needs one decision from you.
+
+### Verified
+
+- **290 tests pass** (15 new in `DiagnosisGateTests.cs`, covering all 14 cases you listed).
+- **505 cross-build parity cases, all identical** (up from 473), including 32 new `quoteGate` cases
+  that feed a reveal mask into both builds and compare which lines the quote is allowed to show.
+- Compile check clean, 20-minute soak clean, save round-trip kept, pre-diagnosis saves still load
+  with their cars fully visible and no retroactive bonus.
+
+---
+
 ## Phase B.2 interlude — Measuring the inspection incentive
 
 **No balance value was changed by this work.** Two new measuring rigs, and the numbers they
@@ -1229,6 +1291,16 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+21. **Skipping the inspection is now the best strategy in the game, by 39%.** The gate works -
+   inspecting finally tells you something - but "Just get stuck in" still reveals every reading for
+   free, so the cheapest way to get the information is to not pay for it. You specified that
+   behaviour, so I built it and measured it rather than changing it. Three ways out, in the order I
+   would pick them: (a) skip reveals which jobs EXIST but not their readings, so you can work the
+   car but not quote it precisely; (b) skip commits you to doing all the work, with no quote screen
+   at all - which is what "just get stuck in" means in plain English; (c) leave it, and accept that
+   diagnosis is for players chasing the bonus. My recommendation is (b): it costs the least, it
+   matches the button's own wording, and it turns skip into a real decision rather than a free pass.
+
 20. **Patience is a weak lever, and that limits what special jobs can do.** Jobs pay out *as each
    one finishes*, so a customer who walks out still leaves you the money for the work already done
    — only the unfinished jobs and the tip are lost. I measured this trying to make URGENT a real

@@ -320,6 +320,9 @@ namespace GarageTycoon.HeadlessTests.Tests
                 GarageSimulation simulation = new GarageSimulation(6101);
                 ActiveCar car = simulation.SpawnCar();
 
+                // The quote only lists work the garage has found, so this one has been over it.
+                car.Diagnosis.RevealAll(false);
+
                 foreach (PartKind kind in Enum.GetValues(typeof(PartKind)))
                 {
                     if (kind == PartKind.None) continue;
@@ -357,6 +360,9 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 GarageSimulation simulation = new GarageSimulation(6103);
                 ActiveCar car = simulation.SpawnCar();
+
+                // The quote only lists work the garage has found, so this one has been over it.
+                car.Diagnosis.RevealAll(false);
                 Quote quote = Quote.For(car);
 
                 simulation.Inventory.Policy = PartGrade.Budget;

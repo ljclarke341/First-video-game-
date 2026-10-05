@@ -408,6 +408,74 @@ namespace GarageTycoon.HeadlessTests
 
             json.Append("\n],\n");
 
+            // --- the diagnosis gate: what the quote is allowed to see ---
+            //
+            // Like quoteParts, this emits its INPUTS as well as its answer. The web spawner is
+            // Math.random based, so the same car cannot be reproduced there by seed; replaying the
+            // inputs compares the RULE, which is the thing that has to agree.
+            //
+            // Two builds can agree on every price and still disagree about which lines exist, and
+            // that would be two different games.
+            json.Append("\"quoteGate\":[\n");
+            first = true;
+
+            foreach (int seed in new[] { 1001, 4242, 6007, 7700 })
+            {
+                GarageSimulation gateSim = new GarageSimulation(seed);
+                ActiveCar gateCar = gateSim.SpawnCar();
+
+                // 0 = nothing looked at, 127 = the whole car, and a spread in between.
+                foreach (int mask in new[] { 0, 1, 2, 3, 5, 18, 63, 127 })
+                {
+                    gateCar.Diagnosis.Restore(mask, mask != 0, false, 1f, new List<int>());
+
+                    Quote quote = Quote.For(gateCar);
+
+                    if (!first) json.Append(",\n");
+                    first = false;
+
+                    json.Append("  {\"seed\":").Append(seed)
+                        .Append(",\"mask\":").Append(mask)
+                        .Append(",\"jobs\":[");
+
+                    for (int i = 0; i < gateCar.Jobs.Count; i++)
+                    {
+                        if (i > 0) json.Append(',');
+                        json.Append((int)gateCar.Jobs[i].Type);
+                    }
+
+                    json.Append("],\"pays\":[");
+                    for (int i = 0; i < gateCar.Jobs.Count; i++)
+                    {
+                        if (i > 0) json.Append(',');
+                        json.Append(D(gateCar.Jobs[i].Payout));
+                    }
+
+                    json.Append("],\"cond\":[");
+                    for (int i = 0; i < VehicleSystemExtensions.Count; i++)
+                    {
+                        if (i > 0) json.Append(',');
+                        json.Append(D(Math.Round(gateCar.Condition.Get((VehicleSystem)i), 6)));
+                    }
+
+                    json.Append("],\"lines\":").Append(quote.LineCount)
+                        .Append(",\"essential\":").Append(quote.EssentialCount)
+                        .Append(",\"all\":").Append(D(Math.Round(quote.EverythingPrice, 2)))
+                        .Append(",\"ess\":").Append(D(Math.Round(quote.EssentialPrice, 2)))
+                        .Append(",\"pct\":[");
+
+                    for (int i = 0; i < quote.Lines.Count; i++)
+                    {
+                        if (i > 0) json.Append(',');
+                        json.Append(quote.Lines[i].ConditionPercent);
+                    }
+
+                    json.Append("]}");
+                }
+            }
+
+            json.Append("\n],\n");
+
             // The weighted quality payout. A special job stretches the existing curve rather than
             // getting its own, so this proves the weighting itself agrees - weight 1 has to come
             // out byte for byte identical to the plain multiplier it replaced.

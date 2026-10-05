@@ -80,7 +80,9 @@ namespace GarageTycoon.HeadlessTests.Tests
         public static SessionReport Play(GarageSimulation simulation, float seconds, float skill,
             bool buyUpgrades = false, float step = 1f / 60f,
             Func<GarageSimulation, int> bayPicker = null,
-            Func<ActiveCar, int> checksWanted = null)
+            Func<ActiveCar, int> checksWanted = null,
+            Func<ActiveCar, DiagnosisAction?> nextCheck = null,
+            Action<ActiveCar> onInspectionDone = null)
         {
             double startCash = simulation.Wallet.Cash;
             double startEarnings = simulation.Wallet.LifetimeEarnings;
@@ -106,7 +108,17 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                     if (chosen >= 0)
                     {
-                        if (!TryInspect(simulation, chosen, checksWanted)) simulation.SelectBay(chosen);
+                        if (!TryInspect(simulation, chosen, checksWanted, nextCheck))
+                        {
+                            // Inspection is over for this car. This is the moment a real player
+                            // writes the quote: they have decided they know enough.
+                            if (onInspectionDone != null && simulation.Bays[chosen] != null)
+                            {
+                                onInspectionDone(simulation.Bays[chosen]);
+                            }
+
+                            simulation.SelectBay(chosen);
+                        }
                     }
                 }
 
@@ -169,13 +181,25 @@ namespace GarageTycoon.HeadlessTests.Tests
         /// Returns false when there is nothing left to look at, so the caller picks up a spanner.
         /// </summary>
         private static bool TryInspect(GarageSimulation simulation, int bayIndex,
-            Func<ActiveCar, int> checksWanted)
+            Func<ActiveCar, int> checksWanted, Func<ActiveCar, DiagnosisAction?> nextCheck)
         {
-            if (checksWanted == null) return false;
             if (bayIndex < 0 || bayIndex >= simulation.Bays.Count) return false;
 
             ActiveCar car = simulation.Bays[bayIndex];
             if (car == null) return false;
+
+            // A strategy that picks WHICH check to run beats one that only picks how many: reading
+            // the complaint and testing the thing it points at is a real player's first move, and
+            // "run them in enum order" cannot express it.
+            if (nextCheck != null)
+            {
+                DiagnosisAction? wantedCheck = nextCheck(car);
+                if (wantedCheck == null) return false;
+
+                return simulation.StartDiagnosis(bayIndex, wantedCheck.Value);
+            }
+
+            if (checksWanted == null) return false;
 
             int wanted = checksWanted(car);
             if (wanted <= 0 || car.Diagnosis.ActionsRun.Count >= wanted) return false;

@@ -180,8 +180,15 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.AreEqual(0, urgent.RevealedJobCount, "its faults should still start hidden");
                 Check.IsTrue(!string.IsNullOrEmpty(urgent.Complaint), "it should still have a complaint");
 
+                // Nothing has been looked at yet, so there is nothing to quote for - an urgent
+                // car is gated exactly like any other, which is the point.
+                Check.AreEqual(0, Quote.For(urgent).LineCount,
+                    "an uninspected urgent car should not be quotable");
+
+                urgent.Diagnosis.RevealAll(false);
+
                 Quote quote = Quote.For(urgent);
-                Check.IsTrue(quote.LineCount > 0, "it should still produce a quote");
+                Check.IsTrue(quote.LineCount > 0, "it should still produce a quote once inspected");
                 Check.IsTrue(quote.EssentialCount >= 1, "it should still have essential work");
 
                 for (int i = 0; i < urgent.Jobs.Count; i++)

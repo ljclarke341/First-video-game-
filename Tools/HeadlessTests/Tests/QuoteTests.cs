@@ -28,7 +28,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             suite.Add("A quote lists every outstanding repair", () =>
             {
-                ActiveCar car = Spawn(1001);
+                ActiveCar car = Inspected(1001);
                 Quote quote = Quote.For(car);
 
                 Check.AreEqual(car.Jobs.Count, quote.LineCount,
@@ -83,7 +83,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             suite.Add("Declining work takes it off the car", () =>
             {
-                ActiveCar car = Spawn(4242);
+                ActiveCar car = Inspected(4242);
                 Quote quote = Quote.For(car);
 
                 if (quote.EssentialCount >= car.Jobs.Count) return;    // nothing to decline on this roll
@@ -133,7 +133,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 for (int seed = 0; seed < 25; seed++)
                 {
-                    ActiveCar car = Spawn(6000 + seed);
+                    ActiveCar car = Inspected(6000 + seed);
                     Quote quote = Quote.For(car);
 
                     everythingTotal += quote.EverythingPrice;
@@ -271,10 +271,27 @@ namespace GarageTycoon.HeadlessTests.Tests
             for (int i = 0; i < steps; i++) simulation.Tick(1f / 60f);
         }
 
+        /// <summary>
+        /// A car straight off the truck: nothing inspected, so the quote knows nothing about it.
+        /// </summary>
         private static ActiveCar Spawn(int seed)
         {
             GarageSimulation simulation = new GarageSimulation(seed);
             return simulation.SpawnCar();
+        }
+
+        /// <summary>
+        /// A car the garage has been over properly, which is what a full quote now requires.
+        ///
+        /// These tests are about the quote's ARITHMETIC - what it totals, what it calls essential,
+        /// what declining does. The gate that decides which lines exist is tested separately in
+        /// DiagnosisGateTests; inspecting here keeps the two concerns apart.
+        /// </summary>
+        private static ActiveCar Inspected(int seed)
+        {
+            ActiveCar car = Spawn(seed);
+            car.Diagnosis.RevealAll(false);
+            return car;
         }
 
         private static void FinishAccepted(ActiveCar car)

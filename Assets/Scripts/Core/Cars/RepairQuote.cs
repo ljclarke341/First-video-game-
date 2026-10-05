@@ -63,7 +63,18 @@ namespace GarageTycoon.Core.Cars
 
         private Quote() { }
 
-        /// <summary>Builds the quote for a car from its jobs and its condition reading.</summary>
+        /// <summary>
+        /// Builds the quote for a car from the work the garage has actually FOUND.
+        ///
+        /// A quote can only list what was discovered. This used to read the condition straight off
+        /// the car, which meant the quote screen showed every fault at its true percentage whether
+        /// or not anybody had looked - and that made inspecting worthless. It was measured: with
+        /// the quote reading the condition directly, running every check changed the quote
+        /// decision on 0.0% of 4,800 cars. The information was already free.
+        ///
+        /// The condition values themselves are untouched, and so are the faults. The only thing
+        /// that changed is WHEN the garage is allowed to see them.
+        /// </summary>
         public static Quote For(ActiveCar car)
         {
             Quote quote = new Quote();
@@ -77,6 +88,11 @@ namespace GarageTycoon.Core.Cars
                 if (job.IsComplete) continue;
 
                 VehicleSystem system = CarCondition.SystemFor(job.Type);
+
+                // Work nobody has found yet cannot be quoted for. There is no danger of stranding
+                // it: picking up a spanner on a car that was never inspected still reveals the lot
+                // (see CarDiagnosis.RevealAll), so an unquoted job is deferred, never lost.
+                if (!car.Diagnosis.IsRevealed(system)) continue;
 
                 QuoteLine line = new QuoteLine();
                 line.JobIndex = i;
@@ -134,6 +150,13 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>Applies the customer's answer to the car, marking each job accepted or declined.</summary>
+        /// <summary>
+        /// Writes the player's answer back onto the car.
+        ///
+        /// Only the quoted lines are touched. A job the garage has not found yet keeps the state
+        /// it already had, which is accepted: the customer was never told about it, so turning it
+        /// down on their behalf would be putting words in their mouth.
+        /// </summary>
         public void Apply(ActiveCar car, QuoteOption option)
         {
             if (car == null) return;
