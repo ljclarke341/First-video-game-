@@ -147,6 +147,18 @@ namespace GarageTycoon.Unity.UI
                       + "lost. It is free, but there is a wait before you can use it again, so it is a "
                       + "decision about WHICH car to save.");
 
+            Heading("PARTS");
+            Bullet(Theme.Success,
+                "Every repair but a diagnostic scan fits a part. What the garage fits is one "
+                + "setting on the PARTS screen - Budget, Standard or Performance.");
+            Bullet(Theme.Cash,
+                "Cheaper parts leave more in the till and finish worse; better ones cost you and "
+                + "finish better. Standard is what the job is priced for, either way.");
+            Bullet(Theme.Danger,
+                "Stock turns up on its own and costs nothing. Running out never blocks a repair - "
+                + "the part comes off the van instead, with a surcharge on top. The quote tells you "
+                + "before you commit.");
+
             Heading("GETTING PAID");
             Bullet(Theme.Cash, "Perfect rounds pay a bonus. Finish a whole job without dropping a "
                                + "single round and it pays 25% more.");

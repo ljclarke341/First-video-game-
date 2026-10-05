@@ -3,6 +3,7 @@ using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Events;
 using GarageTycoon.Core.Minigames;
+using GarageTycoon.Core.Parts;
 using GarageTycoon.Core.Save;
 using GarageTycoon.Core.Simulation;
 using GarageTycoon.Core.Vehicle;
@@ -47,6 +48,7 @@ namespace GarageTycoon.Unity.Platform
         private UpgradeScreen _upgradeScreen;
         private HelpScreen _helpScreen;
         private PerkScreen _perkScreen;
+        private PartsScreen _partsScreen;
         private PopupPanel _popup;
         private ToastLayer _toasts;
         private RectTransform _toastRoot;
@@ -193,6 +195,7 @@ namespace GarageTycoon.Unity.Platform
             _garageScreen.PrestigeRequested += ShowPrestigeConfirmation;
             _garageScreen.HelpRequested += () => _helpScreen.Show();
             _garageScreen.PerksRequested += () => _perkScreen.Show();
+            _garageScreen.PartsRequested += () => _partsScreen.Show();
             _garageScreen.CalmRequested += HandleCalmRequested;
 
             _upgradeScreen = new UpgradeScreen();
@@ -203,6 +206,9 @@ namespace GarageTycoon.Unity.Platform
 
             _perkScreen = new PerkScreen();
             _perkScreen.Build(canvasRect, _simulation, HandlePerkPurchased);
+
+            _partsScreen = new PartsScreen();
+            _partsScreen.Build(canvasRect, _simulation, HandlePartsChanged);
 
             _popup = new PopupPanel();
             _popup.Build(canvasRect);
@@ -239,6 +245,7 @@ namespace GarageTycoon.Unity.Platform
         {
             _simulation.RoundResolved += HandleRoundResolved;
             _simulation.DiagnosisResolved += HandleDiagnosisResolved;
+            _simulation.PartBoughtIn += HandlePartBoughtIn;
             _simulation.JobCompleted += HandleJobCompleted;
             _simulation.CarCompleted += HandleCarCompleted;
             _simulation.CarLeftAngry += HandleCarLeft;
@@ -254,6 +261,7 @@ namespace GarageTycoon.Unity.Platform
 
             _simulation.RoundResolved -= HandleRoundResolved;
             _simulation.DiagnosisResolved -= HandleDiagnosisResolved;
+            _simulation.PartBoughtIn -= HandlePartBoughtIn;
             _simulation.JobCompleted -= HandleJobCompleted;
             _simulation.CarCompleted -= HandleCarCompleted;
             _simulation.CarLeftAngry -= HandleCarLeft;
@@ -293,6 +301,24 @@ namespace GarageTycoon.Unity.Platform
         /// Says what an inspection turned up. A check that found nothing has to say so out loud,
         /// or a botched round just looks like the game ignoring you.
         /// </summary>
+        /// <summary>Changing the parts policy changes what the open quote would cost, so redraw.</summary>
+        private void HandlePartsChanged()
+        {
+            _garageScreen.Refresh();
+            Save();
+        }
+
+        /// <summary>
+        /// Says when a part had to come off the van. The surcharge is the only cash parts ever
+        /// take, so it is the one thing about the system the player must never pay silently.
+        /// </summary>
+        private void HandlePartBoughtIn(ActiveCar car, RepairJob job, PartFitting fitting)
+        {
+            _toasts.Show("No " + fitting.Kind.DisplayName() + " in  -  off the van, -$"
+                         + CashFormat.Short(fitting.Cost),
+                Theme.Warning, new Vector2(0f, -300f));
+        }
+
         private void HandleDiagnosisResolved(ActiveCar car, DiagnosisAction action, MinigameResult result)
         {
             _toasts.Show(result.Message, OutcomeColor(result.Outcome), new Vector2(0f, -240f));

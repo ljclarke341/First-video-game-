@@ -187,6 +187,81 @@ namespace GarageTycoon.HeadlessTests
                         .Append('}');
                 }
             }
+            json.Append("\n],\n");
+
+            // --- the quote's parts line: what each option costs, and what is short ---
+            json.Append("\"quoteParts\":[\n");
+            first = true;
+
+            foreach (int seed in new[] { 61, 404, 1234, 9090 })
+            {
+                foreach (Core.Parts.PartGrade policy in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+                {
+                    foreach (bool bareShelf in new[] { false, true })
+                    {
+                        GarageSimulation simulation = new GarageSimulation(seed);
+                        ActiveCar car = simulation.SpawnCar();
+
+                        simulation.Inventory.Policy = policy;
+
+                        if (bareShelf)
+                        {
+                            // Drain every shelf, so the shortage list is exercised too.
+                            for (int i = 0; i < 200; i++)
+                            {
+                                simulation.Inventory.Fit(JobType.Brakes, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Engine, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Tires, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Paint, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Panels, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Electrics, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Suspension, 1d, 0);
+                                simulation.Inventory.Fit(JobType.Exhaust, 1d, 0);
+                            }
+                        }
+
+                        Quote quote = Quote.For(car);
+
+                        foreach (bool essentialOnly in new[] { false, true })
+                        {
+                            Quote.PartsSummary summary = quote.SummariseParts(
+                                simulation.Inventory, essentialOnly);
+
+                            if (!first) json.Append(",\n");
+                            first = false;
+
+                            json.Append("  {\"seed\":").Append(seed)
+                                .Append(",\"policy\":").Append((int)policy)
+                                .Append(",\"bare\":").Append(bareShelf ? 1 : 0)
+                                .Append(",\"ess\":").Append(essentialOnly ? 1 : 0)
+                                .Append(",\"lines\":[");
+
+                            for (int i = 0; i < quote.LineCount; i++)
+                            {
+                                if (i > 0) json.Append(',');
+                                json.Append("{\"t\":").Append((int)quote.Lines[i].Type)
+                                    .Append(",\"p\":").Append(F((float)quote.Lines[i].Price))
+                                    .Append(",\"e\":").Append(quote.Lines[i].IsEssential ? 1 : 0)
+                                    .Append('}');
+                            }
+
+                            json.Append(']')
+                                .Append(",\"value\":").Append(F((float)Math.Round(summary.Value, 3)))
+                                .Append(",\"nothing\":").Append(summary.NeedsNothing ? 1 : 0)
+                                .Append(",\"short\":[");
+
+                            for (int i = 0; i < summary.Short.Count; i++)
+                            {
+                                if (i > 0) json.Append(',');
+                                json.Append((int)summary.Short[i]);
+                            }
+
+                            json.Append("]}");
+                        }
+                    }
+                }
+            }
+
             json.Append("\n]\n}");
 
             Console.WriteLine(json.ToString());

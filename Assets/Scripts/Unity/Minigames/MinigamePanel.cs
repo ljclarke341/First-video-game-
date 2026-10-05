@@ -105,7 +105,7 @@ namespace GarageTycoon.Unity.Minigames
             _inspectPanel.Build(_viewHost, _simulation);
             _inspectPanel.QuoteRequested += OpenQuote;
 
-            _quotePanel.Build(_viewHost);
+            _quotePanel.Build(_viewHost, _simulation);
             _quotePanel.Answered += HandleQuoteAnswered;
 
             _views.Add(new TimingBarView());

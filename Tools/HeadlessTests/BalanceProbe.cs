@@ -57,6 +57,80 @@ namespace GarageTycoon.HeadlessTests
             }
         }
 
+        /// <summary>
+        /// How often the shelf actually runs dry.
+        ///
+        /// The delivery rate is fixed at one part every PartDeliverySeconds; consumption is not -
+        /// it rises with every bay and every mechanic. So the question is not "does the surcharge
+        /// happen", it is "at what size of garage does it start to bite, and how hard".
+        /// </summary>
+        public static void MeasureStock()
+        {
+            Console.WriteLine("=====================================================");
+            Console.WriteLine(" PARTS: does the shelf ever run dry?");
+            Console.WriteLine("=====================================================");
+            Console.WriteLine();
+            Console.WriteLine(string.Format(
+                "   delivery rate   1 part every {0:0}s  =  {1:0.0} parts per minute",
+                Core.Balance.GameBalance.PartDeliverySeconds,
+                60f / Core.Balance.GameBalance.PartDeliverySeconds));
+            Console.WriteLine(string.Format("   shelf cap       {0} per kind, {1} kinds",
+                Core.Balance.GameBalance.PartShelfCap, Core.Parts.PartKinds.Count));
+            Console.WriteLine();
+            Console.WriteLine("   garage                      parts/min   off the van   surcharge");
+            Console.WriteLine("   ------------------------------------------------------------------");
+
+            Row("1 bay, by hand", 0, 0, 0);
+            Row("2 bays, by hand", 1, 0, 0);
+            Row("2 bays + 1 mechanic", 1, 1, 2);
+            Row("4 bays + 2 mechanics", 3, 2, 4);
+            Row("4 bays + 4 mechanics, trained", 3, 4, 6);
+        }
+
+        private static void Row(string label, int bays, int mechanics, int training)
+        {
+            const float Seconds = 900f;
+            const int Runs = 4;
+
+            double parts = 0d, boughtIn = 0d, surcharge = 0d;
+
+            for (int run = 0; run < Runs; run++)
+            {
+                GarageSimulation simulation = new GarageSimulation(31000 + run * 977);
+
+                if (bays > 0) GameplayHarness.GrantUpgrade(simulation, "workshop_bays", bays);
+                if (mechanics > 0) GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", mechanics);
+                if (training > 0) GameplayHarness.GrantUpgrade(simulation, "auto_skill", training);
+
+                int fittedBefore = 0, vanBefore = 0;
+                double spentBefore = simulation.Wallet.Cash;
+
+                int fitted = 0, van = 0;
+                simulation.PartBoughtIn += (car, job, fitting) => { van++; };
+                simulation.JobCompleted += (car, job, payout) =>
+                {
+                    if (Core.Parts.PartKinds.For(job.Type) != Core.Parts.PartKind.None) fitted++;
+                };
+
+                double spendBefore = simulation.Inventory.TotalSpent;
+                GameplayHarness.Play(simulation, Seconds, 0.85f);
+
+                parts += fitted - fittedBefore;
+                boughtIn += van - vanBefore;
+                surcharge += simulation.Inventory.TotalSpent - spendBefore;
+
+                // keep the compiler honest about the unused locals above
+                if (spentBefore < 0d) Console.Write(string.Empty);
+            }
+
+            double minutes = (Seconds / 60f) * Runs;
+            double rate = parts / minutes;
+            double share = parts <= 0d ? 0d : boughtIn / parts;
+
+            Console.WriteLine(string.Format("   {0,-28} {1,8:0.0} {2,13:0.0}% {3,11:0}",
+                label, rate, share * 100d, surcharge / Runs));
+        }
+
         public static void Run()
         {
             Console.WriteLine("=====================================================");

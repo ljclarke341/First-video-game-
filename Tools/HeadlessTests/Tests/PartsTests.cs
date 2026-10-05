@@ -298,7 +298,88 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.IsTrue(Math.Abs(after.PartValue - 31d) < 0.01d, "the part's value changed");
             });
 
+            suite.Add("The quote's parts line is a Core rule, not a drawing", () =>
+            {
+                // Both builds draw this line. The counting behind it lives in Core so they cannot
+                // come to different conclusions about the same quote.
+                GarageSimulation simulation = new GarageSimulation(6100);
+                ActiveCar car = simulation.SpawnCar();
+                Quote quote = Quote.For(car);
+
+                Quote.PartsSummary everything = quote.SummariseParts(simulation.Inventory, false);
+                Quote.PartsSummary essentials = quote.SummariseParts(simulation.Inventory, true);
+
+                Check.IsTrue(everything.Value >= essentials.Value,
+                    "doing everything cannot need fewer parts than doing the essentials");
+                Check.AreEqual(0, everything.Short.Count,
+                    "an opening shelf should cover a first car");
+            });
+
+            suite.Add("A bare shelf is reported as short on the quote", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(6101);
+                ActiveCar car = simulation.SpawnCar();
+
+                foreach (PartKind kind in Enum.GetValues(typeof(PartKind)))
+                {
+                    if (kind == PartKind.None) continue;
+                    while (simulation.Inventory.TotalStockOf(kind) > 0)
+                    {
+                        simulation.Inventory.AddStock(kind, PartGrade.Standard, 0);
+                        simulation.Inventory.Fit(JobTypeFor(kind), 1d, 0);
+                    }
+                }
+
+                Quote quote = Quote.For(car);
+                Quote.PartsSummary summary = quote.SummariseParts(simulation.Inventory, false);
+
+                Check.IsTrue(summary.Short.Count > 0,
+                    "an empty shelf should be called out on the quote before the player commits");
+            });
+
+            suite.Add("A quote of nothing but scans needs no parts", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(6102);
+
+                List<RepairJob> jobs = new List<RepairJob>
+                {
+                    new RepairJob(JobType.Diagnostics, MinigameType.ToolMatch, 1f, 100d, 1f)
+                };
+                ActiveCar car = new ActiveCar(1, CarCatalog.All[0], jobs, 60f, CustomerMood.Ordinary);
+
+                Quote.PartsSummary summary = Quote.For(car).SummariseParts(simulation.Inventory, false);
+
+                Check.IsTrue(summary.NeedsNothing, "a scan-only quote should need nothing off the shelf");
+                Check.AreEqual(0, summary.Short.Count, "and should report nothing short");
+            });
+
+            suite.Add("A higher grade makes the quote's parts bill bigger", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(6103);
+                ActiveCar car = simulation.SpawnCar();
+                Quote quote = Quote.For(car);
+
+                simulation.Inventory.Policy = PartGrade.Budget;
+                double budget = quote.SummariseParts(simulation.Inventory, false).Value;
+
+                simulation.Inventory.Policy = PartGrade.Performance;
+                double performance = quote.SummariseParts(simulation.Inventory, false).Value;
+
+                Check.IsTrue(performance > budget,
+                    "the quote must reflect the grade the garage is actually fitting");
+            });
+
             return suite;
+        }
+
+        /// <summary>Any repair that fits the given kind, for draining a shelf in a test.</summary>
+        private static JobType JobTypeFor(PartKind kind)
+        {
+            foreach (JobType jobType in Enum.GetValues(typeof(JobType)))
+            {
+                if (PartKinds.For(jobType) == kind) return jobType;
+            }
+            return JobType.Diagnostics;
         }
 
         private static void Advance(GarageSimulation simulation, float seconds)

@@ -165,6 +165,64 @@ namespace GarageTycoon.Core.Cars
             car.SetQuoted(QuoteOption.Custom);
         }
 
+        /// <summary>What the parts on a quote will cost, and which of them the shelf cannot cover.</summary>
+        public struct PartsSummary
+        {
+            /// <summary>Total value of the parts this option needs, at the garage's current policy.</summary>
+            public double Value;
+
+            /// <summary>Kinds the shelf is short of - these come off the van, with the surcharge.</summary>
+            public List<Parts.PartKind> Short;
+
+            /// <summary>True when the option needs nothing off the shelf at all.</summary>
+            public bool NeedsNothing;
+        }
+
+        /// <summary>
+        /// Works out the parts bill for an option on this quote.
+        ///
+        /// IN CORE, not in either view. Both builds draw the same line on the quote screen - what
+        /// the parts cost and what is short - and the counting behind it is a rule, not a drawing.
+        /// Letting each front end work it out separately is how the two start disagreeing about
+        /// the same car, which is the one thing this project has already been bitten by.
+        /// </summary>
+        public PartsSummary SummariseParts(Parts.PartsInventory inventory, bool essentialOnly)
+        {
+            PartsSummary summary = new PartsSummary();
+            summary.Short = new List<Parts.PartKind>();
+
+            if (inventory == null) { summary.NeedsNothing = true; return summary; }
+
+            Parts.PartGrade policy = inventory.Policy;
+            Dictionary<Parts.PartKind, int> needed = new Dictionary<Parts.PartKind, int>();
+
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                QuoteLine line = _lines[i];
+                if (essentialOnly && !line.IsEssential) continue;
+
+                Parts.PartKind kind = Parts.PartKinds.For(line.Type);
+                if (kind == Parts.PartKind.None) continue;
+
+                summary.Value += Parts.PartsInventory.ValueOnJob(line.Price, policy);
+                needed[kind] = (needed.ContainsKey(kind) ? needed[kind] : 0) + 1;
+            }
+
+            if (needed.Count == 0) { summary.NeedsNothing = true; return summary; }
+
+            // Ordered by kind so the two builds list a shortage in the same order, which makes the
+            // cross-build diff meaningful rather than order-dependent.
+            for (int kind = 1; kind <= Parts.PartKinds.Count; kind++)
+            {
+                Parts.PartKind candidate = (Parts.PartKind)kind;
+                if (!needed.ContainsKey(candidate)) continue;
+
+                if (inventory.TotalStockOf(candidate) < needed[candidate]) summary.Short.Add(candidate);
+            }
+
+            return summary;
+        }
+
         /// <summary>The price of a given answer.</summary>
         public double PriceOf(QuoteOption option)
         {

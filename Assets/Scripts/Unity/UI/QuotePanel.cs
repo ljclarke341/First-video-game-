@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Generic;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Parts;
+using GarageTycoon.Core.Simulation;
 using GarageTycoon.Core.Vehicle;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,6 +36,8 @@ namespace GarageTycoon.Unity.UI
         private RectTransform _root;
         private readonly List<LineView> _lines = new List<LineView>();
         private Text _wantHint;
+        private Text _partsEverything;
+        private Text _partsEssential;
         private Button _everythingButton;
         private Button _essentialButton;
         private Button _backButton;
@@ -41,14 +46,17 @@ namespace GarageTycoon.Unity.UI
         private Image _everythingBackground;
         private Image _essentialBackground;
 
+        private GarageSimulation _simulation;
         private ActiveCar _car;
         private Quote _quote;
 
         /// <summary>Raised with the customer's answer. Null option means "back to the ramp".</summary>
         public event Action<ActiveCar, Quote, QuoteOption?> Answered;
 
-        public void Build(RectTransform parent)
+        public void Build(RectTransform parent, GarageSimulation simulation)
         {
+            _simulation = simulation;
+
             _root = UIFactory.CreateRect("QuotePanel", parent);
             UIFactory.Stretch(_root);
 
@@ -57,6 +65,17 @@ namespace GarageTycoon.Unity.UI
             UIFactory.AddVerticalLayout(rows.gameObject, 4f);
 
             for (int i = 0; i < MaxLines; i++) _lines.Add(BuildLine(rows));
+
+            // What the parts will take out of each option. The cost is the same money either way;
+            // the surcharge is not, so a shelf that cannot cover the work is called out here - at
+            // the moment the decision is made, rather than as a surprise afterwards.
+            _partsEverything = UIFactory.CreateText("PartsEverything", _root, string.Empty,
+                Theme.FontTiny, Theme.TextMuted, TextAnchor.MiddleLeft);
+            UIFactory.AnchorBottom(_partsEverything.rectTransform, 24f, 162f, 6f);
+
+            _partsEssential = UIFactory.CreateText("PartsEssential", _root, string.Empty,
+                Theme.FontTiny, Theme.TextMuted, TextAnchor.MiddleLeft);
+            UIFactory.AnchorBottom(_partsEssential.rectTransform, 24f, 136f, 6f);
 
             _wantHint = UIFactory.CreateText("WantHint", _root, string.Empty, Theme.FontTiny,
                 Theme.TextMuted, TextAnchor.MiddleCenter);
@@ -186,6 +205,9 @@ namespace GarageTycoon.Unity.UI
                     : Theme.PanelSunken;
             }
 
+            RefreshPartsLine(_partsEverything, "Everything", false);
+            RefreshPartsLine(_partsEssential, "Essentials", true);
+
             _everythingPrice.text = "$" + CashFormat.Short(_quote.EverythingPrice);
             _essentialPrice.text = "$" + CashFormat.Short(_quote.EssentialPrice);
 
@@ -199,6 +221,44 @@ namespace GarageTycoon.Unity.UI
             _wantHint.text = preferred == QuoteOption.Everything
                 ? "Wants it done properly"
                 : "Would rather keep the bill down";
+        }
+
+        /// <summary>
+        /// Writes one "what the parts cost" line.
+        ///
+        /// Everything here is read from Core - the grade, the share it costs, what is on the shelf.
+        /// The view works out which kinds are short only by counting how many of each the quote
+        /// needs against what the inventory holds; it never re-derives a price.
+        /// </summary>
+        private void RefreshPartsLine(Text label, string prefix, bool essentialOnly)
+        {
+            // The counting lives in Core.Quote.SummariseParts, so this view and the web build
+            // cannot come to different conclusions about the same quote.
+            Quote.PartsSummary summary = _quote.SummariseParts(_simulation.Inventory, essentialOnly);
+
+            if (summary.NeedsNothing)
+            {
+                label.text = prefix + ": no parts needed";
+                label.color = Theme.TextMuted;
+                return;
+            }
+
+            bool isShort = summary.Short.Count > 0;
+
+            string text = prefix + ": " + _simulation.Inventory.Policy.DisplayName() + " parts  "
+                          + (isShort ? "~" : string.Empty)
+                          + "$" + CashFormat.Short(summary.Value);
+
+            if (isShort)
+            {
+                List<string> names = new List<string>();
+                for (int i = 0; i < summary.Short.Count; i++) names.Add(summary.Short[i].DisplayName());
+
+                text += "   " + string.Join(", ", names.ToArray()) + " off the van";
+            }
+
+            label.text = text;
+            label.color = isShort ? Theme.Danger : Theme.TextMuted;
         }
 
         private void Answer(QuoteOption? option)

@@ -70,6 +70,9 @@ namespace GarageTycoon.Unity.UI
         /// <summary>Raised when the player taps the Reputation button.</summary>
         public event Action PerksRequested;
 
+        /// <summary>Raised when the player wants the parts screen.</summary>
+        public event Action PartsRequested;
+
         /// <summary>Raised when the player buys a waiting customer a coffee, with the bay index.</summary>
         public event Action<int> CalmRequested;
 
@@ -301,7 +304,8 @@ namespace GarageTycoon.Unity.UI
             UIFactory.AnchorBottom(bar, Theme.TouchTargetHeight, 28f, Theme.ScreenPadding);
             UIFactory.AddHorizontalLayout(bar.gameObject, Theme.ElementSpacing);
 
-            // Short labels: five buttons on a phone have about seventy points of width each.
+            // Short labels: six buttons on a phone have about sixty points of width each, so the
+            // help button is pinned narrow below and the rest share what is left.
             _upgradeButton = UIFactory.CreateButton("Upgrades", bar, "SHOP", Theme.Info,
                 Theme.TextOnAccent, Theme.FontSmall, () => Raise(UpgradesRequested));
 
@@ -311,6 +315,9 @@ namespace GarageTycoon.Unity.UI
             Button perks = UIFactory.CreateButton("Perks", bar, "REP", Theme.Prestige,
                 Theme.TextOnAccent, Theme.FontSmall, () => Raise(PerksRequested));
 
+            Button parts = UIFactory.CreateButton("Parts", bar, "PARTS", Theme.PanelRaised,
+                Theme.TextPrimary, Theme.FontSmall, () => Raise(PartsRequested));
+
             _prestigeButton = UIFactory.CreateButton("Prestige", bar, "SELL", Theme.Prestige,
                 Theme.TextOnAccent, Theme.FontSmall, () => Raise(PrestigeRequested));
 
@@ -318,7 +325,7 @@ namespace GarageTycoon.Unity.UI
             Button help = UIFactory.CreateButton("Help", bar, "?", Theme.PanelRaised,
                 Theme.TextPrimary, Theme.FontHeading, () => Raise(HelpRequested));
             LayoutElement helpLayout = help.gameObject.AddComponent<LayoutElement>();
-            helpLayout.preferredWidth = 110f;
+            helpLayout.preferredWidth = 88f;
             helpLayout.flexibleWidth = 0f;
         }
 

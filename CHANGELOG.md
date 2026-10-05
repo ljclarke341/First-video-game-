@@ -6,6 +6,80 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1c — Unity Parts, and what the stock rate actually does
+
+Unity now has everything the web build has, consuming the same Core rules. **242 tests passing**,
+**312 cross-build cases identical**, economy unchanged.
+
+### Unity
+
+| | |
+|---|---|
+| `PartsScreen.cs` (new) | PARTS on the bottom bar; grade picker with the Core stars; eight shelf rows with six pips each; fill-now button priced from `PartsInventory.ExpediteFee` |
+| `QuotePanel.cs` | the parts bill for both options, with shortages called out in red |
+| `GameBootstrap.cs` | toast naming the part and the surcharge when one comes off the van |
+| `GarageScreen.cs` | sixth nav button; help button narrowed to 88pt to make room |
+| `HelpScreen.cs` | a PARTS section explaining the three grades and the surcharge |
+
+**No parts rules were written in Unity.** The screen reads grades, costs, quality shifts, the shelf
+cap and the expedite fee straight out of Core. Even the surcharge wording derives its percentage
+from `GameBalance.PartsCounterMarkup` rather than printing "40%".
+
+The one piece of logic both builds needed - *which parts does this quote need, and can the shelf
+cover them* - moved into Core as `Quote.SummariseParts`. It was counting, which is a rule, not a
+drawing; leaving a copy in each front end is how the two start disagreeing about the same car.
+
+### The stock rate: you were right to ask
+
+**The surcharge is not rare. It is common, and it gets worse the better you do.**
+
+Deliveries are fixed at one part every 14 seconds - **4.3 a minute** - while consumption scales with
+every bay and every mechanic:
+
+| Garage | Parts used/min | Off the van | Surcharge per 15 min |
+|---|---|---|---|
+| 1 bay, by hand | 6.6 | **15%** | $79 |
+| 2 bays, by hand | 6.5 | **14%** | $55 |
+| 2 bays + 1 mechanic | 8.3 | **30%** | $176 |
+| 4 bays + 2 mechanics | 11.6 | **50%** | $532 |
+| 4 bays + 4 mechanics, trained | 16.4 | **64%** | $1,022 |
+
+A fully built garage pays the premium on nearly **two thirds** of its parts. The system punishes
+you precisely for succeeding, which is backwards - and the player has no lever, because the
+delivery rate is not something they can improve.
+
+**Recommendation: scale deliveries with the number of people working.** Measured, not guessed -
+three candidate factors, extra deliveries per mechanic:
+
+| Extra per mechanic | 1 bay | +1 mech | +2 mech | +4 mech |
+|---|---|---|---|---|
+| **0 (today)** | 15% | 30% | 50% | 64% |
+| **0.45** | 15% | 10% | 17% | **19%** |
+| **0.7** | 15% | 0% | 4% | **0%** |
+| **1.0** | 15% | 0% | 0% | **0%** |
+
+**0.4-0.5 holds the surcharge flat at roughly 10-20% across every garage size**, which keeps stock
+worth watching without punishing growth. 0.7 and above switch the mechanic off entirely.
+
+**Not changed.** This is a balance decision and it is yours. If you want it, the change is one
+argument on `TickDeliveries` plus the same in the web build, and the measurement rig
+(`probe stock`) is committed so it can be re-run after.
+
+### Verified
+
+- **242 C# tests**, 4 new covering the quote's parts line, a bare shelf, a scan-only quote and the
+  grade changing the bill
+- **312 cross-build cases identical** (up from 264). The 48 new ones cover the quote's parts line
+  across four cars x three grades x stocked/bare x everything/essentials. The web spawner is
+  `Math.random` based, so the C# dump now emits its **input lines** and the browser replays them -
+  comparing the rule rather than two spawners that were never meant to agree.
+- **Economy unchanged**: $504/min, $17,420, 43 cars, 16 lost, 2 bays, 27 upgrades, idle at 53%
+- **Soak**: 40 cars in 20 minutes, nothing stuck, no errors
+- **Nav fits** at 360, 412 and 430px with six buttons
+- **Old saves load** with a full shelf
+
+---
+
 ## Phase B.1b — Parts, playable
 
 The web build now has everything B.1 put into Core, plus the screens to use it.
