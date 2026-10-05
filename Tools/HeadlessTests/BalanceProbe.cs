@@ -4,6 +4,7 @@ using GarageTycoon.Core.Parts;
 using System;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Special;
 using GarageTycoon.HeadlessTests.Tests;
 
 namespace GarageTycoon.HeadlessTests
@@ -199,6 +200,322 @@ namespace GarageTycoon.HeadlessTests
 
             Console.WriteLine(string.Format("   {0,-28} {1,8:0.0} {2,13:0.0}% {3,11:0}",
                 label, rate, share * 100d, surcharge / Runs));
+        }
+
+        /// <summary>
+        /// What a special job is actually worth, measured rather than assumed.
+        ///
+        ///     dotnet run --project Tools/HeadlessTests -- probe special
+        ///
+        /// The control is the ordinary cars in the SAME sessions: same rank, same upgrades, same
+        /// crew, same shelf. That matters, because comparing against a separate baseline run would
+        /// mostly measure the difference between two sets of upgrade purchases.
+        ///
+        /// The number to watch is not the payout. It is the share of special jobs that LEAVE. A
+        /// job that pays half again and is never lost is free money; one that pays half again and
+        /// walks out half the time is not a decision either - it is a trap.
+        /// </summary>
+        public static void MeasureSpecialJobs()
+        {
+            Console.WriteLine("=== SPECIAL JOBS ===");
+            Console.WriteLine();
+
+            // Does noticing the badge change anything? That is the design claim, so it gets
+            // measured first: the same sessions, played by a player who prioritises by value and
+            // by one who just works bays in order and never looks at the badge.
+            SpecialJobDefinition shippedUrgent = SpecialJobCatalog.FindByType(SpecialJobType.Urgent);
+
+            // At the shipped dials, and at a looser candidate, because the question is not only
+            // "how often is this lost" but "does the player's choice change how often".
+            foreach (double patienceDial in new[] { shippedUrgent.PatienceMultiplier, 0.75d })
+            {
+                UseUrgentPatience(patienceDial);
+
+                Console.WriteLine("-- urgent patience x" + patienceDial.ToString("0.00") + " --");
+
+                // Which BAY you work turns out to be nearly irrelevant - a special job is lost to
+                // there being more work than hands, not to the order you pick things up in. So the
+                // decision that matters has to be one about the car itself, and the one the player
+                // actually has is what they agree to repair.
+                MeasureSpecialStyle("never inspects anything", null, null);
+                MeasureSpecialStyle("inspects every car thoroughly (4 checks)", null, null,
+                    checksWanted: car => 4);
+                MeasureSpecialStyle("inspects thoroughly, but skips it on a special job", null, null,
+                    checksWanted: car => car.Special == null ? 4 : 0);
+                MeasureSpecialStyle("quotes essentials only on special jobs", null, null,
+                    essentialsOnSpecial: true);
+            }
+
+            SpecialJobCatalog.RestoreDefaults();
+
+            // And what the patience dial is actually doing, since that is the lever that decides
+            // whether an urgent job is a chance or a trap.
+            Console.WriteLine("-- what patience x N does to urgent work (value player) --");
+            Console.WriteLine("patience   arrived   lost%   per car   per arrival   vs ordinary");
+
+            foreach (double candidate in new[] { 0.45d, 0.55d, 0.65d, 0.75d, 0.85d, 1d })
+            {
+                UseUrgentPatience(candidate);
+
+                SpecialSample sample = RunSpecialSample(null);
+                SpecialSample.Tally urgent = sample.Row(1);
+                SpecialSample.Tally ordinary = sample.Row(0);
+
+                Console.WriteLine(
+                    ("x" + candidate.ToString("0.00")).PadRight(11)
+                    + urgent.Arrived.ToString().PadLeft(7)
+                    + urgent.LossPercent.ToString("0.0").PadLeft(8)
+                    + ("$" + urgent.PerCompleted.ToString("0")).PadLeft(10)
+                    + ("$" + urgent.PerArrival.ToString("0")).PadLeft(14)
+                    + (ordinary.PerArrival <= 0d ? "-"
+                        : (urgent.PerArrival / ordinary.PerArrival).ToString("0.00") + "x").PadLeft(13));
+            }
+
+            SpecialJobCatalog.RestoreDefaults();
+            Console.WriteLine();
+            Console.WriteLine("per arrival is the number that matters: it is what the car is worth");
+            Console.WriteLine("BEFORE you know whether you will manage to finish it.");
+            Console.WriteLine();
+        }
+
+        /// <summary>Swaps in a candidate patience dial, leaving every other number as shipped.</summary>
+        private static void UseUrgentPatience(double patienceMultiplier)
+        {
+            SpecialJobCatalog.RestoreDefaults();
+            SpecialJobDefinition shipped = SpecialJobCatalog.FindByType(SpecialJobType.Urgent);
+
+            SpecialJobCatalog.OverrideForMeasurement(new SpecialJobDefinition(
+                shipped.Type, shipped.DisplayName, shipped.Tagline, shipped.ColorHex,
+                patienceMultiplier, shipped.PayoutMultiplier, shipped.SpeedTipMultiplier,
+                shipped.QualityWeight, shipped.ExtraJobs, shipped.ExpectedGrade,
+                shipped.SpawnWeight, shipped.MinRankLevel));
+        }
+
+        /// <summary>A player who never looks at the badge: first unfinished bay, every time.</summary>
+        private static int IgnoreTheBadge(GarageSimulation simulation)
+        {
+            for (int i = 0; i < simulation.Bays.Count; i++)
+            {
+                ActiveCar car = simulation.Bays[i];
+                if (car != null && !car.AllJobsComplete) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// A player who reads the badge and acts on it: the special job first, then value per
+        /// second like everyone else. If this player does no better than the one who ignores the
+        /// badge, the badge is decoration and the job is not a decision.
+        /// </summary>
+        private static int ChaseTheBadge(GarageSimulation simulation)
+        {
+            int best = -1;
+            double bestScore = double.MinValue;
+
+            for (int i = 0; i < simulation.Bays.Count; i++)
+            {
+                ActiveCar car = simulation.Bays[i];
+                if (car == null || car.AllJobsComplete) continue;
+
+                double atRisk = 0d;
+                for (int j = 0; j < car.Jobs.Count; j++)
+                {
+                    if (!car.Jobs[j].IsComplete) atRisk += car.Jobs[j].Payout;
+                }
+
+                double score = atRisk / (car.TimeRemaining < 1f ? 1f : car.TimeRemaining);
+
+                // A special job jumps the queue outright, rather than merely scoring well.
+                if (car.Special != null) score += 1000000d;
+
+                if (score > bestScore) { bestScore = score; best = i; }
+            }
+
+            return best;
+        }
+
+        private static void MeasureSpecialStyle(string label, Func<GarageSimulation, int> bayPicker,
+            QuoteOption? quote = null, bool essentialsOnSpecial = false,
+            Func<ActiveCar, int> checksWanted = null)
+        {
+            SpecialSample sample = RunSpecialSample(bayPicker, quote, essentialsOnSpecial, checksWanted);
+
+            Console.WriteLine("a player who " + label + ":");
+            Console.WriteLine("kind      arrived   lost   lost%   per car   per arrival   patience/job");
+
+            foreach (int key in new[] { 0, 1 })
+            {
+                SpecialSample.Tally row = sample.Row(key);
+                string name = key == 0 ? "ordinary"
+                    : SpecialJobCatalog.FindByType((SpecialJobType)key).DisplayName.ToLowerInvariant();
+
+                if (row.Arrived == 0) { Console.WriteLine(name.PadRight(10) + "never arrived"); continue; }
+
+                Console.WriteLine(
+                    name.PadRight(10)
+                    + row.Arrived.ToString().PadLeft(7)
+                    + row.Lost.ToString().PadLeft(7)
+                    + row.LossPercent.ToString("0.0").PadLeft(8)
+                    + ("$" + row.PerCompleted.ToString("0")).PadLeft(10)
+                    + ("$" + row.PerArrival.ToString("0")).PadLeft(14)
+                    + row.PatiencePerJob.ToString("0.0").PadLeft(15) + "s");
+            }
+
+            Console.WriteLine("special work is " + sample.SpecialSharePercent.ToString("0.0")
+                + "% of everything the garage earned, and the garage earned $"
+                + (sample.Sessions == 0 ? 0d : sample.SessionIncome / sample.Sessions).ToString("0")
+                + " in the 15 minutes");
+            Console.WriteLine();
+        }
+
+        /// <summary>One batch of sessions, tallied by what kind of car it was.</summary>
+        private sealed class SpecialSample
+        {
+            public readonly Dictionary<int, double> Earned = new Dictionary<int, double>();
+            public readonly Dictionary<int, int> Completed = new Dictionary<int, int>();
+            public readonly Dictionary<int, int> Lost = new Dictionary<int, int>();
+            public readonly Dictionary<int, double> Patience = new Dictionary<int, double>();
+            public readonly Dictionary<int, int> Arrived = new Dictionary<int, int>();
+
+            /// <summary>
+            /// What the garage earned across every session, total.
+            ///
+            /// This is the number that decides whether a special job changes a DECISION. Per-car
+            /// figures can only say which car was worth more; they cannot say whether chasing one
+            /// was the right call, because the cost of chasing it is paid by the other cars.
+            /// </summary>
+            public double SessionIncome;
+            public int Sessions;
+
+            public struct Tally
+            {
+                public int Arrived;
+                public int Completed;
+                public int Lost;
+                public double Money;
+                public double PatienceTotal;
+
+                /// <summary>Of the cars that were resolved either way, how many walked out.</summary>
+                public double LossPercent
+                {
+                    get
+                    {
+                        int resolved = Completed + Lost;
+                        return resolved == 0 ? 0d : Lost * 100d / resolved;
+                    }
+                }
+
+                public double PerCompleted { get { return Completed == 0 ? 0d : Money / Completed; } }
+
+                /// <summary>
+                /// What the car is worth the moment it arrives, before you know whether you will
+                /// finish it. The honest comparison: a big cheque you lose half the time is not
+                /// worth half again as much as a small one you always collect.
+                /// </summary>
+                public double PerArrival
+                {
+                    get
+                    {
+                        int resolved = Completed + Lost;
+                        return resolved == 0 ? 0d : Money / resolved;
+                    }
+                }
+
+                public double PatiencePerJob { get { return Arrived == 0 ? 0d : PatienceTotal / Arrived; } }
+            }
+
+            public Tally Row(int key)
+            {
+                Tally row = new Tally();
+                row.Arrived = Arrived.TryGetValue(key, out int a) ? a : 0;
+                row.Completed = Completed.TryGetValue(key, out int c) ? c : 0;
+                row.Lost = Lost.TryGetValue(key, out int l) ? l : 0;
+                row.Money = Earned.TryGetValue(key, out double e) ? e : 0d;
+                row.PatienceTotal = Patience.TryGetValue(key, out double p) ? p : 0d;
+                return row;
+            }
+
+            public double SpecialSharePercent
+            {
+                get
+                {
+                    double total = 0d, special = 0d;
+                    foreach (KeyValuePair<int, double> pair in Earned)
+                    {
+                        total += pair.Value;
+                        if (pair.Key != 0) special += pair.Value;
+                    }
+                    return total <= 0d ? 0d : special * 100d / total;
+                }
+            }
+        }
+
+        private static SpecialSample RunSpecialSample(Func<GarageSimulation, int> bayPicker,
+            QuoteOption? quote = null, bool essentialsOnSpecial = false,
+            Func<ActiveCar, int> checksWanted = null)
+        {
+            SpecialSample sample = new SpecialSample();
+
+            for (int seed = 0; seed < 120; seed++)
+            {
+                GarageSimulation simulation = new GarageSimulation(31000 + seed);
+
+                // Enough rank that special jobs are unlocked from the first car, so the sample is
+                // not mostly made of the opening minutes where none can appear.
+                GameplayHarness.GrantUpgrade(simulation, "workshop_rates", 8);
+
+                // Three bays and NO mechanics, deliberately. With mechanics covering every bay the
+                // garage runs itself and the player's choice of bay changes nothing - which is the
+                // first thing this probe measured, and it made both styles of play look identical.
+                // A special job is a decision only when there is more work than hands.
+                GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 2);
+
+                simulation.CarSpawned += car =>
+                {
+                    int key = (int)car.SpecialType;
+                    sample.Arrived[key] = sample.Arrived.TryGetValue(key, out int a) ? a + 1 : 1;
+                    double perJob = car.TotalTime / car.Jobs.Count;
+                    sample.Patience[key] = sample.Patience.TryGetValue(key, out double p) ? p + perJob : perJob;
+                };
+
+                simulation.CarCompleted += (car, money) =>
+                {
+                    int key = (int)car.SpecialType;
+                    sample.Earned[key] = sample.Earned.TryGetValue(key, out double e) ? e + money : money;
+                    sample.Completed[key] = sample.Completed.TryGetValue(key, out int c) ? c + 1 : 1;
+                };
+
+                simulation.CarLeftAngry += car =>
+                {
+                    int key = (int)car.SpecialType;
+                    sample.Lost[key] = sample.Lost.TryGetValue(key, out int l) ? l + 1 : 1;
+                };
+
+                if (quote.HasValue || essentialsOnSpecial)
+                {
+                    simulation.CarEnteredBay += (car, bay) =>
+                    {
+                        if (essentialsOnSpecial)
+                        {
+                            // The decision this is testing: a short fuse is a reason to turn work
+                            // down that you would happily take on an ordinary car.
+                            if (car.Special != null) Quote.For(car).Apply(car, QuoteOption.EssentialOnly);
+                            return;
+                        }
+
+                        Quote.For(car).Apply(car, quote.Value);
+                    };
+                }
+
+                // buyUpgrades off, so the sample is not quietly turned into a measurement of the
+                // shop: a session that hires mechanics stops being a test of the player's choices.
+                SessionReport report = GameplayHarness.Play(simulation, 900f, 0.85f,
+                    bayPicker: bayPicker, checksWanted: checksWanted);
+                sample.SessionIncome += report.CashEarned;
+                sample.Sessions++;
+            }
+
+            return sample;
         }
 
         public static void Run()

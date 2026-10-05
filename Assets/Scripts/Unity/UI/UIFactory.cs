@@ -241,12 +241,13 @@ namespace GarageTycoon.Unity.UI
         }
 
         /// <summary>Adds a thin outline to a panel, drawn as four child strips.</summary>
-        public static void AddOutline(Image panel, Color color, float thickness = 2f)
+        public static Outline AddOutline(Image panel, Color color, float thickness = 2f)
         {
             Outline outline = panel.gameObject.AddComponent<Outline>();
             outline.effectColor = color;
             outline.effectDistance = new Vector2(thickness, -thickness);
             outline.useGraphicAlpha = false;
+            return outline;
         }
 
         /// <summary>Adds a CanvasGroup, used for fading popups in and out.</summary>

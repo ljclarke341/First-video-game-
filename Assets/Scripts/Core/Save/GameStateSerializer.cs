@@ -18,7 +18,7 @@ namespace GarageTycoon.Core.Save
     public static class GameStateSerializer
     {
         /// <summary>Bumped whenever the save shape changes, so old files can be migrated or discarded.</summary>
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
 
         /// <summary>
         /// The oldest save this build can still read. Anything older is refused rather than loaded
@@ -191,6 +191,7 @@ namespace GarageTycoon.Core.Save
             diagnosis.Add("actions", actions);
 
             json.Add("diagnosis", diagnosis);
+            json.Add("special", (int)car.SpecialType);
             json.Add("quoted", car.Quoted);
             json.Add("quotedAs", (int)car.QuotedAs);
 
@@ -432,6 +433,11 @@ namespace GarageTycoon.Core.Save
             // Older saves have no quote. Defaulting to "not quoted" is right AND safe: those cars
             // already have every job accepted, so the worst that happens is the player is offered
             // a quote for work that is already all on the bill.
+            // A save from before special jobs has no entry, and None is exactly right: those
+            // cars were ordinary customers and must come back as ordinary customers.
+            car.SetSpecial(Special.SpecialJobCatalog.FindByType(
+                (Special.SpecialJobType)json["special"].AsInt((int)Special.SpecialJobType.None)));
+
             car.RestoreQuote(json["quoted"].AsBool(false),
                 (QuoteOption)json["quotedAs"].AsInt((int)QuoteOption.Everything));
 

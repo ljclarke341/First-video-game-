@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GarageTycoon.Core.Special;
 using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Diagnosis;
@@ -391,6 +392,49 @@ namespace GarageTycoon.HeadlessTests.Tests
                     double expected = gross / GameBalance.PartsPayoutCompensation;
                     Check.IsTrue(Math.Abs(job.LabourPayout - expected) < 0.01d,
                         "a $" + gross + " job kept " + job.LabourPayout + " instead of " + expected);
+                }
+            });
+
+            suite.Add("The special job rate matches the web build", () =>
+            {
+                // web: B.specialChance
+                Check.IsTrue(Math.Abs(GameBalance.SpecialJobChance - 0.12f) < 0.0001f,
+                    "special job chance is " + GameBalance.SpecialJobChance + ", the web build has 0.12");
+            });
+
+            suite.Add("Urgent's dials match the web build", () =>
+            {
+                // web: SPECIAL_JOBS.urgent
+                SpecialJobDefinition urgent =
+                    SpecialJobCatalog.FindByType(SpecialJobType.Urgent);
+
+                Check.IsTrue(urgent != null, "the web build has an urgent job and this one does not");
+
+                Check.IsTrue(Math.Abs(urgent.PatienceMultiplier - 0.75d) < 0.0001d,
+                    "urgent patience is " + urgent.PatienceMultiplier + ", the web build has 0.75");
+                Check.IsTrue(Math.Abs(urgent.PayoutMultiplier - 1.5d) < 0.0001d,
+                    "urgent payout is " + urgent.PayoutMultiplier + ", the web build has 1.5");
+                Check.IsTrue(Math.Abs(urgent.SpeedTipMultiplier - 2d) < 0.0001d,
+                    "urgent tip is " + urgent.SpeedTipMultiplier + ", the web build has 2");
+                Check.IsTrue(Math.Abs(urgent.QualityWeight - 1d) < 0.0001d,
+                    "urgent quality weight is " + urgent.QualityWeight + ", the web build has 1");
+                Check.AreEqual(0, urgent.ExtraJobs, "urgent extra jobs differ from the web build");
+                Check.AreEqual(1, urgent.MinRankLevel, "urgent unlocks at a different rank in the web build");
+            });
+
+            suite.Add("The catalogue holds the same jobs in the same order as the web build", () =>
+            {
+                // web: SPECIAL_ORDER - the order decides which job a weighted roll lands on, so
+                // two builds listing the same jobs in a different order spawn different cars.
+                int[] expected = { (int)SpecialJobType.Urgent };
+
+                Check.AreEqual(expected.Length, SpecialJobCatalog.All.Count,
+                    "the two builds offer a different number of special jobs");
+
+                for (int i = 0; i < expected.Length; i++)
+                {
+                    Check.AreEqual(expected[i], (int)SpecialJobCatalog.All[i].Type,
+                        "special job " + i + " is a different kind in the web build");
                 }
             });
 

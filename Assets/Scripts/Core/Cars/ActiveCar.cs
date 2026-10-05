@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using GarageTycoon.Core.Minigames;
+// Aliased: the namespace and the ActiveCar.Special property would otherwise shadow each other.
+using SpecialJobs = GarageTycoon.Core.Special;
 using GarageTycoon.Core.Util;
 
 namespace GarageTycoon.Core.Cars
@@ -36,6 +38,47 @@ namespace GarageTycoon.Core.Cars
         /// looked at simply has nothing revealed yet.
         /// </summary>
         public Diagnosis.CarDiagnosis Diagnosis { get; private set; }
+
+        /// <summary>
+        /// What makes this car out of the ordinary, or null for most customers.
+        ///
+        /// It is a MODIFIER, not a different kind of car. The same diagnosis, quote, parts,
+        /// mini-games and quality apply; this only turns some of the dials.
+        /// </summary>
+        public SpecialJobs.SpecialJobDefinition Special { get; private set; }
+
+        /// <summary>Convenience for the UI and the save, which only need the kind.</summary>
+        public SpecialJobs.SpecialJobType SpecialType
+        {
+            get { return Special == null ? SpecialJobs.SpecialJobType.None : Special.Type; }
+        }
+
+        /// <summary>
+        /// The share of this car's value paid as a finishing tip.
+        ///
+        /// Reads the global rule and lets a special job scale it, which is how "speed matters
+        /// more" is expressed without a second tip system to keep in step with the first.
+        /// </summary>
+        public double SpeedTipFraction
+        {
+            get
+            {
+                double fraction = Balance.GameBalance.SpeedTipFraction;
+                return Special == null ? fraction : fraction * Special.SpeedTipMultiplier;
+            }
+        }
+
+        /// <summary>
+        /// How hard the quality multiplier bites on this car.
+        ///
+        /// Stretches the EXISTING curve around 1.0 rather than redefining it: a weight of 2 turns
+        /// a 0.9x into 0.8x and a 1.05x into 1.10x. The curve, its slope and its score are
+        /// untouched; a fussier customer simply cares twice as much about the same number.
+        /// </summary>
+        public double QualityWeight
+        {
+            get { return Special == null ? 1d : Special.QualityWeight; }
+        }
 
         /// <summary>True once the customer has been given a bill and answered it.</summary>
         public bool Quoted { get; private set; }
@@ -275,6 +318,12 @@ namespace GarageTycoon.Core.Cars
         {
             if (condition != null) Condition = condition;
             Complaint = complaint ?? string.Empty;
+        }
+
+        /// <summary>Marks this car as something out of the ordinary. Set by the spawner and the save.</summary>
+        public void SetSpecial(SpecialJobs.SpecialJobDefinition special)
+        {
+            Special = special;
         }
 
         /// <summary>Records the customer's answer to the quote.</summary>

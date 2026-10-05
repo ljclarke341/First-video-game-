@@ -6,6 +6,66 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2a — Special jobs: URGENT
+
+The first of the five special job types. It is a **modifier on the ordinary car, not a second kind
+of car**: an urgent job still arrives, gets inspected, quoted, parted, repaired and graded exactly
+the same way. All it does is turn some dials. That was deliberate — a separate repair flow would
+have doubled the surface area of every future change.
+
+### What arrived
+
+- `Core/Special/` — `SpecialJobType`, `SpecialJobDefinition`, `SpecialJobCatalog`. One place that
+  knows what unusual jobs exist and how often; the UI reads the name and colour from it, so the
+  next four need no UI work.
+- URGENT: patience **x0.75**, payout **x1.5**, speed tip **x2**. Unlocks at garage rank 1, and
+  turns up on **12%** of cars once unlocked.
+- Badge on the bay card (both builds), a banner on the inspection ramp, and a reminder on the
+  quote screen next to the buttons — at the moment the decision is made, not after it.
+- Saved and restored. Save version 4. A save written before this comes back with ordinary
+  customers, which is what those cars were.
+
+### The patience dial was measured, not chosen
+
+I built it at x0.55 first, which is what "short fuse" sounded like. Then I measured it
+(`dotnet run --project Tools/HeadlessTests -- probe special`), and it was a trap:
+
+| urgent patience | lost | per completed car | **per arrival** | vs an ordinary car |
+|---|---|---|---|---|
+| x0.45 | 75.4% | $499 | $123 | 0.39x |
+| **x0.55** (first attempt) | 60.9% | $546 | $214 | **0.68x** |
+| x0.65 | 45.5% | $553 | $302 | 0.98x |
+| **x0.75** (shipped) | 28.5% | $543 | $388 | **1.28x** |
+| x0.85 | 17.3% | $530 | $438 | 1.44x |
+| x1.00 | 6.6% | $517 | $482 | 1.55x |
+
+"Per arrival" is the one that matters: what the car is worth before you know whether you will
+manage to finish it. At x0.55 an urgent car was worth **less than an ordinary one**, so the correct
+play was to ignore the badge — which is an anti-decision, not a decision. Break-even is near x0.65.
+x0.75 makes it a car you want, that still walks out on you a bit under a third of the time.
+
+### Three float-to-double fixes, same bug as the last three
+
+`CustomerMood.PatienceMultiplier()`, `GameBalance.PatienceScale` and
+`SpecialJobDefinition.PatienceMultiplier` were floats. `1.3f` is really 1.2999999523162842 and the
+web build's `1.3` is not, which put the two builds' patience timers a thousandth of a second apart
+and failed parity. `CarSpawner` now works the whole chain in double and narrows once at the end.
+
+This is the **fourth** number in this project to have had that exact bug. See the open question
+below.
+
+### Verified
+
+- **275 tests pass** (15 new, in `SpecialJobTests.cs`) — including one that asserts the design rule
+  directly: every special job must change something other than the payout, or the test fails.
+- **473 cross-build parity cases, all identical** (up from 364). The special job *roll* is
+  deliberately not compared: the two builds draw from different generators by design, so only the
+  arithmetic is held to parity.
+- Compile check clean. 20-minute web soak clean, no stuck bays. Save round-trip kept, and saves
+  from before quotes and before parts still load.
+
+---
+
 ## Phase B.1f — Both measured balance levers applied
 
 | | Was | Now |
@@ -1118,6 +1178,29 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+20. **Patience is a weak lever, and that limits what special jobs can do.** Jobs pay out *as each
+   one finishes*, so a customer who walks out still leaves you the money for the work already done
+   — only the unfinished jobs and the tip are lost. I measured this trying to make URGENT a real
+   decision: no patience value, and no choice the player makes (which bay to work, whether to
+   inspect, whether to quote essentials only) moves total session income by more than about 4%.
+   Taking every job is the right play in every case I measured. The remaining four special jobs
+   will hit the same ceiling if they lean on patience. Worth deciding how you want to handle it
+   before PERFORMANCE JOB — I did not change the payout model, because that is a real economy
+   change and your call.
+
+19. **Inspecting is currently a losing strategy for every car, not just urgent ones.** Running four
+   checks on every car costs about **28% of session income** ($13,869 to $9,896) and pushes the
+   ordinary loss rate from 8.9% to 29%, against a diagnosis bonus capped at 1.12x. That is a
+   Phase A balance issue rather than a special-jobs one, so I have not touched it — but it means
+   "should I inspect this urgent car?" cannot be a real decision yet, because the answer is already
+   "no" for every car.
+
+18. **Every shared number should be a double from the start.** Four separate float-vs-double bugs
+   now (the tip multiplier, the quality score, the part quality modifier, and now the patience
+   chain), all the same shape, all found only by parity. I have been fixing them one at a time as
+   parity catches them. Say the word and I will sweep the remaining shared floats in one pass
+   rather than waiting for the fifth.
+
 17. **The web build is still not in the repo**, and V2 makes that cost much higher than it was.
    Every system now has to be written twice by hand - once in C#, once in JavaScript - and the two
    have already diverged once (the missing tip constant was a web-only bug the C# never had).

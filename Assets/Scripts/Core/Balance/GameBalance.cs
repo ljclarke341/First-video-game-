@@ -31,7 +31,9 @@ namespace GarageTycoon.Core.Balance
         ///
         /// Raise this if rounds ever get slower again; the balance tests will tell you.
         /// </summary>
-        public const float PatienceScale = 1.3f;
+        // A double, not a float: 1.3f is really 1.2999999523162842, and the web build's 1.3 is
+        // not, which was enough to put the two builds' patience timers apart in the third decimal.
+        public const double PatienceScale = 1.3d;
 
         /// <summary>How many repair bays the player starts with (more can be unlocked).</summary>
         public const int StartingBayCount = 1;
@@ -132,6 +134,18 @@ namespace GarageTycoon.Core.Balance
             if (mechanicCount < 0) mechanicCount = 0;
             return (float)(PartDeliverySeconds / (1d + mechanicCount * PartDeliveryPerMechanic));
         }
+
+        // ---------------------------------------------------------------------
+        // Special jobs
+        // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Chance that an arriving car is something out of the ordinary.
+        ///
+        /// Low on purpose. The ordinary loop is the game; these are the days that stand out, and
+        /// at one car in eight a special job stays an event rather than becoming the new normal.
+        /// </summary>
+        public const float SpecialJobChance = 0.12f;
 
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const float PerfectProgress = 0.45f;

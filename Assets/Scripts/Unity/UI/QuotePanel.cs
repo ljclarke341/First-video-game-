@@ -218,9 +218,23 @@ namespace GarageTycoon.Unity.UI
             _essentialBackground.color = preferred == QuoteOption.EssentialOnly
                 ? Theme.WithAlpha(Theme.Success, 0.18f) : Theme.PanelRaised;
 
-            _wantHint.text = preferred == QuoteOption.Everything
+            string hint = preferred == QuoteOption.Everything
                 ? "Wants it done properly"
                 : "Would rather keep the bill down";
+
+            // On a special job the customer's taste is not the only thing shaping the answer: a
+            // short fuse makes a long quote a risk whatever they would prefer. The reminder goes
+            // here, next to the buttons, rather than on a screen the player has already left.
+            if (_car.Special == null)
+            {
+                _wantHint.text = hint;
+                _wantHint.color = Theme.TextMuted;
+            }
+            else
+            {
+                _wantHint.text = hint + " - " + _car.Special.Tagline;
+                _wantHint.color = Theme.Hex(_car.Special.ColorHex);
+            }
         }
 
         /// <summary>

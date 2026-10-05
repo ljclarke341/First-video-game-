@@ -121,9 +121,13 @@ namespace GarageTycoon.Core.Cars
 
         public ActiveCar SpawnSpecific(CarDefinition definition, SpawnParameters parameters)
         {
+            // Rolled before the jobs, because a special job can add work to the car.
+            Special.SpecialJobDefinition special = Special.SpecialJobCatalog.Roll(_random, parameters.RankLevel);
+
             int jobCount = _random.NextInt(definition.MinJobs, definition.MaxJobs + 1);
 
             if (_random.Chance(parameters.ExtraJobChance)) jobCount++;
+            if (special != null) jobCount += special.ExtraJobs;
 
             // Never ask for more distinct jobs than the car actually has on its list.
             jobCount = MathUtil.ClampInt(jobCount, 1, definition.LikelyJobs.Length);
@@ -165,6 +169,8 @@ namespace GarageTycoon.Core.Cars
             double payoutPool = definition.BasePayout * parameters.PayoutMultiplier
                                 * mood.PayoutMultiplier() * Balance.GameBalance.PartsPayoutCompensation;
 
+            if (special != null) payoutPool *= special.PayoutMultiplier;
+
             List<RepairJob> finalJobs = new List<RepairJob>();
             for (int i = 0; i < jobs.Count; i++)
             {
@@ -175,12 +181,21 @@ namespace GarageTycoon.Core.Cars
                 finalJobs.Add(new RepairJob(jobs[i].Type, jobs[i].Minigame, jobs[i].WorkAmount, payout, difficulty));
             }
 
-            float patience = definition.BasePatienceSeconds + definition.PatiencePerJobSeconds * (finalJobs.Count - 1);
-            patience *= Balance.GameBalance.PatienceScale;
-            patience *= mood.PatienceMultiplier();
-            patience *= parameters.PatienceMultiplier <= 0f ? 1f : parameters.PatienceMultiplier;
+            // Worked out in double and narrowed once at the end. Multiplying floats step by step
+            // drifted the patience timer a thousandth of a second away from the web build's, which
+            // is invisible in play and still a parity failure - and parity is how the two builds
+            // are kept honest.
+            double patienceSeconds = definition.BasePatienceSeconds
+                                     + definition.PatiencePerJobSeconds * (finalJobs.Count - 1);
+            patienceSeconds *= Balance.GameBalance.PatienceScale;
+            patienceSeconds *= mood.PatienceMultiplier();
+            patienceSeconds *= parameters.PatienceMultiplier <= 0f ? 1d : parameters.PatienceMultiplier;
+            if (special != null) patienceSeconds *= special.PatienceMultiplier;
+
+            float patience = (float)patienceSeconds;
 
             ActiveCar car = new ActiveCar(_nextInstanceId, definition, finalJobs, patience, mood);
+            car.SetSpecial(special);
 
             // The inspection reading is read OFF the jobs just chosen, so the two can never
             // disagree - the car's condition always explains the work it needs. See CarCondition

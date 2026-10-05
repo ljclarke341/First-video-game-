@@ -311,6 +311,7 @@ namespace GarageTycoon.Core.Simulation
             parameters.PatienceMultiplier = bundle.PatienceMultiplier;
             parameters.PayoutMultiplier = bundle.PayoutMultiplier * modifiers.PayoutMultiplier;
             parameters.ExtraJobChance = modifiers.ExtraJobChance;
+            parameters.RankLevel = RankLevel;
 
             ActiveCar car = Spawner.Spawn(parameters);
             _waiting.Add(car);
@@ -559,8 +560,11 @@ namespace GarageTycoon.Core.Simulation
                 // Applied exactly ONCE, here, to the labour. Nothing downstream multiplies by it
                 // again, and the car's finishing tip is taken from LabourPayout rather than from
                 // this, so a good repair is not paid for twice.
+                // A fussier customer cares MORE about the same score. This stretches the existing
+                // curve around 1.0 rather than redefining it, so quality still means exactly what
+                // it meant - it is simply worth more to this particular customer.
                 QualityReport quality = RepairQuality.ForJob(job, car.Mood);
-                payout *= quality.PayMultiplier;
+                payout *= 1d + (quality.PayMultiplier - 1d) * car.QualityWeight;
 
                 if (job.IsFlawless) payout *= GameBalance.PerfectJobCashBonus;
 
@@ -608,8 +612,10 @@ namespace GarageTycoon.Core.Simulation
                 if (car.Jobs[i].IsAccepted) basePayout += car.Jobs[i].LabourPayout;
             }
 
+            // SpeedTipFraction comes off the car, so an urgent job can make finishing fast worth
+            // double without a second tip system existing alongside the first.
             double tip = MathUtil.RoundCash(
-                basePayout * GameBalance.SpeedTipFraction * car.RepairSpeedFraction * car.Mood.TipMultiplier());
+                basePayout * car.SpeedTipFraction * car.RepairSpeedFraction * car.Mood.TipMultiplier());
             if (tip > 0d)
             {
                 Wallet.Earn(tip);

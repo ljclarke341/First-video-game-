@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Minigames;
 using GarageTycoon.Core.Parts;
@@ -64,8 +65,22 @@ namespace GarageTycoon.HeadlessTests.Tests
         /// </summary>
         /// <param name="skill">0 = hopeless, 1 = perfect.</param>
         /// <param name="buyUpgrades">When true, the virtual player spends spare cash the way a real one would.</param>
+        /// <param name="bayPicker">
+        /// Which bay the virtual player works next, or null for the default "most money at risk"
+        /// strategy. A probe passes this to model a DIFFERENT player: the whole claim behind a
+        /// special job is that noticing it changes what you do, and that claim can only be measured
+        /// by comparing a player who notices against one who does not.
+        /// </param>
+        /// <param name="checksWanted">
+        /// How many inspection checks the virtual player runs on a car before picking up a spanner,
+        /// or null for none. Inspecting costs real seconds off the customer's patience and pays a
+        /// bonus for an accurate diagnosis, so it is the clearest decision in the game that has a
+        /// cost on both sides - and a probe cannot see it at all unless the harness can inspect.
+        /// </param>
         public static SessionReport Play(GarageSimulation simulation, float seconds, float skill,
-            bool buyUpgrades = false, float step = 1f / 60f)
+            bool buyUpgrades = false, float step = 1f / 60f,
+            Func<GarageSimulation, int> bayPicker = null,
+            Func<ActiveCar, int> checksWanted = null)
         {
             double startCash = simulation.Wallet.Cash;
             double startEarnings = simulation.Wallet.LifetimeEarnings;
@@ -83,17 +98,24 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             for (int i = 0; i < steps; i++)
             {
-                // Pick a car to work on whenever we are idle.
-                if (simulation.PlayerSession == null)
+                // Pick a car to work on whenever we are idle. An inspection counts as busy: it
+                // takes the place of repair work, exactly as it does for a real player.
+                if (simulation.PlayerSession == null && simulation.DiagnosisSession == null)
                 {
-                    ClaimAnyBay(simulation);
+                    int chosen = bayPicker == null ? BestBay(simulation) : bayPicker(simulation);
+
+                    if (chosen >= 0)
+                    {
+                        if (!TryInspect(simulation, chosen, checksWanted)) simulation.SelectBay(chosen);
+                    }
                 }
 
                 simulation.Tick(step);
 
-                // Feed inputs to whatever round is currently on screen.
-                WorkSession session = simulation.PlayerSession;
-                MinigameBase game = session == null ? null : session.Minigame;
+                // Feed inputs to whatever round is currently on screen. LiveMinigame rather than
+                // the work session's, so an inspection round is played too instead of sitting
+                // untouched until it times out.
+                MinigameBase game = simulation.LiveMinigame;
 
                 if (game != trackedGame)
                 {
@@ -142,7 +164,38 @@ namespace GarageTycoon.HeadlessTests.Tests
         /// rusty utes over supercars. That made extra bays measure as a 30% INCOME LOSS, which said
         /// more about the strategy than about the upgrade.
         /// </summary>
+        /// <summary>
+        /// Runs the next outstanding check on this bay's car, if the player wants to inspect it.
+        /// Returns false when there is nothing left to look at, so the caller picks up a spanner.
+        /// </summary>
+        private static bool TryInspect(GarageSimulation simulation, int bayIndex,
+            Func<ActiveCar, int> checksWanted)
+        {
+            if (checksWanted == null) return false;
+            if (bayIndex < 0 || bayIndex >= simulation.Bays.Count) return false;
+
+            ActiveCar car = simulation.Bays[bayIndex];
+            if (car == null) return false;
+
+            int wanted = checksWanted(car);
+            if (wanted <= 0 || car.Diagnosis.ActionsRun.Count >= wanted) return false;
+
+            for (int i = 0; i < DiagnosisActions.Count; i++)
+            {
+                if (simulation.StartDiagnosis(bayIndex, (DiagnosisAction)i)) return true;
+            }
+
+            return false;
+        }
+
         private static void ClaimAnyBay(GarageSimulation simulation)
+        {
+            int best = BestBay(simulation);
+            if (best >= 0) simulation.SelectBay(best);
+        }
+
+        /// <summary>The bay with the most money at risk per second of patience left.</summary>
+        public static int BestBay(GarageSimulation simulation)
         {
             int bestBay = -1;
             double bestScore = double.MinValue;
@@ -168,7 +221,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 }
             }
 
-            if (bestBay >= 0) simulation.SelectBay(bestBay);
+            return bestBay;
         }
 
         /// <summary>

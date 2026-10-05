@@ -18,6 +18,12 @@ namespace GarageTycoon.Core.Cars
         /// <summary>Chance this car arrives with one extra job on top of its normal roll.</summary>
         public float ExtraJobChance;
 
+        /// <summary>
+        /// Garage rank, so the spawner knows which special jobs have been unlocked.
+        /// Special jobs arrive gradually rather than all at once.
+        /// </summary>
+        public int RankLevel;
+
         /// <summary>Sensible defaults for a brand new save.</summary>
         public static SpawnParameters Default
         {
@@ -28,6 +34,7 @@ namespace GarageTycoon.Core.Cars
                 parameters.PayoutMultiplier = 1d;
                 parameters.PatienceMultiplier = 1f;
                 parameters.ExtraJobChance = 0f;
+                parameters.RankLevel = 0;
                 return parameters;
             }
         }

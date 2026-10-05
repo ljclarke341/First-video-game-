@@ -41,6 +41,9 @@ namespace GarageTycoon.Unity.UI
         private Text _workerText;
         private Image _moodBadge;
         private Text _moodText;
+        private Outline _outline;
+        private Image _specialBadge;
+        private Text _specialText;
         private Button _calmButton;
         private Text _calmText;
         private RectTransform _jobRow;
@@ -80,7 +83,7 @@ namespace GarageTycoon.Unity.UI
         {
             _background = UIFactory.CreatePanel("Bay" + _bayIndex, parent, Theme.PanelRaised);
             _root = _background.rectTransform;
-            UIFactory.AddOutline(_background, Theme.PanelOutline);
+            _outline = UIFactory.AddOutline(_background, Theme.PanelOutline);
 
             _button = _background.gameObject.AddComponent<Button>();
             _button.targetGraphic = _background;
@@ -133,6 +136,24 @@ namespace GarageTycoon.Unity.UI
             _moodText = UIFactory.CreateText("MoodText", _moodBadge.transform, string.Empty, Theme.FontTiny,
                 Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIFactory.Stretch(_moodText.rectTransform);
+
+            // ---- out-of-the-ordinary jobs (header, right, under the payout) ----
+            //
+            // This sits on the right because it is the thing you decide a bay's priority on. An
+            // urgent car and an ordinary one look identical otherwise, and by the time you notice
+            // the timer draining fast the customer is usually already leaving.
+            _specialBadge = UIFactory.CreatePanel("Special", _root, Theme.TextMuted, 6);
+            _specialBadge.raycastTarget = false;
+            RectTransform specialRect = _specialBadge.rectTransform;
+            specialRect.anchorMin = new Vector2(1f, 1f);
+            specialRect.anchorMax = new Vector2(1f, 1f);
+            specialRect.pivot = new Vector2(1f, 1f);
+            specialRect.sizeDelta = new Vector2(112f, 26f);
+            specialRect.anchoredPosition = new Vector2(-Theme.PanelPadding, -46f);
+
+            _specialText = UIFactory.CreateText("SpecialText", _specialBadge.transform, string.Empty,
+                Theme.FontTiny, Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Stretch(_specialText.rectTransform);
 
             // ---- name (header, middle) and payout (header, right) ----
             _carName = UIFactory.CreateText("CarName", _root, string.Empty, Theme.FontBody,
@@ -249,6 +270,7 @@ namespace GarageTycoon.Unity.UI
             {
                 _background.color = Theme.Panel;
                 _moodBadge.gameObject.SetActive(false);
+                _specialBadge.gameObject.SetActive(false);
                 return;
             }
 
@@ -259,6 +281,16 @@ namespace GarageTycoon.Unity.UI
             {
                 _moodBadge.color = Theme.Hex(car.Mood.ColorHex());
                 _moodText.text = car.Mood.DisplayName().ToUpperInvariant();
+            }
+
+            // The badge reads from Core's catalogue, so a new kind of special job needs no change
+            // here: it arrives with its own name and colour already.
+            bool showSpecial = car.Special != null;
+            _specialBadge.gameObject.SetActive(showSpecial);
+            if (showSpecial)
+            {
+                _specialBadge.color = Theme.Hex(car.Special.ColorHex);
+                _specialText.text = car.Special.DisplayName.ToUpperInvariant();
             }
 
             _calmButton.interactable = canCalm;
@@ -280,6 +312,11 @@ namespace GarageTycoon.Unity.UI
             _background.color = baseColor;
 
             _carImage.color = Theme.Hex(car.Definition.BodyColorHex);
+
+            // A special job gets the whole card outlined in its colour, so it reads at a glance
+            // from across the garage screen rather than only when you look at the badge. The
+            // outline is recoloured, never re-added: this runs every frame.
+            _outline.effectColor = showSpecial ? Theme.Hex(car.Special.ColorHex) : Theme.PanelOutline;
 
             _rarityRibbon.color = Theme.Hex(car.Definition.Rarity.ColorHex());
             _rarityText.text = car.Definition.Rarity.DisplayName().ToUpperInvariant();

@@ -41,6 +41,8 @@ namespace GarageTycoon.Unity.UI
 
         private RectTransform _root;
         private Text _complaint;
+        private Text _complaintHeading;
+        private Image _complaintPanel;
         private readonly List<SystemRow> _rows = new List<SystemRow>();
         private readonly List<CheckButton> _checks = new List<CheckButton>();
         private Button _skipButton;
@@ -64,8 +66,11 @@ namespace GarageTycoon.Unity.UI
             Image complaintPanel = UIFactory.CreatePanel("Complaint", _root, Theme.WithAlpha(Theme.Info, 0.12f), 10);
             UIFactory.AnchorTop(complaintPanel.rectTransform, 74f, 0f, 0f);
 
+            _complaintPanel = complaintPanel;
+
             Text heading = UIFactory.CreateText("Heading", complaintPanel.transform, "CUSTOMER SAYS",
                 Theme.FontTiny, Theme.Info, TextAnchor.UpperLeft, FontStyle.Bold);
+            _complaintHeading = heading;
             UIFactory.AnchorTop(heading.rectTransform, 22f, 6f, 12f);
 
             _complaint = UIFactory.CreateText("Text", complaintPanel.transform, string.Empty,
@@ -200,7 +205,24 @@ namespace GarageTycoon.Unity.UI
         {
             if (_root == null || _car == null) return;
 
-            _complaint.text = _car.Complaint;
+            // On a special job the heading carries the warning, because this is the screen where
+            // the player decides how many checks to run - and on an urgent car that choice is the
+            // whole job. Saying it here rather than afterwards is the point.
+            if (_car.Special == null)
+            {
+                _complaintHeading.text = "CUSTOMER SAYS";
+                _complaintHeading.color = Theme.Info;
+                _complaintPanel.color = Theme.WithAlpha(Theme.Info, 0.12f);
+                _complaint.text = _car.Complaint;
+            }
+            else
+            {
+                Color accent = Theme.Hex(_car.Special.ColorHex);
+                _complaintHeading.text = _car.Special.DisplayName.ToUpperInvariant() + " - CUSTOMER SAYS";
+                _complaintHeading.color = accent;
+                _complaintPanel.color = Theme.WithAlpha(accent, 0.14f);
+                _complaint.text = _car.Complaint + "  (" + _car.Special.Tagline + ")";
+            }
 
             for (int i = 0; i < _rows.Count; i++)
             {

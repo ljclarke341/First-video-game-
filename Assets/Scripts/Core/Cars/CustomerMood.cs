@@ -42,15 +42,23 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>Multiplies how long this customer will wait.</summary>
-        public static float PatienceMultiplier(this CustomerMood mood)
+        /// <summary>
+        /// How patient this customer is, relative to the ordinary one.
+        ///
+        /// A double, like every other number the two builds share. Held as a float, 1.3 is really
+        /// 1.2999999523162842, and the web build's 1.3 is not - which is enough to put the two
+        /// builds' patience timers a thousandth of a second apart. This is the fourth number in
+        /// the project to have had that exact bug; shared arithmetic is double here, always.
+        /// </summary>
+        public static double PatienceMultiplier(this CustomerMood mood)
         {
             switch (mood)
             {
-                case CustomerMood.Relaxed: return 1.4f;
-                case CustomerMood.Impatient: return 0.7f;
-                case CustomerMood.BigTipper: return 1f;
-                case CustomerMood.Vip: return 0.8f;
-                default: return 1f;
+                case CustomerMood.Relaxed: return 1.4d;
+                case CustomerMood.Impatient: return 0.7d;
+                case CustomerMood.BigTipper: return 1d;
+                case CustomerMood.Vip: return 0.8d;
+                default: return 1d;
             }
         }
 

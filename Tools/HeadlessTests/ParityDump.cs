@@ -322,6 +322,139 @@ namespace GarageTycoon.HeadlessTests
                 }
             }
 
+            json.Append("\n],\n");
+
+            // --- special jobs: the dials, the roll, and what they do to a car ---
+            //
+            // The dials alone are not enough. Two builds can agree on "patience x 0.55" and still
+            // disagree on the car, because one of them applies it before the mood multiplier and
+            // the other after. So this dumps the finished numbers as well as the inputs.
+            json.Append("\"specialDials\":[\n");
+            first = true;
+
+            for (int i = 0; i < Core.Special.SpecialJobCatalog.All.Count; i++)
+            {
+                Core.Special.SpecialJobDefinition definition = Core.Special.SpecialJobCatalog.All[i];
+
+                if (!first) json.Append(",\n");
+                first = false;
+
+                json.Append("  {\"type\":").Append((int)definition.Type)
+                    .Append(",\"name\":\"").Append(definition.DisplayName)
+                    .Append("\",\"patience\":").Append(F((float)definition.PatienceMultiplier))
+                    .Append(",\"payout\":").Append(F((float)definition.PayoutMultiplier))
+                    .Append(",\"tip\":").Append(F((float)definition.SpeedTipMultiplier))
+                    .Append(",\"quality\":").Append(F((float)definition.QualityWeight))
+                    .Append(",\"extraJobs\":").Append(definition.ExtraJobs)
+                    .Append(",\"grade\":").Append((int)definition.ExpectedGrade)
+                    .Append(",\"weight\":").Append(F(definition.SpawnWeight))
+                    .Append(",\"minRank\":").Append(definition.MinRankLevel)
+                    .Append('}');
+            }
+
+            json.Append("\n],\n");
+
+            // What a special job does to the car, after every other multiplier has had its turn.
+            //
+            // The dials alone are not enough: two builds can agree on "patience x 0.55" and still
+            // disagree on the car, because one applies it before the mood multiplier and the other
+            // after. The roll itself is deliberately NOT compared - the two builds draw from
+            // different generators by design, so only the arithmetic can be held to parity.
+            json.Append("\"specialApply\":[\n");
+            first = true;
+
+            foreach (int typeValue in new[] { 0, 1 })
+            {
+                Core.Special.SpecialJobDefinition definition =
+                    Core.Special.SpecialJobCatalog.FindByType((Core.Special.SpecialJobType)typeValue);
+
+                foreach (float basePatience in new[] { 18f, 30f, 47.5f })
+                {
+                    foreach (double baseGross in new[] { 60d, 240d, 1337d })
+                    {
+                        for (int moodIndex = 0; moodIndex < 5; moodIndex++)
+                        {
+                            CustomerMood mood = (CustomerMood)moodIndex;
+
+                            // Exactly the order CarSpawner uses: scale, then mood, then special.
+                            double patience = basePatience * Core.Balance.GameBalance.PatienceScale;
+                            patience *= mood.PatienceMultiplier();
+                            if (definition != null) patience *= definition.PatienceMultiplier;
+
+                            double gross = baseGross * mood.PayoutMultiplier()
+                                           * Core.Balance.GameBalance.PartsPayoutCompensation;
+                            if (definition != null) gross *= definition.PayoutMultiplier;
+
+                            double tipFraction = Core.Balance.GameBalance.SpeedTipFraction
+                                                 * (definition == null ? 1d : definition.SpeedTipMultiplier);
+                            double qualityWeight = definition == null ? 1d : definition.QualityWeight;
+
+                            if (!first) json.Append(",\n");
+                            first = false;
+
+                            json.Append("  {\"type\":").Append(typeValue)
+                                .Append(",\"basePat\":").Append(F(basePatience))
+                                .Append(",\"baseGross\":").Append(F((float)baseGross))
+                                .Append(",\"m\":").Append(moodIndex)
+                                .Append(",\"patience\":").Append(D(patience))
+                                .Append(",\"gross\":").Append(D(gross))
+                                .Append(",\"tipFraction\":").Append(D(tipFraction))
+                                .Append(",\"qualityWeight\":").Append(D(qualityWeight))
+                                .Append('}');
+                        }
+                    }
+                }
+            }
+
+            json.Append("\n],\n");
+
+            // The weighted quality payout. A special job stretches the existing curve rather than
+            // getting its own, so this proves the weighting itself agrees - weight 1 has to come
+            // out byte for byte identical to the plain multiplier it replaced.
+            json.Append("\"specialQualityPay\":[\n");
+            first = true;
+
+            foreach (int typeValue in new[] { 0, 1 })
+            {
+                Core.Special.SpecialJobDefinition definition =
+                    Core.Special.SpecialJobCatalog.FindByType((Core.Special.SpecialJobType)typeValue);
+                double weight = definition == null ? 1d : definition.QualityWeight;
+
+                foreach (double gross in new[] { 73d, 418d, 2051d })
+                {
+                    foreach (int[] mix in new[]
+                             {
+                                 new[] { 3, 0, 0 },
+                                 new[] { 1, 2, 1 },
+                                 new[] { 0, 0, 5 }
+                             })
+                    {
+                        RepairJob job = new RepairJob(JobType.Engine, MinigameType.TimingBar, 1.4f, gross, 1f);
+
+                        for (int i = 0; i < mix[0]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Perfect, ""));
+                        for (int i = 0; i < mix[1]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Good, ""));
+                        for (int i = 0; i < mix[2]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Weak, ""));
+
+                        job.RecordPart(Core.Parts.PartGrade.Standard, 0d,
+                            Core.Parts.PartsInventory.ValueOnJob(gross, Core.Parts.PartGrade.Standard));
+
+                        QualityReport report = RepairQuality.ForJob(job, CustomerMood.Ordinary);
+
+                        double pay = job.LabourPayout * (1d + (report.PayMultiplier - 1d) * weight);
+                        if (job.IsFlawless) pay *= Core.Balance.GameBalance.PerfectJobCashBonus;
+
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"type\":").Append(typeValue)
+                            .Append(",\"gross\":").Append(F((float)gross))
+                            .Append(",\"mix\":\"").Append(mix[0]).Append('-').Append(mix[1]).Append('-').Append(mix[2])
+                            .Append("\",\"pay\":").Append(F((float)Core.Util.MathUtil.RoundCash(pay)))
+                            .Append('}');
+                    }
+                }
+            }
+
             json.Append("\n]\n}");
 
             Console.WriteLine(json.ToString());
@@ -330,6 +463,20 @@ namespace GarageTycoon.HeadlessTests
         private static string F(float value)
         {
             return value.ToString("0.####", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Prints a double at full comparison precision.
+        ///
+        /// Rounding a dump value to three decimals was enough to manufacture a parity failure out
+        /// of nothing: 47.5475 is a tie, and C# rounds a tie to even while JavaScript rounds it up,
+        /// so two builds that agreed to thirteen decimal places disagreed on the printout. The
+        /// comparator already allows 1e-6, so the honest thing is to print the number and let it
+        /// judge. Narrowing to float would be just as wrong - that loses more than the tolerance.
+        /// </summary>
+        private static string D(double value)
+        {
+            return value.ToString("0.######", CultureInfo.InvariantCulture);
         }
     }
 }
