@@ -6,6 +6,68 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2f — Special jobs: RESTORATION
+
+The third of the five, and the first whose decision is about **capacity** rather than money.
+
+### Exact Core rules added
+
+Two fields on `SpecialJobDefinition`, applied in `CarSpawner`, and nothing else:
+
+- **`WorkMultiplier`** - how much longer each repair takes. The important part is that it earns
+  **nothing**: the payout pool is set by the car, and work only decides how that pool is split
+  between the jobs. So longer work is a pure cost in player time, and whatever the job pays has to
+  be argued for separately through its payout multiplier. A test pins this directly - forcing the
+  multiplier to 1 must not change the car's gross by a penny.
+- **`MinimumJobs`** - a floor on the job count. `ExtraJobs` alone could not guarantee a complicated
+  car, because the roll it adds to starts from the car's own minimum.
+
+Plus one new quote option, **`QuoteOption.Declined`**, because a job you cannot refuse is not a
+decision. Declining accepts no lines, so the car has nothing outstanding, finishes owing nothing
+and frees the bay on the next tick. It uses the existing `ApplyCustom` path.
+
+Restoration: 4 jobs (floor of 3, +1), each **1.5x** as long, **2x** payout, **1.4x** patience
+(deliberately the opposite of Urgent), quality weight 1, no grade expectation.
+
+### The decision, measured
+
+120 seeds x 15 minutes, taking every restoration against turning every one away:
+
+| garage | take | refuse | taking is |
+|---|---|---|---|
+| 3 bays, no crew | $954/min | $946/min | **+0.8%** |
+| 1 bay, no crew | $933/min | $910/min | **+2.5%** |
+| 3 bays, crew of 2 | $1,216/min | $1,213/min | **+0.2%** |
+
+A restoration is a **$814 cheque against an ordinary $356**, for 19.3 rounds of work against roughly
+8. About 2.2x the work for 2.3x the money - very nearly rate-neutral, which is why the margins above
+are so fine.
+
+### Three things the numbers taught me
+
+**The scarce resource is the player's hands, not the bay.** At 60 seeds the three-bay case looked
+like a loss for taking; at 120 it is a small win. What does move is *crew*: with nobody to cover the
+other bays, a twenty-round job starves them.
+
+**Restorations are genuinely rough cars, and that was emergent.** Condition is derived from work
+(`CarCondition.FromJobs` reads severity off `WorkAmount`), so longer jobs make the car read as worse
+- 0.50 optional lines against an ordinary car's 1.46. Nothing sets that; it falls out. It is right
+for an old car needing everything doing, and it means the decision is take-it-or-turn-it-away rather
+than haggle-it-down.
+
+**Payout barely moves the three-bay case.** Sweeping 1.6x to 2.5x shifted it by under 1%, while the
+one-bay case moved steadily. More money does not buy back attention.
+
+### Verified
+
+- **331 tests pass** (19 new).
+- **547 cross-build parity cases, all identical.**
+- Compile check clean, 20-minute soak clean, saves round-trip, pre-restoration saves load.
+- Browser: badge, banner, a four-line quote, and "Turn it down" pressed for real - car gone, cash
+  unchanged, counted as finished rather than lost.
+
+---
+
 ## Phase B.2e — Special jobs: PERFORMANCE
 
 The second of the five. Its decision is **which grade of part to fit**, and it is built entirely
@@ -1424,6 +1486,18 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+25. **Restoration's decision is real but low-stakes.** Taking one beats refusing by 0.2-2.5%
+   depending on the garage. It is never a trap and never obvious, which is what you asked for - but
+   a player who always refuses loses about 1%, which is close to "does not matter". If you want it
+   to bite harder, the payout is the lever (2.3x-2.5x made the one-bay case +5-7% while leaving the
+   three-bay case flat). I have left it at 2x because that is where it measured as genuinely
+   neutral rather than where it felt best.
+
+24. **"Everything" and "Essentials only" are often the same price on a restoration**, because
+   almost all of its work is essential. The quote screen shows two buttons with the same number on
+   them, which looks like a bug and is not. Worth either hiding the duplicate option or saying
+   "nothing optional on this one".
+
 23. **The parts policy is one global setting, which blunts the performance job.** Fitting
    performance parts is worth 5.1% on a performance car, but the player can only change the policy
    for the car in their own hands - mechanics keep fitting whatever the setting says. The mixed

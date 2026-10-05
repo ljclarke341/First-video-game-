@@ -45,6 +45,30 @@ namespace GarageTycoon.Core.Special
         /// <summary>Extra repairs on top of the car's normal roll.</summary>
         public int ExtraJobs { get; private set; }
 
+        /// <summary>
+        /// How much longer each individual repair on this car takes, 1 for the usual.
+        ///
+        /// This is the opportunity-cost lever, and it works because the payout pool is set by the
+        /// CAR, not by the work: see CarSpawner, where work only decides how that pool is split
+        /// between the jobs. So raising this adds real minutes at the bench and not a penny of
+        /// gross. Whatever the job pays has to be argued for separately, in the open, through its
+        /// payout multiplier - which is exactly the trade the player is being asked to judge.
+        ///
+        /// It also makes quality harder through the EXISTING rules rather than a new multiplier:
+        /// efficiency is minimum-rounds over rounds-played, so a longer job is more chances to
+        /// drop one.
+        /// </summary>
+        public double WorkMultiplier { get; private set; }
+
+        /// <summary>
+        /// The fewest repairs this kind of job should ever turn up with, or 0 for no floor.
+        ///
+        /// ExtraJobs alone cannot guarantee a complicated car: the roll it adds to starts from the
+        /// car's own minimum and is clamped by how many distinct jobs that car can have. A
+        /// restoration that arrived with two jobs on it would not be a restoration.
+        /// </summary>
+        public int MinimumJobs { get; private set; }
+
         /// <summary>The grade this customer expects. Fitting below it disappoints them.</summary>
 /// <summary>
         /// The grade of part this customer turned up expecting, or null if they do not care.
@@ -70,7 +94,8 @@ namespace GarageTycoon.Core.Special
         public SpecialJobDefinition(SpecialJobType type, string displayName, string tagline,
             string colorHex, double patienceMultiplier, double payoutMultiplier,
             double speedTipMultiplier, double qualityWeight, int extraJobs,
-            PartGrade? expectedGrade, float spawnWeight, int minRankLevel)
+            PartGrade? expectedGrade, float spawnWeight, int minRankLevel,
+            double workMultiplier = 1d, int minimumJobs = 0)
         {
             Type = type;
             DisplayName = displayName;
@@ -81,6 +106,8 @@ namespace GarageTycoon.Core.Special
             SpeedTipMultiplier = speedTipMultiplier;
             QualityWeight = qualityWeight;
             ExtraJobs = extraJobs;
+            WorkMultiplier = workMultiplier <= 0d ? 1d : workMultiplier;
+            MinimumJobs = minimumJobs;
             ExpectedGrade = expectedGrade;
             SpawnWeight = spawnWeight;
             MinRankLevel = minRankLevel;

@@ -69,7 +69,44 @@ namespace GarageTycoon.Core.Special
                 extraJobs: 0,
                 expectedGrade: PartGrade.Performance,
                 spawnWeight: 1f,
-                minRankLevel: 2)
+                minRankLevel: 2),
+
+            // RESTORATION: the bay is the resource, and this car eats it.
+            //
+            // An old car that needs everything doing. Four jobs rather than two or three, and each
+            // one takes half again as long - and crucially, the longer work earns NOTHING by
+            // itself, because the payout pool is set by the car and work only splits it. So the
+            // extra time is a pure cost, and the 1.6x payout is what is offered against it.
+            //
+            // The decision is therefore not "is this worth more" - it plainly is - but "is it
+            // worth THE BAY". Do the sums: roughly twice the work for 1.6x the money is a worse
+            // rate than an ordinary car, so filling the garage with these makes you poorer. Taking
+            // one when you have a bay going spare makes you richer. That is the whole job.
+            //
+            // The way out is the quote. Four jobs means more of them are optional, so a player who
+            // inspects can take the two that matter and hand the car back sooner - which is what
+            // makes diagnosis worth more here than anywhere else in the game, without revealing
+            // anything for free.
+            //
+            // Patience is HIGHER, not lower. Nobody restoring a car is in a hurry, and it keeps
+            // this from being Urgent with a different hat: the risk is your throughput, not losing
+            // the customer. Quality weight stays at 1 for the same reason - longer jobs are harder
+            // to finish cleanly on their own, through efficiency, without another multiplier.
+            new SpecialJobDefinition(
+                SpecialJobType.Restoration,
+                "Restoration",
+                "A long job on an old car. Pays well, and it will tie up the bay.",
+                "#7FB069",
+                patienceMultiplier: 1.4d,
+                payoutMultiplier: 2d,
+                speedTipMultiplier: 1d,
+                qualityWeight: 1d,
+                extraJobs: 1,
+                expectedGrade: null,
+                spawnWeight: 1f,
+                minRankLevel: 3,
+                workMultiplier: 1.5d,
+                minimumJobs: 3)
         };
 
         /// <summary>The definitions as shipped, so a measurement run can always put them back.</summary>

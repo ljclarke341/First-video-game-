@@ -42,6 +42,7 @@ namespace GarageTycoon.Unity.UI
         private Button _everythingButton;
         private Button _essentialButton;
         private Button _backButton;
+        private Button _declineButton;
         private Text _everythingPrice;
         private Text _essentialPrice;
         private Image _everythingBackground;
@@ -106,6 +107,18 @@ namespace GarageTycoon.Unity.UI
             ignored.text = "inspect more";
             ignored.color = Theme.TextMuted;
             ignored.fontSize = Theme.FontTiny;
+
+            // Turning the work away. A job you cannot refuse is not a decision, and on a long
+            // restoration the right answer genuinely depends on what else wants your hands.
+            // Deliberately the quietest button on the row: it is right sometimes, never obvious.
+            Text declineNote;
+            Image declineBackground;
+            _declineButton = BuildOption(options, "Decline", "TURN IT\nDOWN",
+                () => Answer(QuoteOption.Declined), out declineNote, out declineBackground);
+            declineNote.text = "free the bay";
+            declineNote.color = Theme.TextMuted;
+            declineNote.fontSize = Theme.FontTiny;
+            declineBackground.color = Theme.PanelSunken;
 
             SetVisible(false);
         }

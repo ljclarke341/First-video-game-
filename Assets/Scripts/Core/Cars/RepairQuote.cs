@@ -14,7 +14,20 @@ namespace GarageTycoon.Core.Cars
         EssentialOnly = 1,
 
         /// <summary>The player picked line by line.</summary>
-        Custom = 2
+        Custom = 2,
+
+        /// <summary>
+        /// The garage turned the work down. The customer takes the car away unrepaired.
+        ///
+        /// This exists because a job you cannot refuse is not a decision. A restoration is twice
+        /// the work for twice the money, so whether it is worth taking depends entirely on what
+        /// else wants your hands - and without this the car simply happens to you.
+        ///
+        /// Nothing is earned and nothing is lost: the bay frees on the next tick, which is the
+        /// point. It is a general rule rather than a restoration-only one, because "you can always
+        /// turn work down" is easier to understand than a button that appears on some cars.
+        /// </summary>
+        Declined = 3
     }
 
     /// <summary>One line on the quote: a repair, what it is for, and what it costs.</summary>
@@ -161,6 +174,15 @@ namespace GarageTycoon.Core.Cars
         public void Apply(ActiveCar car, QuoteOption option)
         {
             if (car == null) return;
+
+            if (option == QuoteOption.Declined)
+            {
+                // Turned down: nothing is accepted, so the car has no outstanding work, finishes
+                // owing nothing and releases the bay. Uses the same path as picking lines by hand.
+                ApplyCustom(car, null);
+                car.SetQuoted(QuoteOption.Declined);
+                return;
+            }
 
             for (int i = 0; i < _lines.Count; i++)
             {

@@ -127,7 +127,15 @@ namespace GarageTycoon.Core.Cars
             int jobCount = _random.NextInt(definition.MinJobs, definition.MaxJobs + 1);
 
             if (_random.Chance(parameters.ExtraJobChance)) jobCount++;
-            if (special != null) jobCount += special.ExtraJobs;
+
+            if (special != null)
+            {
+                jobCount += special.ExtraJobs;
+
+                // A floor as well as a bonus. The roll above starts from the car's own minimum, so
+                // a restoration could otherwise turn up with two jobs on it and not be one.
+                if (jobCount < special.MinimumJobs) jobCount = special.MinimumJobs;
+            }
 
             // Never ask for more distinct jobs than the car actually has on its list.
             jobCount = MathUtil.ClampInt(jobCount, 1, definition.LikelyJobs.Length);
@@ -152,6 +160,12 @@ namespace GarageTycoon.Core.Cars
                 JobType jobType = chosenTypes[i];
 
                 float work = baseWork * _random.Range(0.9f, 1.15f);
+
+                // Longer repairs, and deliberately NOT more money for them: the payout pool below
+                // is set by the car, and work only decides how that pool is split between jobs.
+                // So this buys the player nothing except time at the bench, which is the entire
+                // point of it - what the job pays has to be argued for separately.
+                if (special != null) work = (float)(work * special.WorkMultiplier);
                 MinigameType minigame = MinigameFactory.ChooseType(jobType, _random, previousType);
                 previousType = minigame;
 

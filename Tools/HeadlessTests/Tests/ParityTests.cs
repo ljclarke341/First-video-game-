@@ -426,7 +426,12 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 // web: SPECIAL_ORDER - the order decides which job a weighted roll lands on, so
                 // two builds listing the same jobs in a different order spawn different cars.
-                int[] expected = { (int)SpecialJobType.Urgent, (int)SpecialJobType.Performance };
+                int[] expected =
+                {
+                    (int)SpecialJobType.Urgent,
+                    (int)SpecialJobType.Performance,
+                    (int)SpecialJobType.Restoration
+                };
 
                 Check.AreEqual(expected.Length, SpecialJobCatalog.All.Count,
                     "the two builds offer a different number of special jobs");
@@ -465,6 +470,30 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.IsTrue(Math.Abs(GameBalance.GradeShortfallPenalty - 0.13d) < 0.0001d,
                     "the shortfall penalty is " + GameBalance.GradeShortfallPenalty
                         + ", the web build has 0.13");
+            });
+
+            suite.Add("Restoration's dials match the web build", () =>
+            {
+                // web: SPECIAL_JOBS.restoration
+                SpecialJobDefinition restoration =
+                    SpecialJobCatalog.FindByType(SpecialJobType.Restoration);
+
+                Check.IsTrue(restoration != null, "the web build has a restoration job and this one does not");
+
+                Check.IsTrue(Math.Abs(restoration.PatienceMultiplier - 1.4d) < 0.0001d,
+                    "restoration patience is " + restoration.PatienceMultiplier + ", the web build has 1.4");
+                Check.IsTrue(Math.Abs(restoration.PayoutMultiplier - 2d) < 0.0001d,
+                    "restoration payout is " + restoration.PayoutMultiplier + ", the web build has 2");
+                Check.IsTrue(Math.Abs(restoration.WorkMultiplier - 1.5d) < 0.0001d,
+                    "restoration work is " + restoration.WorkMultiplier + ", the web build has 1.5");
+                Check.IsTrue(Math.Abs(restoration.QualityWeight - 1d) < 0.0001d,
+                    "restoration quality weight is " + restoration.QualityWeight + ", the web build has 1");
+                Check.AreEqual(1, restoration.ExtraJobs, "restoration extra jobs differ from the web build");
+                Check.AreEqual(3, restoration.MinimumJobs, "restoration minimum jobs differ from the web build");
+                Check.AreEqual(3, restoration.MinRankLevel,
+                    "restoration unlocks at a different rank in the web build");
+                Check.IsFalse(restoration.ExpectedGrade.HasValue,
+                    "a restoration customer has no opinion about part grades, as in the web build");
             });
 
             return suite;
