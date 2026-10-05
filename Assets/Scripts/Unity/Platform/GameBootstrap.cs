@@ -1,9 +1,11 @@
 using System;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Events;
 using GarageTycoon.Core.Minigames;
 using GarageTycoon.Core.Save;
 using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Vehicle;
 using GarageTycoon.Unity.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -236,6 +238,7 @@ namespace GarageTycoon.Unity.Platform
         private void SubscribeToSimulation()
         {
             _simulation.RoundResolved += HandleRoundResolved;
+            _simulation.DiagnosisResolved += HandleDiagnosisResolved;
             _simulation.JobCompleted += HandleJobCompleted;
             _simulation.CarCompleted += HandleCarCompleted;
             _simulation.CarLeftAngry += HandleCarLeft;
@@ -250,6 +253,7 @@ namespace GarageTycoon.Unity.Platform
             if (_simulation == null) return;
 
             _simulation.RoundResolved -= HandleRoundResolved;
+            _simulation.DiagnosisResolved -= HandleDiagnosisResolved;
             _simulation.JobCompleted -= HandleJobCompleted;
             _simulation.CarCompleted -= HandleCarCompleted;
             _simulation.CarLeftAngry -= HandleCarLeft;
@@ -282,23 +286,38 @@ namespace GarageTycoon.Unity.Platform
             // Land the round on the car itself: a bolt goes tight, or the car takes a knock.
             _garageScreen.NotifyRoundResolved(session, result);
 
-            Color color;
-            switch (result.Outcome)
+            _toasts.Show(result.Message, OutcomeColor(result.Outcome), new Vector2(0f, -240f));
+        }
+
+        /// <summary>
+        /// Says what an inspection turned up. A check that found nothing has to say so out loud,
+        /// or a botched round just looks like the game ignoring you.
+        /// </summary>
+        private void HandleDiagnosisResolved(ActiveCar car, DiagnosisAction action, MinigameResult result)
+        {
+            _toasts.Show(result.Message, OutcomeColor(result.Outcome), new Vector2(0f, -240f));
+
+            int found = 0;
+            VehicleSystem[] covers = action.Covers();
+            for (int i = 0; i < covers.Length; i++)
             {
-                case MinigameOutcome.Perfect: color = Theme.PerfectZone; break;
-                case MinigameOutcome.Good: color = Theme.Success; break;
-                case MinigameOutcome.Weak: color = Theme.TextSecondary; break;
-                case MinigameOutcome.Damage: color = Theme.Danger; break;
-                default: color = Theme.Warning; break;
+                if (car.Diagnosis.IsRevealed(covers[i]) && car.Condition.IsFaulty(covers[i])) found++;
             }
 
-            _toasts.Show(result.Message, color, new Vector2(0f, -240f));
+            _toasts.Show(found > 0 ? (found == 1 ? "Found a fault" : "Found " + found + " faults")
+                                   : "Learned nothing",
+                found > 0 ? Theme.Info : Theme.TextMuted, new Vector2(0f, -300f));
         }
 
         private void HandleJobCompleted(ActiveCar car, RepairJob job, double payout)
         {
             _toasts.Show(job.Type.DisplayName() + " done!  +$" + CashFormat.Short(payout),
                 Theme.Cash, new Vector2(0f, -120f));
+
+            // How well it was done, not just what it paid.
+            QualityReport quality = RepairQuality.ForJob(job, car.Mood);
+            _toasts.Show(RepairQuality.StarsText(quality.Stars) + "  " + quality.Percent + "%",
+                quality.Stars >= 4 ? Theme.PerfectZone : Theme.TextSecondary, new Vector2(0f, -180f));
 
             // Light the car's own card up too, so the feedback is tied to the bay it came from.
             _garageScreen.FlashCar(car, Theme.Cash);
@@ -313,6 +332,18 @@ namespace GarageTycoon.Unity.Platform
             _toasts.Show(message, car.IsFlawless ? Theme.PerfectZone : Theme.Success, new Vector2(0f, 60f));
             _garageScreen.FlashCar(car, car.IsFlawless ? Theme.PerfectZone : Theme.Success);
             _garageScreen.NotifyCarCompleted(car);
+        }
+
+        private static Color OutcomeColor(MinigameOutcome outcome)
+        {
+            switch (outcome)
+            {
+                case MinigameOutcome.Perfect: return Theme.PerfectZone;
+                case MinigameOutcome.Good: return Theme.Success;
+                case MinigameOutcome.Weak: return Theme.TextSecondary;
+                case MinigameOutcome.Damage: return Theme.Danger;
+                default: return Theme.Warning;
+            }
         }
 
         private void HandleCarLeft(ActiveCar car)

@@ -171,6 +171,8 @@ namespace GarageTycoon.Core.Save
             diagnosis.Add("actions", actions);
 
             json.Add("diagnosis", diagnosis);
+            json.Add("quoted", car.Quoted);
+            json.Add("quotedAs", (int)car.QuotedAs);
 
             return json;
         }
@@ -378,6 +380,12 @@ namespace GarageTycoon.Core.Save
             ActiveCar car = new ActiveCar(instanceId, definition, jobs, totalTime, mood);
             car.SetCondition(LoadCondition(json, instanceId, jobs), json["complaint"].AsString(string.Empty));
             LoadDiagnosis(car, json["diagnosis"]);
+
+            // Older saves have no quote. Defaulting to "not quoted" is right AND safe: those cars
+            // already have every job accepted, so the worst that happens is the player is offered
+            // a quote for work that is already all on the bill.
+            car.RestoreQuote(json["quoted"].AsBool(false),
+                (QuoteOption)json["quotedAs"].AsInt((int)QuoteOption.Everything));
 
             // A version 1 save has no complaint either, so write one from the condition we just
             // derived. Without this an old car shows a blank line where its problem should be.

@@ -292,6 +292,7 @@ namespace GarageTycoon.Unity.UI
 
             _minigamePanel = new MinigamePanel();
             _minigamePanel.Build(host, _simulation);
+            _minigamePanel.QuoteAccepted += HandleQuoteAccepted;
         }
 
         private void BuildBottomBar()
@@ -328,7 +329,33 @@ namespace GarageTycoon.Unity.UI
 
         private void HandleBaySelected(int bayIndex)
         {
+            if (bayIndex < 0 || bayIndex >= _simulation.Bays.Count) return;
+
+            ActiveCar car = _simulation.Bays[bayIndex];
+            if (car == null || car.State != CarState.InBay || car.AllJobsComplete) return;
+
+            // A car nobody has looked at goes on the ramp first. One already quoted - or one the
+            // player chose to skip inspecting - goes straight back under the spanner, so returning
+            // to a car you are part way through costs no extra taps.
+            bool decided = car.Quoted || car.Diagnosis.WasSkipped;
+
+            if (!decided)
+            {
+                _minigamePanel.Inspect(car);
+                return;
+            }
+
             _simulation.SelectBay(bayIndex);
+        }
+
+        /// <summary>Starts the work once a quote has been answered.</summary>
+        private void HandleQuoteAccepted(ActiveCar car, QuoteOption option)
+        {
+            // Nothing accepted means the customer wants their keys back: the car is already
+            // finished and the simulation retires it on the next tick.
+            if (car.AllJobsComplete) return;
+
+            _simulation.SelectBay(car.BayIndex);
         }
 
         private void HandleCalmRequested(int bayIndex)

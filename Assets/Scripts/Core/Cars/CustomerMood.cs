@@ -55,15 +55,23 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>Multiplies the finishing tip.</summary>
-        public static float TipMultiplier(this CustomerMood mood)
+        /// <summary>
+        /// How well this customer tips.
+        ///
+        /// Returns DOUBLE rather than float, and that is not fussiness. The tip is money, computed
+        /// in double, and 1.4f widened to double is 1.399999976158142 - so a tip that should be
+        /// exactly 17.5 landed on 17.4999997 and rounded DOWN to 17, while the web build, whose
+        /// numbers are all doubles, paid 18. A parity diff over 249 cases found six such dollars.
+        /// </summary>
+        public static double TipMultiplier(this CustomerMood mood)
         {
             switch (mood)
             {
-                case CustomerMood.Relaxed: return 0.8f;
-                case CustomerMood.Impatient: return 1.4f;
-                case CustomerMood.BigTipper: return 2.4f;
-                case CustomerMood.Vip: return 1.8f;
-                default: return 1f;
+                case CustomerMood.Relaxed: return 0.8d;
+                case CustomerMood.Impatient: return 1.4d;
+                case CustomerMood.BigTipper: return 2.4d;
+                case CustomerMood.Vip: return 1.8d;
+                default: return 1d;
             }
         }
 

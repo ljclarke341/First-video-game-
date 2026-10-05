@@ -62,6 +62,28 @@ namespace GarageTycoon.Core.Diagnosis
         }
 
         /// <summary>
+        /// The two or three words that fit under the check's name on a button.
+        ///
+        /// Kept word-for-word identical to the web build's hints: the same screen in two
+        /// implementations should not describe the same button differently. Description() above is
+        /// the longer sentence, used where there is room for one.
+        /// </summary>
+        public static string ShortHint(this DiagnosisAction action)
+        {
+            switch (action)
+            {
+                case DiagnosisAction.VisualInspection: return "Body and coolant";
+                case DiagnosisAction.ObdScan: return "Electrics and engine";
+                case DiagnosisAction.BrakeInspection: return "Pads and discs";
+                case DiagnosisAction.BatteryTest: return "Charge and earth";
+                case DiagnosisAction.EngineTest: return "Engine and coolant";
+                case DiagnosisAction.SuspensionCheck: return "Arms and dampers";
+                case DiagnosisAction.TestDrive: return "A bit of everything";
+                default: return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// Which systems this check can see.
         ///
         /// Most checks look hard at one or two things. The test drive is the odd one out: it

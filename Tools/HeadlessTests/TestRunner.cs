@@ -106,7 +106,8 @@ namespace GarageTycoon.HeadlessTests
                 Tests.ConditionTests.Build(),
                 Tests.QualityTests.Build(),
                 Tests.QuoteTests.Build(),
-                Tests.DiagnosisTests.Build()
+                Tests.DiagnosisTests.Build(),
+                Tests.ParityTests.Build()
             };
 
             int passed = 0;

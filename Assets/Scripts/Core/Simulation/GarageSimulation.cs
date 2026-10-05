@@ -826,27 +826,6 @@ namespace GarageTycoon.Core.Simulation
         }
 
         /// <summary>Feeds a tap through to the inspection round, if one is running.</summary>
-        public bool DiagnosisPress()
-        {
-            if (DiagnosisSession == null) return false;
-            DiagnosisSession.Minigame.Press();
-            return true;
-        }
-
-        public bool DiagnosisRelease()
-        {
-            if (DiagnosisSession == null) return false;
-            DiagnosisSession.Minigame.Release();
-            return true;
-        }
-
-        public bool DiagnosisSelectOption(int optionIndex)
-        {
-            if (DiagnosisSession == null) return false;
-            DiagnosisSession.Minigame.SelectOption(optionIndex);
-            return true;
-        }
-
         /// <summary>Abandons the inspection without crediting it.</summary>
         public void CancelDiagnosis()
         {
@@ -901,21 +880,39 @@ namespace GarageTycoon.Core.Simulation
         public event Action<ActiveCar, float> CustomerCalmed;
 
         /// <summary>Forwards a screen tap / button press into the player's current round.</summary>
+        /// <summary>
+        /// The round the player's hands are on right now - an inspection if one is running,
+        /// otherwise the repair. Every control routes through this, so a diagnosis round gets the
+        /// existing mini-game views and inputs for free rather than needing a parallel path that
+        /// could drift out of step with them.
+        /// </summary>
+        public MinigameBase LiveMinigame
+        {
+            get
+            {
+                if (DiagnosisSession != null) return DiagnosisSession.Minigame;
+                return PlayerSession != null ? PlayerSession.Minigame : null;
+            }
+        }
+
         public void PlayerPress()
         {
-            if (PlayerSession != null && PlayerSession.Minigame != null) PlayerSession.Minigame.Press();
+            MinigameBase minigame = LiveMinigame;
+            if (minigame != null) minigame.Press();
         }
 
         /// <summary>Forwards a finger lift into the player's current round.</summary>
         public void PlayerRelease()
         {
-            if (PlayerSession != null && PlayerSession.Minigame != null) PlayerSession.Minigame.Release();
+            MinigameBase minigame = LiveMinigame;
+            if (minigame != null) minigame.Release();
         }
 
         /// <summary>Forwards a tool button / direction button tap into the player's current round.</summary>
         public void PlayerSelectOption(int optionIndex)
         {
-            if (PlayerSession != null && PlayerSession.Minigame != null) PlayerSession.Minigame.SelectOption(optionIndex);
+            MinigameBase minigame = LiveMinigame;
+            if (minigame != null) minigame.SelectOption(optionIndex);
         }
 
         // ------------------------------------------------------------------
@@ -1057,6 +1054,11 @@ namespace GarageTycoon.Core.Simulation
 
             WorkSession suspendedPlayer = PlayerSession;
             PlayerSession = null;
+
+            // An inspection the player left open is abandoned rather than ticked through the
+            // catch-up. Nobody was holding the phone, so it would simply time out and record a
+            // failed check - the player would come back to a wasted inspection they never played.
+            DiagnosisSession = null;
 
             for (int i = 0; i < steps; i++)
             {

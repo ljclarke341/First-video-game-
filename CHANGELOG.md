@@ -6,6 +6,87 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## V2 Phase A, part 3 — Unity catches up, and the two builds are checked against each other
+
+No new systems. This brings Unity level with the web build and puts machinery in place so the two
+cannot quietly drift again.
+
+### What Unity gained
+
+| Web build | Unity | Where |
+|---|---|---|
+| Inspection ramp | `InspectPanel.cs` | complaint, 7-row condition sheet, 7 check buttons, skip / quote |
+| Quote screen | `QuotePanel.cs` | priced lines with their readings, **Needed** tags, 3 answers |
+| Bench routing | `MinigamePanel.cs` | ramp / quote / inspection round / repair round |
+| "Not looked at" and declined chips | `BayCardView.cs` | the card only shows what the garage knows |
+| Tap routes to the ramp | `GarageScreen.cs` | a quoted or skipped car goes straight back to work |
+| Star rating on a finished job | `GameBootstrap.cs` | toast beside the payout |
+| "Found a fault" / "Learned nothing" | `GameBootstrap.cs` | a botched check has to say so out loud |
+| Five-step how-to-play | `HelpScreen.cs` | including "you never have to inspect" |
+
+Both decision screens live in the workbench rather than an overlay, as in the web build, so a
+diagnosis round plays in exactly the spot a repair round does.
+
+**Input now has one path.** `PlayerPress` / `PlayerRelease` / `PlayerSelectOption` route to whichever
+round is live — an inspection if one is running, otherwise the repair. That mirrors the web build's
+`liveGame()` accessor and means diagnosis rounds inherit every existing control rather than needing
+a parallel path that could fall out of step. The separate `DiagnosisPress` trio is gone.
+
+### Three bugs the parity work found
+
+**1. The tip was a dollar out, systematically.** `CustomerMood.TipMultiplier()` returned `float`.
+Widened to double, `1.4f` is `1.399999976158142`, so a tip that should be exactly `17.5` computed as
+`17.4999997` and rounded **down** to 17 — while the web build, whose numbers are all doubles, paid
+18. Six of 249 compared cases. The multiplier now returns `double`.
+
+**2. "Found 2 faults" could be a lie.** The web counted every newly revealed system, including
+healthy ones, so a check that confirmed two systems were fine announced two faults. Now both builds
+count actual faults.
+
+**3. Closing the app mid-inspection wasted the check.** Offline catch-up runs the real tick, so an
+open diagnosis round played itself out with nobody holding the phone, timed out, and recorded a
+failed check. Both builds now abandon an open inspection before the catch-up. Two new tests cover
+it, including one confirming mechanics still self-diagnose and earn while you are away.
+
+### How parity is enforced from here
+
+**17 parity tests** (`ParityTests.cs`) pin every shared number — the tip fraction and the whole mood
+tip table, both condition thresholds, the job→system map, the system order (the save packs a bitmask
+by index, so reordering breaks saves in *both* builds), diagnosis difficulty, the complete check
+table, the reveal thresholds, the bonus, the quality weights, customer expectations, quote
+preferences and satisfaction swings. Each failure message names the web build's own identifier, so
+the matching line is easy to find. **The fix for a failure is never to edit the number here alone.**
+
+**A 249-case cross-build diff.** `dotnet run --project Tools/HeadlessTests -- parity` prints the
+shared calculations as JSON; a browser script runs the identical inputs through the web build; the
+two are diffed. Currently **249 of 249 identical** across condition readings, quality scoring,
+diagnosis bonuses and tips.
+
+That diff is what caught the float/double bug — and it first reported eight mismatches that turned
+out to be the *harness* reimplementing `MathUtil.RoundCash` as `Math.Round` instead of calling it.
+C# rounds halves to even, JavaScript rounds them up. A parity dump has to call the same helper the
+game calls, never re-derive it.
+
+### Intentional differences, flagged rather than hidden
+
+| Difference | Why |
+|---|---|
+| **Unity has no audio** | The web synthesises everything with Web Audio. Unity needs procedural `AudioClip` generation — real work, not yet done. Pre-existing. |
+| **Save formats differ** | C# writes named JSON fields; the web packs jobs into a positional array for size. Both are version 2 and both load their own version 1. Converging them would gain nothing. |
+| **`DiagnosisAction` has two descriptions in C#** | `ShortHint()` matches the web word-for-word on buttons; `Description()` is a longer sentence with nowhere to go in the web's layout. |
+| **Custom quotes have no UI in either build** | `ApplyCustom` / `applyCustomQuote` exist and are tested, but neither build exposes line-by-line picking yet. |
+| **Which car is on the ramp is not saved** | UI state in both. Reloading drops you back at the bay, keeping the diagnosis and the quote. |
+| **Runtime floats can differ by $1** | `RepairSpeedFraction` is a `float` in C# and a double in JS. It is derived from live patience values, not a constant, and the two builds have different cars anyway. Bit-exact runtime parity is neither achievable nor useful; constant-level parity is, and that is now enforced. |
+
+### Verified
+
+- **214 tests passing**, up from 195. All 135 originals still pass unmodified.
+- **Economy byte-for-byte unchanged**: $503/min, 31 cars, $17,422, idle at 53% of hands-on.
+- **Compile check clean.**
+- **Web soak run**: 42 cars in 20 minutes, nothing stuck, no console errors.
+
+---
+
 ## V2 Phase A, part 2 — The flow you can actually play
 
 Phase A built condition, diagnosis, quotes and quality in Core with 60 tests. This is the part

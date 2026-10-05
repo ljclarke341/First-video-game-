@@ -78,12 +78,30 @@ namespace GarageTycoon.Unity.UI
                       + "small mini-game. Finish a car before the owner loses patience and you get paid.");
 
             Heading("THE LOOP");
-            Step(1, "A car arrives with two to four jobs on it. Its card shows what it needs, what it "
-                    + "pays, and a bar counting down the owner's patience.");
-            Step(2, "Tap the car to start work. Each job is played as one of the four mini-games below, "
-                    + "over and over, until that job's bar is full.");
-            Step(3, "Finish every job and the owner pays up. Let the timer run out and they leave "
+            Step(1, "A car arrives and the owner tells you what's wrong - in their words, not yours. "
+                    + "Its card just says the jobs have not been looked at. The bar underneath is their "
+                    + "patience, and it is already running.");
+            Step(2, "Tap the car to put it on the ramp. Run checks to find out what it actually needs - "
+                    + "each one is a short mini-game. A check you play well tells you something; a "
+                    + "botched one tells you nothing.");
+            Step(3, "Then write the quote. Do everything and earn more but stay in the bay longer, or do "
+                    + "the essentials and get them out quickly for less. Red NEEDED jobs are the ones "
+                    + "the car really should not leave without.");
+            Step(4, "Now do the work. Each job is one of the four mini-games below, played over and over "
+                    + "until its bar is full. Every job is scored out of five stars.");
+            Step(5, "Finish the quoted work and they pay up. Let the timer run out and they leave "
                     + "annoyed - you keep what the finished jobs earned and lose the rest.");
+
+            Heading("YOU NEVER HAVE TO INSPECT");
+            Bullet(Theme.Info,
+                "In a hurry? JUST GET STUCK IN on the ramp shows you everything at once and starts the "
+                + "work. It costs nothing - you only miss the small bonus for a thorough inspection.");
+            Bullet(Theme.Warning,
+                "The condition sheet is the reason for the work. \"Brakes at 34%\" is why the brake "
+                + "service is on the quote. Anything still showing -- is something you have not looked at.");
+            Bullet(Theme.Prestige,
+                "Different customers want different quotes. A VIP wants the job done properly; someone "
+                + "in a hurry wants the bill small. The one they were hoping for is highlighted.");
 
             Heading("THE FOUR JOBS");
             Minigame(MinigameType.TimingBar, Theme.Info,

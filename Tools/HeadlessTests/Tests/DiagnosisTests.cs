@@ -289,6 +289,43 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.IsTrue(report.CashEarned > 0d, "nothing was earned");
             });
 
+            suite.Add("Going away mid-inspection does not waste the check", () =>
+            {
+                // Nobody is holding the phone during the catch-up, so an open inspection would
+                // simply time out and record a failed check the player never got to play.
+                GarageSimulation simulation = new GarageSimulation(900);
+                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+                Advance(simulation, 20f);
+
+                Check.IsTrue(simulation.StartDiagnosis(0, DiagnosisAction.BrakeInspection),
+                    "could not start an inspection to interrupt");
+
+                ActiveCar car = simulation.Bays[0];
+                int actionsBefore = car.Diagnosis.ActionsRun.Count;
+
+                simulation.ApplyOfflineProgress(3600d);
+
+                Check.IsTrue(simulation.DiagnosisSession == null,
+                    "the inspection was still running after coming back");
+                Check.AreEqual(actionsBefore, car.Diagnosis.ActionsRun.Count,
+                    "a check was consumed while the player was away");
+            });
+
+            suite.Add("Mechanics keep working while you are away", () =>
+            {
+                // Offline runs the real tick, so the self-diagnosis that lets a mechanic pick up an
+                // uninspected car has to work there too - otherwise idle income quietly stops.
+                GarageSimulation simulation = new GarageSimulation(901);
+                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
+                Advance(simulation, 30f);
+
+                OfflineReport report = simulation.ApplyOfflineProgress(3600d);
+
+                Check.IsTrue(report.CarsCompleted > 0,
+                    "no cars were finished while away, got " + report.CarsCompleted);
+                Check.IsTrue(report.CashEarned > 0d, "nothing was earned while away");
+            });
+
             return suite;
         }
 

@@ -37,6 +37,16 @@ namespace GarageTycoon.Core.Cars
         /// </summary>
         public Diagnosis.CarDiagnosis Diagnosis { get; private set; }
 
+        /// <summary>True once the customer has been given a bill and answered it.</summary>
+        public bool Quoted { get; private set; }
+
+        /// <summary>
+        /// Which answer they gave. Kept after the fact rather than used and thrown away, so the
+        /// satisfaction they drive off with can still account for whether the quote was the one
+        /// they were hoping for.
+        /// </summary>
+        public QuoteOption QuotedAs { get; private set; }
+
         /// <summary>
         /// Whether the player can see a given job yet.
         ///
@@ -104,6 +114,7 @@ namespace GarageTycoon.Core.Cars
             Condition = Vehicle.CarCondition.FromPercents(null);
             Complaint = string.Empty;
             Diagnosis = new Diagnosis.CarDiagnosis();
+            QuotedAs = QuoteOption.Everything;
             _jobs.AddRange(jobs);
 
             TotalTime = patienceSeconds;
@@ -264,6 +275,20 @@ namespace GarageTycoon.Core.Cars
         {
             if (condition != null) Condition = condition;
             Complaint = complaint ?? string.Empty;
+        }
+
+        /// <summary>Records the customer's answer to the quote.</summary>
+        public void SetQuoted(QuoteOption option)
+        {
+            Quoted = true;
+            QuotedAs = option;
+        }
+
+        /// <summary>Used by the save system to restore a car that was already quoted.</summary>
+        public void RestoreQuote(bool quoted, QuoteOption option)
+        {
+            Quoted = quoted;
+            QuotedAs = option;
         }
 
         public void MoveToBay(int bayIndex)

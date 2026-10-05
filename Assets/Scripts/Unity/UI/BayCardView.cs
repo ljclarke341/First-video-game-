@@ -316,9 +316,31 @@ namespace GarageTycoon.Unity.UI
 
                 RepairJob job = car.Jobs[i];
 
+                // A job the garage has not found yet is not named. The card may only show what
+                // the inspection has actually turned up - otherwise diagnosis means nothing.
+                if (!car.IsJobRevealed(i))
+                {
+                    _jobLabels[i].text = "Not looked at";
+                    _jobLabels[i].color = Theme.TextMuted;
+                    _jobLabels[i].fontStyle = FontStyle.Italic;
+                    _jobChips[i].color = Theme.PanelSunken;
+                    continue;
+                }
+
+                _jobLabels[i].fontStyle = FontStyle.Normal;
+
                 // The chip names the job and the mini-game it uses, so the player can see at a glance
                 // what they are in for before committing to the car.
                 _jobLabels[i].text = job.Type.DisplayName() + "\n" + job.Minigame.DisplayName();
+
+                // Work the customer turned down stays visible but plainly off the books.
+                if (job.IsDeclined)
+                {
+                    _jobLabels[i].text = job.Type.DisplayName() + "\ndeclined";
+                    _jobLabels[i].color = Theme.WithAlpha(Theme.TextMuted, 0.6f);
+                    _jobChips[i].color = Theme.WithAlpha(Theme.PanelSunken, 0.5f);
+                    continue;
+                }
 
                 bool isActive = car.ActiveJobIndex == i;
 

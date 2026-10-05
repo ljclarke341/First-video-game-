@@ -145,6 +145,8 @@ namespace GarageTycoon.Core.Cars
 
                 car.Jobs[line.JobIndex].SetAccepted(accepted);
             }
+
+            car.SetQuoted(option);
         }
 
         /// <summary>Applies a hand-picked set of job indices; everything else on the quote is declined.</summary>
@@ -159,6 +161,8 @@ namespace GarageTycoon.Core.Cars
 
                 car.Jobs[jobIndex].SetAccepted(accepted);
             }
+
+            car.SetQuoted(QuoteOption.Custom);
         }
 
         /// <summary>The price of a given answer.</summary>

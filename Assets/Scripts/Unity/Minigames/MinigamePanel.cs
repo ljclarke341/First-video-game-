@@ -1,7 +1,10 @@
 using System.Collections.Generic;
+using System;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Minigames;
+using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Vehicle;
 using GarageTycoon.Unity.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -36,6 +39,21 @@ namespace GarageTycoon.Unity.Minigames
 
         /// <summary>The car on the ramp, showing the repair actually happening.</summary>
         private readonly RepairView _repairView = new RepairView();
+
+        /// <summary>The inspection ramp and the quote. Both live in the bench, not in an overlay,
+        /// so the whole job stays in one place on a phone - and so a diagnosis round plays in
+        /// exactly the spot a repair round does.</summary>
+        private readonly InspectPanel _inspectPanel = new InspectPanel();
+        private readonly QuotePanel _quotePanel = new QuotePanel();
+
+        /// <summary>The car being looked over, and the bill being written. UI state, not saved -
+        /// a reload drops you back at the bay, which is where the web build lands too.</summary>
+        private ActiveCar _inspecting;
+        private ActiveCar _quotingCar;
+        private Quote _quote;
+
+        /// <summary>Raised when a quote is answered, so the screen can start the work.</summary>
+        public event Action<ActiveCar, QuoteOption> QuoteAccepted;
 
         private readonly List<MinigameView> _views = new List<MinigameView>();
         private MinigameView _activeView;
@@ -84,6 +102,12 @@ namespace GarageTycoon.Unity.Minigames
             _viewHost = UIFactory.CreateRect("ViewHost", _root);
             UIFactory.AnchorMiddle(_viewHost, RepairBandTop + RepairBandHeight + 6f, 0f, 0f);
 
+            _inspectPanel.Build(_viewHost, _simulation);
+            _inspectPanel.QuoteRequested += OpenQuote;
+
+            _quotePanel.Build(_viewHost);
+            _quotePanel.Answered += HandleQuoteAnswered;
+
             _views.Add(new TimingBarView());
             _views.Add(new ToolMatchView());
             _views.Add(new HoldReleaseView());
@@ -104,9 +128,123 @@ namespace GarageTycoon.Unity.Minigames
             UIFactory.Stretch(_idleText.rectTransform, Theme.PanelPadding);
         }
 
+        /// <summary>
+        /// Puts a car on the inspection ramp. Called when the player taps a bay holding a car
+        /// nobody has looked at yet.
+        /// </summary>
+        public void Inspect(ActiveCar car)
+        {
+            _inspecting = car;
+            _quotingCar = null;
+            _quote = null;
+            _simulation.ClearPlayerSession();
+            Refresh();
+        }
+
+        /// <summary>True while the bench is showing the ramp or the quote rather than a repair.</summary>
+        public bool IsDeciding { get { return _inspecting != null || _quotingCar != null; } }
+
+        private void OpenQuote(ActiveCar car)
+        {
+            _inspecting = null;
+            _simulation.CancelDiagnosis();
+
+            _quotingCar = car;
+            _quote = Quote.For(car);
+            Refresh();
+        }
+
+        private void HandleQuoteAnswered(ActiveCar car, Quote quote, QuoteOption? option)
+        {
+            // No option means "back to the ramp for another look".
+            if (!option.HasValue)
+            {
+                _quotingCar = null;
+                _quote = null;
+                _inspecting = car;
+                Refresh();
+                return;
+            }
+
+            quote.Apply(car, option.Value);
+
+            _quotingCar = null;
+            _quote = null;
+            _inspecting = null;
+
+            Action<ActiveCar, QuoteOption> handler = QuoteAccepted;
+            if (handler != null) handler(car, option.Value);
+
+            Refresh();
+        }
+
+        /// <summary>Drops whatever decision was in progress, e.g. when its car leaves.</summary>
+        private void ClearDecision()
+        {
+            _inspecting = null;
+            _quotingCar = null;
+            _quote = null;
+        }
+
         /// <summary>Called once a frame to keep the panel in step with the simulation.</summary>
         public void Refresh()
         {
+            // ---- an inspection round owns the bench while it plays ----
+            DiagnosisSession diagnosis = _simulation.DiagnosisSession;
+            if (diagnosis != null && diagnosis.Car != null)
+            {
+                _jobLabel.text = diagnosis.Action.DisplayName();
+                _carLabel.text = diagnosis.Car.Definition.DisplayName;
+                _jobProgress.Fraction = 0f;
+                _twistLabel.gameObject.SetActive(false);
+
+                _inspectPanel.SetVisible(false);
+                _quotePanel.SetVisible(false);
+                _idlePanel.gameObject.SetActive(false);
+                _repairView.Clear();
+
+                if (!ReferenceEquals(diagnosis.Minigame, _boundMinigame)) BindView(diagnosis.Minigame);
+
+                _roundTimer.Fraction = diagnosis.Minigame.TimeLimit <= 0f
+                    ? 0f : diagnosis.Minigame.TimeRemaining / diagnosis.Minigame.TimeLimit;
+                _roundTimer.FillColor = Theme.TimerColor(_roundTimer.Fraction);
+
+                if (_activeView != null) _activeView.Refresh();
+                return;
+            }
+
+            // ---- the ramp ----
+            if (_inspecting != null && _inspecting.State != CarState.InBay) ClearDecision();
+
+            if (_inspecting != null)
+            {
+                ShowDecision(_inspecting, "On the ramp");
+                _inspectPanel.Bind(_inspecting);
+                _inspectPanel.Refresh();
+                _quotePanel.SetVisible(false);
+
+                // How much of the car has been worked out, as the top bar.
+                _jobProgress.Fraction =
+                    _inspecting.Diagnosis.RevealedCount / (float)VehicleSystemExtensions.Count;
+                return;
+            }
+
+            // ---- the quote ----
+            if (_quotingCar != null && _quotingCar.State != CarState.InBay) ClearDecision();
+
+            if (_quotingCar != null)
+            {
+                ShowDecision(_quotingCar, "The quote");
+                _quotePanel.Bind(_quotingCar, _quote);
+                _quotePanel.Refresh();
+                _inspectPanel.SetVisible(false);
+                _jobProgress.Fraction = 1f;
+                return;
+            }
+
+            _inspectPanel.SetVisible(false);
+            _quotePanel.SetVisible(false);
+
             WorkSession session = _simulation.PlayerSession;
 
             if (session == null || session.Car == null)
@@ -161,6 +299,23 @@ namespace GarageTycoon.Unity.Minigames
             _roundTimer.FillColor = Theme.TimerColor(_roundTimer.Fraction);
 
             if (_activeView != null) _activeView.Refresh();
+        }
+
+        /// <summary>Shared chrome for the two decision screens.</summary>
+        private void ShowDecision(ActiveCar car, string title)
+        {
+            if (_activeView != null) { _activeView.Unbind(); _activeView = null; }
+            _boundMinigame = null;
+
+            _jobLabel.text = title;
+            _carLabel.text = car.Definition.DisplayName;
+            _roundTimer.Fraction = 0f;
+            _twistLabel.gameObject.SetActive(false);
+            _idlePanel.gameObject.SetActive(false);
+
+            // The car silhouette is already on the bay card directly above, and both decision
+            // screens need the height more than they need a second copy of it.
+            _repairView.Clear();
         }
 
         private void BindView(MinigameBase minigame)

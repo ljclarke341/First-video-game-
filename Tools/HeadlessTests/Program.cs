@@ -14,6 +14,14 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            // "parity" prints the shared Phase A calculations as JSON, so the same inputs can be
+            // run through the web build and the two outputs diffed.
+            if (args != null && args.Length > 0 && args[0] == "parity")
+            {
+                ParityDump.Run();
+                return 0;
+            }
+
             return TestRunner.RunAll(args);
         }
     }
