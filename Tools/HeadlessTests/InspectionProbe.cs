@@ -39,44 +39,23 @@ namespace GarageTycoon.HeadlessTests
 
             List<Strategy> strategies = new List<Strategy>
             {
+                // Walk straight past the ramp. The safety valve commits the car on the first
+                // spanner, so this is the lazy version of getting stuck in.
                 new Strategy("1 never inspect", car => 0),
 
-                new Strategy("2 inspect every car fully", car => DiagnosisActions.Count),
+                // Read the complaint, test what it points at, stop. The move the gate exists for.
+                Strategy.Targeted("2 targeted (complaint)", ComplaintDirectedCheck),
 
-                // Re-asked each time the player is free, so "until the first fault" really does
-                // stop the moment one turns up rather than running a fixed number of checks.
-                new Strategy("3 stop at the first fault", car =>
-                    AnyFaultFound(car) ? 0 : DiagnosisActions.Count),
-
-                new Strategy("4 only urgent jobs", car =>
-                    car.Special == null ? 0 : DiagnosisActions.Count),
-
-                new Strategy("5 only rare and above", car =>
-                    car.Definition.Rarity >= CarRarity.Rare ? DiagnosisActions.Count : 0),
-
-                // What the player can actually tell at the counter: the complaint names a second
-                // symptom. Read off the sentence itself, not off the hidden condition.
-                new Strategy("6 only multi-symptom complaints", car =>
-                    ComplaintNamesTwo(car) ? DiagnosisActions.Count : 0),
-
-                // ---- the strategies the gate is supposed to make possible ----
-
-                // Read the complaint, test what it points at, stop. This is the move the whole
-                // redesign exists to reward: targeted, cheap, and informed by a free clue.
-                Strategy.Targeted("7 only what the complaint points at", ComplaintDirectedCheck),
-
-                // One look, then commit. The fastest strategy that is not simply blind.
-                Strategy.Targeted("8 one likely check, then quote", car =>
+                // One look, then commit to a quote on what little that turned up.
+                Strategy.Targeted("3 one check, then quote", car =>
                     car.Diagnosis.ActionsRun.Count > 0 ? (DiagnosisAction?)null
                         : ComplaintDirectedCheck(car)),
 
-                // Keep going until nothing is left hidden that matters.
-                Strategy.Targeted("9 until every fault is known", car =>
-                    car.Diagnosis.FoundEverything(car.Condition) ? (DiagnosisAction?)null
-                        : FirstUnrunCheck(car)),
+                // Every check, every car.
+                new Strategy("4 full inspection", car => DiagnosisActions.Count),
 
-                // The explicit "just get stuck in" button, as opposed to never touching the car.
-                new Strategy("10 skip (just get stuck in)", car => 0, skip: true)
+                // The button: take the whole car on, blind, now.
+                new Strategy("5 skip / commit", car => 0, skip: true)
             };
 
             List<Result> results = new List<Result>();
@@ -84,44 +63,28 @@ namespace GarageTycoon.HeadlessTests
 
             PrintTable("THE MONEY", results, new[]
             {
-                new Column("profit/car", r => "$" + r.ProfitPerCar.ToString("0")),
-                new Column("profit/min", r => "$" + r.ProfitPerMinute.ToString("0")),
+                new Column("income/min", r => "$" + r.ProfitPerMinute.ToString("0")),
                 new Column("session income", r => "$" + r.IncomePerSession.ToString("0")),
-                new Column("vs no inspect", r => r.IncomeVsBaseline.ToString("+0.0%;-0.0%;0.0%"))
+                new Column("vs never", r => r.IncomeVsBaseline.ToString("+0.0%;-0.0%;0.0%")),
+                new Column("profit/car", r => "$" + r.ProfitPerCar.ToString("0"))
             }, results[0]);
 
             PrintTable("THE CARS", results, new[]
             {
                 new Column("cars done", r => r.CompletedPerSession.ToString("0.0")),
                 new Column("cars lost", r => r.LostPerSession.ToString("0.0")),
-                new Column("lost %", r => r.LossPercent.ToString("0.0")),
-                new Column("secs/car", r => r.SecondsPerCar.ToString("0.0")),
-                new Column("avg payout", r => "$" + r.PayoutPerCar.ToString("0"))
+                new Column("lost %", r => r.LossPercent.ToString("0.0") + "%"),
+                new Column("avg payout", r => "$" + r.PayoutPerCar.ToString("0")),
+                new Column("secs/car", r => r.SecondsPerCar.ToString("0.0"))
             }, results[0]);
 
-            PrintTable("THE WORK", results, new[]
+            PrintTable("THE INSPECTION", results, new[]
             {
+                new Column("checks/car", r => r.ChecksPerCar.ToString("0.00")),
                 new Column("diag bonus", r => r.DiagnosisBonus.ToString("0.000") + "x"),
-                new Column("quality score", r => r.QualityScore.ToString("0.000")),
-                new Column("quality mult", r => r.QualityMultiplier.ToString("0.000") + "x"),
-                new Column("parts cost", r => "$" + r.PartValuePerCar.ToString("0")),
-                new Column("surcharge", r => "$" + r.SurchargePerCar.ToString("0"))
-            }, results[0]);
-
-            PrintTable("WHICH CARS PAID", results, new[]
-            {
-                new Column("rare+ /car", r => "$" + r.RareProfitPerCar.ToString("0")),
-                new Column("common /car", r => "$" + r.CommonProfitPerCar.ToString("0")),
-                new Column("urgent /car", r => r.UrgentCars == 0 ? "-" : "$" + r.UrgentProfitPerCar.ToString("0")),
-                new Column("checks run", r => r.ChecksPerCar.ToString("0.00"))
-            }, results[0]);
-
-            PrintTable("WHAT LOOKING BOUGHT", results, new[]
-            {
                 new Column("quotes written", r => r.Quotes.ToString()),
-                new Column("decision moved", r => r.DecisionsChangedPct.ToString("0.0") + "%"),
-                new Column("work declined", r => r.UnnecessaryAvoidedPct.ToString("0.0") + "%"),
-                new Column("work found", r => r.ExtraWorkFoundPct.ToString("0.0") + "%")
+                new Column("work declined", r => r.JobsDeclinedPct.ToString("0.0") + "%"),
+                new Column("decision moved", r => r.DecisionsChangedPct.ToString("0.0") + "%")
             }, results[0]);
 
             InformationValue.Run(Seeds);
@@ -258,6 +221,16 @@ namespace GarageTycoon.HeadlessTests
             public int UnnecessaryAvoided;
             public int ExtraWorkFound;
 
+            // Per JOB rather than per car: "how much of the work that came through the door did
+            // the player turn down" is the question, and cars carry different numbers of jobs.
+            public int JobsSeen;
+            public int JobsDeclined;
+
+            public double JobsDeclinedPct
+            {
+                get { return JobsSeen == 0 ? 0d : JobsDeclined * 100d / JobsSeen; }
+            }
+
             public double IncomeVsBaseline;
 
             public double DecisionsChangedPct { get { return Pct(DecisionsChanged); } }
@@ -336,6 +309,18 @@ namespace GarageTycoon.HeadlessTests
 
                 simulation.CarCompleted += (car, money) =>
                 {
+                    // A car that was never quoted still had work come through the door, and the
+                    // player declined none of it. Counting only quoted cars would flatter every
+                    // strategy that does not quote.
+                    if (!car.Quoted)
+                    {
+                        for (int i = 0; i < car.Jobs.Count; i++)
+                        {
+                            result.JobsSeen++;
+                            if (car.Jobs[i].IsDeclined) result.JobsDeclined++;
+                        }
+                    }
+
                     result.Completed++;
                     result.Payout += car.EarnedSoFar;
                     result.BonusTotal += car.Diagnosis.PayoutBonus(car.Condition);
@@ -371,7 +356,14 @@ namespace GarageTycoon.HeadlessTests
                 // is how that stays true.
                 if (strategy.Skip)
                 {
-                    simulation.CarEnteredBay += (car, bay) => { car.Diagnosis.RevealAll(true); };
+                    // Exactly what the button does now: commit to the lot, reveal nothing, earn
+                    // no bonus. It used to call RevealAll here, which is the behaviour that made
+                    // this the best strategy in the game by 39%.
+                    simulation.CarEnteredBay += (car, bay) =>
+                    {
+                        car.Diagnosis.Skip();
+                        car.AcceptAllWork();
+                    };
                 }
 
                 SessionReport report = GameplayHarness.Play(simulation, SessionSeconds, Skill,
@@ -423,6 +415,13 @@ namespace GarageTycoon.HeadlessTests
             if (Math.Abs(known.EssentialPrice - blindTotal) > 0.01d) result.DecisionsChanged++;
 
             known.Apply(car, QuoteOption.EssentialOnly);
+
+            for (int i = 0; i < car.Jobs.Count; i++)
+            {
+                if (car.Jobs[i].IsComplete) continue;
+                result.JobsSeen++;
+                if (!car.Jobs[i].IsAccepted) result.JobsDeclined++;
+            }
         }
 
         // ------------------------------------------------------------------

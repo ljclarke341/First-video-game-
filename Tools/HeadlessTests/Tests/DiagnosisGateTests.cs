@@ -207,22 +207,79 @@ namespace GarageTycoon.HeadlessTests.Tests
             // 9-10: skipping
             // ----------------------------------------------------------
 
-            suite.Add("Skipping reveals the whole car", () =>
+            suite.Add("Skipping tells the player nothing", () =>
             {
+                // The point of Option B. Skipping used to reveal the whole condition sheet, which
+                // meant the cheapest way to get the information was to refuse to pay for it.
                 ActiveCar car = Spawn(7800);
-                car.Diagnosis.RevealAll(true);
+                car.Diagnosis.Skip();
 
-                Check.AreEqual(VehicleSystemExtensions.Count, car.Diagnosis.RevealedCount,
-                    "skipping should leave nothing hidden");
+                Check.AreEqual(0, car.Diagnosis.RevealedCount,
+                    "skipping handed the player the condition sheet for free");
 
-                Check.AreEqual(CountOutstanding(car), Quote.For(car).LineCount,
-                    "and the quote should list the lot");
+                for (int i = 0; i < VehicleSystemExtensions.Count; i++)
+                {
+                    Check.IsFalse(car.Diagnosis.IsRevealed((VehicleSystem)i),
+                        ((VehicleSystem)i).DisplayName() + " was readable after skipping");
+                }
+
+                Check.IsTrue(car.Diagnosis.HasStarted, "skipping should count as a decision taken");
+                Check.IsTrue(car.Diagnosis.WasSkipped, "skipping should mark the car skipped");
+            });
+
+            suite.Add("Skipping bypasses the quote entirely", () =>
+            {
+                ActiveCar car = Spawn(7801);
+                car.Diagnosis.Skip();
+
+                Check.AreEqual(0, Quote.For(car).LineCount,
+                    "a skipped car produced a quote, so the readings leaked through it");
+            });
+
+            suite.Add("Skipping takes the whole car on", () =>
+            {
+                ActiveCar car = Spawn(7802);
+
+                // Quote small first, then change your mind and get stuck in: the work you just
+                // agreed to is the whole car, not the trimmed list you walked away from.
+                car.Diagnosis.RevealAll(false);
+                Quote.For(car).Apply(car, QuoteOption.EssentialOnly);
+
+                ActiveCar fresh = Spawn(7802);
+                fresh.Diagnosis.Skip();
+                fresh.AcceptAllWork();
+
+                Check.AreEqual(fresh.Jobs.Count, fresh.AcceptedJobCount,
+                    "skipping should accept every outstanding job");
+
+                for (int i = 0; i < fresh.Jobs.Count; i++)
+                {
+                    Check.IsTrue(fresh.Jobs[i].IsAccepted,
+                        fresh.Jobs[i].Type + " was left declined after getting stuck in");
+                }
+            });
+
+            suite.Add("Skipping routes straight into the repair", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(7803);
+                Advance(simulation, 20f);
+
+                ActiveCar car = simulation.Bays[0];
+                Check.IsTrue(car != null, "expected a car in the bay");
+
+                car.Diagnosis.Skip();
+                car.AcceptAllWork();
+
+                Check.IsTrue(simulation.SelectBay(0), "the player could not start work after skipping");
+                Check.IsTrue(simulation.PlayerSession != null, "no work session started");
+                Check.AreEqual(0, car.Diagnosis.RevealedCount,
+                    "starting work after a skip revealed the car anyway");
             });
 
             suite.Add("Skipping earns no diagnosis bonus", () =>
             {
                 ActiveCar skipped = Spawn(7900);
-                skipped.Diagnosis.RevealAll(true);
+                skipped.Diagnosis.Skip();
 
                 Check.IsTrue(Math.Abs(skipped.Diagnosis.PayoutBonus(skipped.Condition) - 1d) < 0.0001d,
                     "a skipped car paid a diagnosis bonus");
@@ -267,6 +324,56 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 Check.IsTrue(Math.Abs(car.Diagnosis.PayoutBonus(car.Condition) - 1d) < 0.0001d,
                     "nobody should be retroactively paid a bonus they never earned");
+            });
+
+            suite.Add("A skipped car survives a save still unknown", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(8050);
+                Advance(simulation, 20f);
+
+                ActiveCar before = simulation.Bays[0];
+                Check.IsTrue(before != null, "no car to skip");
+
+                before.Diagnosis.Skip();
+                before.AcceptAllWork();
+
+                string json = GameStateSerializer.Save(simulation, 1000d);
+                GarageSimulation loaded = GameStateSerializer.Load(json, 1);
+                Check.IsTrue(loaded != null, "the save did not load");
+
+                ActiveCar after = loaded.Bays[0];
+                Check.IsTrue(after != null, "the car did not come back");
+
+                Check.AreEqual(0, after.Diagnosis.RevealedCount,
+                    "a skipped car came back from the save fully revealed");
+                Check.IsTrue(after.Diagnosis.WasSkipped, "it came back without its skipped flag");
+                Check.IsTrue(Math.Abs(after.Diagnosis.PayoutBonus(after.Condition) - 1d) < 0.0001d,
+                    "and it was paid a bonus it never earned");
+                Check.AreEqual(0, Quote.For(after).LineCount,
+                    "and the quote leaked its readings after the round trip");
+            });
+
+            suite.Add("Offline catch-up never reveals a skipped car", () =>
+            {
+                GarageSimulation simulation = new GarageSimulation(8060);
+                Advance(simulation, 20f);
+
+                ActiveCar car = simulation.Bays[0];
+                Check.IsTrue(car != null, "no car to skip");
+
+                car.Diagnosis.Skip();
+                car.AcceptAllWork();
+
+                simulation.ApplyOfflineProgress(3600d);
+
+                // If it is still here, it must still be unknown. If it finished while the game was
+                // closed, that is fine - but nothing may have filled its sheet in on the way.
+                ActiveCar after = simulation.Bays[0];
+                if (after != null && after.InstanceId == car.InstanceId)
+                {
+                    Check.AreEqual(0, after.Diagnosis.RevealedCount,
+                        "the catch-up inspected a car the player had chosen not to look at");
+                }
             });
 
             suite.Add("A round trip keeps a partial inspection partial", () =>

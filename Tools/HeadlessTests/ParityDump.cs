@@ -476,6 +476,47 @@ namespace GarageTycoon.HeadlessTests
 
             json.Append("\n],\n");
 
+            // --- "just get stuck in": what skipping does, and does not do ---
+            //
+            // Three things have to agree, or one build is giving information away that the other
+            // charges for: the reveal mask stays empty, the quote stays empty, and the bonus stays
+            // at 1. The accepted-job count is in here too because skipping commits to the car.
+            json.Append("\"skipRule\":[\n");
+            first = true;
+
+            foreach (int seed in new[] { 7800, 7801, 7802, 8050 })
+            {
+                GarageSimulation skipSim = new GarageSimulation(seed);
+                ActiveCar skipCar = skipSim.SpawnCar();
+
+                skipCar.Diagnosis.Skip();
+                skipCar.AcceptAllWork();
+
+                Quote afterSkip = Quote.For(skipCar);
+
+                if (!first) json.Append(",\n");
+                first = false;
+
+                json.Append("  {\"seed\":").Append(seed)
+                    .Append(",\"jobs\":[");
+
+                for (int i = 0; i < skipCar.Jobs.Count; i++)
+                {
+                    if (i > 0) json.Append(',');
+                    json.Append((int)skipCar.Jobs[i].Type);
+                }
+
+                json.Append("],\"revealed\":").Append(skipCar.Diagnosis.RevealedCount)
+                    .Append(",\"started\":").Append(skipCar.Diagnosis.HasStarted ? 1 : 0)
+                    .Append(",\"skipped\":").Append(skipCar.Diagnosis.WasSkipped ? 1 : 0)
+                    .Append(",\"quoteLines\":").Append(afterSkip.LineCount)
+                    .Append(",\"accepted\":").Append(skipCar.AcceptedJobCount)
+                    .Append(",\"bonus\":").Append(D(skipCar.Diagnosis.PayoutBonus(skipCar.Condition)))
+                    .Append('}');
+            }
+
+            json.Append("\n],\n");
+
             // The weighted quality payout. A special job stretches the existing curve rather than
             // getting its own, so this proves the weighting itself agrees - weight 1 has to come
             // out byte for byte identical to the plain multiplier it replaced.

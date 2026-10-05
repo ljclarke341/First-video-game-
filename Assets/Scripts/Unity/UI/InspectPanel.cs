@@ -55,6 +55,16 @@ namespace GarageTycoon.Unity.UI
         /// <summary>Raised when the player is done looking and wants to write the quote.</summary>
         public event Action<ActiveCar> QuoteRequested;
 
+        /// <summary>
+        /// Raised by "just get stuck in": take the whole car on, now, without looking at it.
+        ///
+        /// Deliberately NOT the quote event. Skipping used to reveal the entire condition sheet
+        /// and then open the quote, which handed the player every reading for free and made
+        /// ignoring diagnosis the strongest play in the game. Skipping now buys speed and nothing
+        /// else: straight to the spanner, no readings, no bill, no bonus.
+        /// </summary>
+        public event Action<ActiveCar> CommitRequested;
+
         public void Build(RectTransform parent, GarageSimulation simulation)
         {
             _simulation = simulation;
@@ -283,9 +293,12 @@ namespace GarageTycoon.Unity.UI
         {
             if (_car == null) return;
 
-            // Reveals everything at once, free, and earns no diagnosis bonus.
-            _car.Diagnosis.RevealAll(true);
-            RaiseQuote();
+            // Commits to the lot without looking: no readings, no quote, no bonus.
+            _car.Diagnosis.Skip();
+            _car.AcceptAllWork();
+
+            Action<ActiveCar> handler = CommitRequested;
+            if (handler != null) handler(_car);
         }
 
         private void HandleQuote()

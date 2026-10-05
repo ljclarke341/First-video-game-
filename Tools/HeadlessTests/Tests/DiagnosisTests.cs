@@ -111,9 +111,13 @@ namespace GarageTycoon.HeadlessTests.Tests
                     "a broad check should not also be the most thorough");
             });
 
-            suite.Add("Working on a car reveals it, for free", () =>
+            suite.Add("Working on a car nobody inspected is always allowed", () =>
             {
                 // THE SAFETY VALVE. If this ever fails, diagnosis has become a gate.
+                //
+                // It used to reveal the whole car as well, which is what made ignoring diagnosis
+                // strictly better than using it. Now it commits to the work and tells you nothing:
+                // a job does not have to be revealed to be worked on.
                 GarageSimulation simulation = new GarageSimulation(300);
                 Advance(simulation, 20f);
 
@@ -123,10 +127,12 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 Check.IsTrue(simulation.SelectBay(0), "the player could not pick up an uninspected car");
 
-                Check.AreEqual(car.Jobs.Count, car.RevealedJobCount,
-                    "starting work should reveal everything");
+                Check.AreEqual(0, car.RevealedJobCount,
+                    "picking up a spanner handed the player the condition sheet for free");
                 Check.IsTrue(car.Diagnosis.WasSkipped,
                     "a car worked without inspection should earn no diagnosis bonus");
+                Check.IsTrue(simulation.PlayerSession != null,
+                    "the player should be working on it");
             });
 
             suite.Add("Skipping the inspection pays no bonus", () =>

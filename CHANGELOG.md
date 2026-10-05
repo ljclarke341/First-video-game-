@@ -6,6 +6,47 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2d — "Just get stuck in" means getting stuck in (Option B)
+
+The hole in the previous entry, closed. Skipping the inspection used to call `RevealAll(true)` and
+then open the quote: it handed over the complete condition sheet for free and let the player decline
+the optional work off the back of it, which measured as the best strategy in the game by 39%.
+
+Skipping now buys **speed and nothing else**. `CarDiagnosis.Skip()` marks the car committed and
+reveals nothing; the quote screen is never shown, because choosing Everything vs Essentials needs
+readings and the point of skipping is that there are none.
+
+The safety valve changed with it. Picking up a spanner on a car nobody inspected still commits to
+the work and still pays no bonus, but it no longer reveals the car. Nothing is stranded by that: a
+job does not have to be revealed to be worked on.
+
+### The dominant strategy is gone
+
+| strategy | income/min | vs never | cars done | lost | checks/car | diag bonus | avg payout | work declined |
+|---|---|---|---|---|---|---|---|---|
+| 1 never inspect | $915 | — | 36.7 | 12.8% | 0.00 | 1.000x | $360 | 0.0% |
+| 2 targeted (complaint) | $860 | -6.8% | **45.4** | **4.4%** | 2.06 | 1.076x | $278 | 35.8% |
+| 3 one check, then quote | $868 | -5.6% | 33.7 | 15.3% | 1.00 | 1.040x | $370 | 3.9% |
+| 4 full inspection | $539 | -41.6% | 30.7 | 14.2% | 7.00 | 1.113x | $253 | 51.7% |
+| 5 skip / commit | $915 | 0.0% | 36.7 | 12.8% | 0.00 | 1.000x | $360 | 0.0% |
+
+Skipping was $1,275/min and 81.4 cars a session. It is now **identical to never inspecting**, which
+is correct - they are the same decision, one taken deliberately and one by default.
+
+Nothing dominates any more. The spread between not looking and inspecting sensibly is 5-7%, where it
+was 39%. Inspecting still costs slightly more than it returns; see the open question.
+
+### Verified
+
+- **295 tests pass** (5 new, covering all eleven cases listed).
+- **509 cross-build parity cases, all identical** (up from 505), including a new `skipRule` section
+  that pins the reveal count, the quote line count, the accepted jobs and the bonus after a skip.
+- Web skip verified by pressing the real button: 0 systems revealed, 0 quote lines, bonus 1.000,
+  3 of 3 jobs accepted, routed straight into the mini-game, no percentages anywhere on screen.
+- Compile check clean, 20-minute soak clean, saves round-trip, help text updated.
+
+---
+
 ## Phase B.2c — The shared float/double audit
 
 Cleanup only. **No value changed, and nothing about the game moved**: the 505 parity cases are
@@ -1325,7 +1366,15 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
-21. **Skipping the inspection is now the best strategy in the game, by 39%.** The gate works -
+22. **Inspecting is now competitive but still slightly behind.** With the skip hole closed, the
+   spread is 5-7% rather than 39%, and targeted inspection finishes the most cars of any strategy
+   (45.4 a session against 36.7) at a third of the loss rate. But not looking still earns the most
+   per minute, because the inspection bonus caps at 1.12x and the time costs more than that. If you
+   want inspecting to be the *best* play rather than a reasonable one, the bonus is the lever - you
+   asked me not to touch it yet, so I have not.
+
+21. ~~**Skipping the inspection is now the best strategy in the game, by 39%.**~~ **Fixed** in Phase
+   B.2d with Option B. Original note: The gate works -
    inspecting finally tells you something - but "Just get stuck in" still reveals every reading for
    free, so the cheapest way to get the information is to not pay for it. You specified that
    behaviour, so I built it and measured it rather than changing it. Three ways out, in the order I

@@ -138,6 +138,27 @@ namespace GarageTycoon.Core.Diagnosis
         }
 
         /// <summary>
+        /// "Just get stuck in": the garage commits to the work without looking at the car.
+        ///
+        /// This reveals NOTHING. That is the whole point of it, and the difference between this
+        /// and RevealAll(true), which is what it used to call. Revealing everything for free made
+        /// skipping the best strategy in the game by a distance: you got the complete quote, could
+        /// decline the optional work off the back of it, and paid nothing for the privilege but a
+        /// bonus that caps at 1.12x. Measured, it beat every inspection strategy by 39%.
+        ///
+        /// So now skipping buys speed and nothing else. The work gets done, the readings stay
+        /// unknown, and the player never sees a percentage they did not earn.
+        ///
+        /// Nothing is stranded by it: a job does not need to be revealed to be worked on. Being
+        /// unrevealed only means the bay card says "not looked at" and the quote cannot list it.
+        /// </summary>
+        public void Skip()
+        {
+            HasStarted = true;
+            WasSkipped = true;
+        }
+
+        /// <summary>
         /// What a finished diagnosis is worth, as a multiple on the car's payout.
         ///
         /// Deliberately small. Diagnosis should be worth doing, not compulsory-by-economics - a

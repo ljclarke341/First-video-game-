@@ -104,6 +104,7 @@ namespace GarageTycoon.Unity.Minigames
 
             _inspectPanel.Build(_viewHost, _simulation);
             _inspectPanel.QuoteRequested += OpenQuote;
+            _inspectPanel.CommitRequested += CommitToRepair;
 
             _quotePanel.Build(_viewHost, _simulation);
             _quotePanel.Answered += HandleQuoteAnswered;
@@ -144,6 +145,26 @@ namespace GarageTycoon.Unity.Minigames
         /// <summary>True while the bench is showing the ramp or the quote rather than a repair.</summary>
         public bool IsDeciding { get { return _inspecting != null || _quotingCar != null; } }
 
+        /// <summary>
+        /// "Just get stuck in": skip the ramp and the quote, and start turning spanners.
+        ///
+        /// The quote screen is never shown, so the player is not asked to choose between
+        /// Everything and Essentials after deciding not to look - that choice needs readings,
+        /// and the whole point of skipping is that there are none.
+        /// </summary>
+        private void CommitToRepair(ActiveCar car)
+        {
+            _inspecting = null;
+            _quotingCar = null;
+            _quote = null;
+            _simulation.CancelDiagnosis();
+
+            Action<ActiveCar> handler = RepairCommitted;
+            if (handler != null) handler(car);
+
+            Refresh();
+        }
+
         private void OpenQuote(ActiveCar car)
         {
             _inspecting = null;
@@ -153,6 +174,9 @@ namespace GarageTycoon.Unity.Minigames
             _quote = Quote.For(car);
             Refresh();
         }
+
+        /// <summary>Raised when the player commits to a car without inspecting it.</summary>
+        public event Action<ActiveCar> RepairCommitted;
 
         private void HandleQuoteAnswered(ActiveCar car, Quote quote, QuoteOption? option)
         {

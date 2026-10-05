@@ -774,14 +774,17 @@ namespace GarageTycoon.Core.Simulation
 
             if (PlayerSession != null && PlayerSession.Car == car) return true;
 
-            // THE SAFETY VALVE. Starting work on a car nobody inspected properly reveals the lot,
-            // for free, with no diagnosis bonus. This is what keeps diagnosis from ever being a
-            // gate: there is no sequence of inputs that leaves a car with work the player cannot
-            // reach, and a player who ignores the whole system has the game they had before.
-            if (!car.Diagnosis.FoundEverything(car.Condition))
-            {
-                car.Diagnosis.RevealAll(true);
-            }
+            // THE SAFETY VALVE. Picking up a spanner on a car nobody inspected commits to the
+            // work, with no diagnosis bonus. This is what keeps diagnosis from ever being a gate:
+            // there is no sequence of inputs that leaves a car with work the player cannot reach,
+            // and a player who ignores the whole system has the game they had before.
+            //
+            // It marks the car skipped WITHOUT revealing it. It used to reveal everything, which
+            // handed the player the full condition sheet for free the instant they picked up a
+            // spanner - and that made ignoring diagnosis strictly better than using it. A job does
+            // not need to be revealed to be worked on, so nothing here is stranded by staying
+            // unknown.
+            if (!car.Diagnosis.HasStarted) car.Diagnosis.Skip();
 
             int jobIndex = car.FirstIncompleteJobIndex();
             if (jobIndex < 0) return false;

@@ -327,6 +327,21 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>Records the customer's answer to the quote.</summary>
+/// <summary>
+        /// "Just get stuck in": take on every outstanding job, whether or not it has been found.
+        ///
+        /// Skipping commits to the WHOLE car. A player who quoted small, went back to the ramp and
+        /// then decided to stop messing about should get the work they just agreed to, not the
+        /// trimmed-down list they had walked away from.
+        /// </summary>
+        public void AcceptAllWork()
+        {
+            for (int i = 0; i < _jobs.Count; i++)
+            {
+                if (!_jobs[i].IsComplete) _jobs[i].SetAccepted(true);
+            }
+        }
+
         public void SetQuoted(QuoteOption option)
         {
             Quoted = true;

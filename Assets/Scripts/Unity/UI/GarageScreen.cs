@@ -296,6 +296,7 @@ namespace GarageTycoon.Unity.UI
             _minigamePanel = new MinigamePanel();
             _minigamePanel.Build(host, _simulation);
             _minigamePanel.QuoteAccepted += HandleQuoteAccepted;
+            _minigamePanel.RepairCommitted += HandleRepairCommitted;
         }
 
         private void BuildBottomBar()
@@ -353,6 +354,13 @@ namespace GarageTycoon.Unity.UI
             }
 
             _simulation.SelectBay(bayIndex);
+        }
+
+        /// <summary>Starts the work when the player skipped the ramp entirely.</summary>
+        private void HandleRepairCommitted(ActiveCar car)
+        {
+            if (car == null || car.AllJobsComplete) return;
+            _simulation.SelectBay(car.BayIndex);
         }
 
         /// <summary>Starts the work once a quote has been answered.</summary>
