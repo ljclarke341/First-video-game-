@@ -6,6 +6,36 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1b — Parts, playable
+
+The web build now has everything B.1 put into Core, plus the screens to use it.
+
+### What you can do
+
+**A Parts screen** on the bottom bar. Pick what the garage fits — Budget, Standard or Performance —
+and see the shelf: eight kinds, six slots each, green for what is in. Stock turns up on its own and
+costs nothing; pay the price shown to have a shelf filled now instead of waiting.
+
+**The quote tells you the parts bill** before you commit. Both options are priced
+(*"Everything: Standard parts · $106"*), and anything the shelf cannot cover is called out in red —
+*"Brake Pads off the van"* — so running short is visible at the moment the decision is made, not a
+surprise afterwards.
+
+**A toast when a part comes off the van**, naming it and what the surcharge cost.
+
+### Verified
+
+- **264 cross-build cases identical**, up from 249 — the 15 new ones are part values, labour after
+  the part, and surcharges across five job sizes and all three grades.
+- **238 C# tests passing**, economy still $17,420 against Phase A's $17,422.
+- **Standard neutrality checked in the browser directly**: at $37, $100, $1,000 and $7,391 gross,
+  the labour left after a Standard part differs from the pre-parts figure by exactly 0.
+- **20-minute soak**: 49 cars, 2 lost, no car held longer than 46 seconds, no errors.
+- **Nav fits at 360, 412 and 430px** with six buttons, no clipped labels, no page scroll.
+- Old saves load with a full shelf; jobs from before parts keep the pre-parts price.
+
+---
+
 ## Phase B.1 — Parts and inventory (Core)
 
 A part for every repair, three grades to choose between, a shelf that runs down and refills, and a

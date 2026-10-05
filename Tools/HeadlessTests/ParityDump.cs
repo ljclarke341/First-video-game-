@@ -161,6 +161,32 @@ namespace GarageTycoon.HeadlessTests
                     }
                 }
             }
+            json.Append("\n],\n");
+
+            // --- parts: the value of a part on a job, and the labour left after it ---
+            json.Append("\"parts\":[\n");
+            first = true;
+            foreach (double gross in new[] { 37d, 100d, 413d, 1000d, 7391d })
+            {
+                foreach (Core.Parts.PartGrade grade in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+                {
+                    double value = Core.Parts.PartsInventory.ValueOnJob(gross, grade);
+
+                    RepairJob job = new RepairJob(JobType.Brakes, MinigameType.TimingBar, 1f, gross, 1f);
+                    job.RecordPart(grade, 0d, value);
+
+                    if (!first) json.Append(",\n");
+                    first = false;
+
+                    json.Append("  {\"gross\":").Append(F((float)gross))
+                        .Append(",\"g\":").Append((int)grade)
+                        .Append(",\"value\":").Append(F((float)Math.Round(value, 4)))
+                        .Append(",\"labour\":").Append(F((float)Math.Round(job.LabourPayout, 4)))
+                        .Append(",\"surcharge\":").Append(F((float)Core.Util.MathUtil.RoundCash(
+                            value * (Core.Balance.GameBalance.PartsCounterMarkup - 1d))))
+                        .Append('}');
+                }
+            }
             json.Append("\n]\n}");
 
             Console.WriteLine(json.ToString());
