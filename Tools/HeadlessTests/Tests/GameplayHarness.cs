@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Minigames;
+using GarageTycoon.Core.Parts;
 using GarageTycoon.Core.Simulation;
 using GarageTycoon.Core.Util;
 
@@ -10,7 +12,21 @@ namespace GarageTycoon.HeadlessTests.Tests
     /// <summary>What happened during a simulated play session.</summary>
     public struct SessionReport
     {
+        /// <summary>Money in, before anything goes out again.</summary>
         public double CashEarned;
+
+        /// <summary>
+        /// CASH that left the wallet on parts: counter surcharges and expedite fees.
+        ///
+        /// Not the parts' value - that never passes through the wallet at all, because the job
+        /// simply keeps the labour. Subtracting it here as well would count the same money twice.
+        ///
+        /// Before parts existed, gross income and money kept were the same number, so the probe
+        /// only ever reported gross. They are not the same now: payouts carry the part, so a
+        /// gross figure would read 28% higher without the garage being a penny better off.
+        /// </summary>
+        public double PartsSpend;
+
         public double FinalCash;
         public int CarsCompleted;
         public int CarsLost;
@@ -22,6 +38,15 @@ namespace GarageTycoon.HeadlessTests.Tests
         public double CashPerMinute
         {
             get { return SecondsPlayed <= 0f ? 0d : CashEarned / (SecondsPlayed / 60d); }
+        }
+
+        /// <summary>
+        /// What the garage actually kept, per minute. THIS is the figure to compare against the
+        /// numbers from before parts existed - it is the same quantity those measured.
+        /// </summary>
+        public double NetPerMinute
+        {
+            get { return SecondsPlayed <= 0f ? 0d : (CashEarned - PartsSpend) / (SecondsPlayed / 60d); }
         }
     }
 
@@ -44,6 +69,7 @@ namespace GarageTycoon.HeadlessTests.Tests
         {
             double startCash = simulation.Wallet.Cash;
             double startEarnings = simulation.Wallet.LifetimeEarnings;
+            double startParts = simulation.Inventory.TotalSpent;
             int startCompleted = simulation.Stats.CarsCompleted;
             int startLost = simulation.Stats.CarsLost;
             int startRounds = simulation.Stats.RoundsPlayed;
@@ -93,6 +119,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             SessionReport report = new SessionReport();
             report.CashEarned = simulation.Wallet.LifetimeEarnings - startEarnings;
+            report.PartsSpend = simulation.Inventory.TotalSpent - startParts;
             report.FinalCash = simulation.Wallet.Cash;
             report.CarsCompleted = simulation.Stats.CarsCompleted - startCompleted;
             report.CarsLost = simulation.Stats.CarsLost - startLost;

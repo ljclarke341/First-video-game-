@@ -4,6 +4,7 @@ using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Minigames;
+using GarageTycoon.Core.Parts;
 using GarageTycoon.Core.Simulation;
 using GarageTycoon.Core.Vehicle;
 
@@ -292,10 +293,91 @@ namespace GarageTycoon.HeadlessTests.Tests
                     "paint is never essential in either build");
             });
 
+            // --------------------------------------------------------------
+            // Parts (Phase B)
+            // --------------------------------------------------------------
+
+            suite.Add("The parts share and its compensation match the web build", () =>
+            {
+                // web: B.partFraction and B.partsCompensation
+                Check.IsTrue(Math.Abs(GameBalance.PartCostFraction - 0.22d) < 0.0001d,
+                    "PartCostFraction is " + GameBalance.PartCostFraction + "; the web's is 0.22");
+
+                // The compensation is DERIVED, never written down twice. If a build ever hard-codes
+                // 1.282 instead of computing it, the two drift the moment the fraction is tuned.
+                double derived = 1d / (1d - GameBalance.PartCostFraction);
+                Check.IsTrue(Math.Abs(GameBalance.PartsPayoutCompensation - derived) < 1e-9d,
+                    "the compensation must be derived from the fraction, not written down separately");
+            });
+
+            suite.Add("Grade multipliers match the web build", () =>
+            {
+                // web: PART_GRADES[].cost and .quality
+                CheckGrade(PartGrade.Budget, 0.55d, -0.1f);
+                CheckGrade(PartGrade.Standard, 1d, 0f);
+                CheckGrade(PartGrade.Performance, 1.9d, 0.08f);
+            });
+
+            suite.Add("The job to part map matches the web build", () =>
+            {
+                // web: JOB_PART
+                CheckPart(JobType.Brakes, PartKind.BrakePads);
+                CheckPart(JobType.Tires, PartKind.Tyres);
+                CheckPart(JobType.Engine, PartKind.EngineParts);
+                CheckPart(JobType.Electrics, PartKind.Electrical);
+                CheckPart(JobType.Suspension, PartKind.SuspensionParts);
+                CheckPart(JobType.Exhaust, PartKind.ExhaustParts);
+                CheckPart(JobType.Panels, PartKind.BodyPanel);
+                CheckPart(JobType.Paint, PartKind.Paint);
+                CheckPart(JobType.Diagnostics, PartKind.None);
+            });
+
+            suite.Add("Counter markup, shelf cap and delivery rate match the web build", () =>
+            {
+                // web: B.partMarkup, B.shelfCap, B.partDelivery
+                Check.IsTrue(Math.Abs(GameBalance.PartsCounterMarkup - 1.4d) < 0.0001d,
+                    "markup is " + GameBalance.PartsCounterMarkup + "; the web's B.partMarkup is 1.4");
+                Check.AreEqual(6, GameBalance.PartShelfCap, "shelf cap differs from the web's B.shelfCap");
+                Check.IsTrue(Math.Abs(GameBalance.PartDeliverySeconds - 14f) < 0.0001f,
+                    "delivery rate differs from the web's B.partDelivery");
+                Check.AreEqual(3, GameBalance.StartingPartStock, "opening stock differs from the web");
+            });
+
+            suite.Add("Standard parts are economically invisible, in both builds", () =>
+            {
+                // The single most important property of the whole parts system: fitting Standard
+                // leaves the labour exactly as it was before parts existed. Four separate leaks
+                // broke this while looking correct, so it is asserted directly rather than trusted.
+                foreach (double gross in new[] { 37d, 100d, 1000d, 7391d })
+                {
+                    RepairJob job = new RepairJob(JobType.Brakes, MinigameType.TimingBar, 1f, gross, 1f);
+                    job.RecordPart(PartGrade.Standard, 0d,
+                        PartsInventory.ValueOnJob(gross, PartGrade.Standard));
+
+                    double expected = gross / GameBalance.PartsPayoutCompensation;
+                    Check.IsTrue(Math.Abs(job.LabourPayout - expected) < 0.01d,
+                        "a $" + gross + " job kept " + job.LabourPayout + " instead of " + expected);
+                }
+            });
+
             return suite;
         }
 
         // ------------------------------------------------------------------
+
+        private static void CheckGrade(PartGrade grade, double cost, float quality)
+        {
+            Check.IsTrue(Math.Abs(grade.CostMultiplier() - cost) < 0.0001d,
+                grade + " costs " + grade.CostMultiplier() + "x; the web's PART_GRADES has " + cost);
+            Check.IsTrue(Math.Abs(grade.QualityModifier() - quality) < 0.0001f,
+                grade + " shifts quality by " + grade.QualityModifier() + "; the web has " + quality);
+        }
+
+        private static void CheckPart(JobType job, PartKind expected)
+        {
+            Check.AreEqual((int)expected, (int)PartKinds.For(job),
+                job + " fits a different part than the web's JOB_PART");
+        }
 
         private static void CheckMood(CustomerMood mood, float expected, string webField)
         {

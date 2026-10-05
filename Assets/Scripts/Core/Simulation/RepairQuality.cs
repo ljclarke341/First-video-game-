@@ -1,6 +1,7 @@
 using System;
 using GarageTycoon.Core.Balance;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Parts;
 using GarageTycoon.Core.Util;
 
 namespace GarageTycoon.Core.Simulation
@@ -29,6 +30,10 @@ namespace GarageTycoon.Core.Simulation
         public int RoundsPlayed;
         public int PerfectRounds;
         public int DamagedRounds;
+
+        /// <summary>What was fitted, so the finished-job readout can say so.</summary>
+        public Parts.PartGrade PartGrade;
+        public bool PartFitted;
 
         /// <summary>
         /// How happy this leaves the customer, 0..1 - the score judged against what THEY expected,
@@ -95,7 +100,10 @@ namespace GarageTycoon.Core.Simulation
             {
                 // Nothing was played - a mechanic's instant work, or a restored save. Treat it as
                 // competent rather than as a zero, which would read as a punishment for automating.
-                report.Score = 0.6f;
+                report.Score = MathUtil.Clamp01(
+                    0.6f + (job.PartFitted ? job.FittedGrade.QualityModifier() : 0f));
+                report.PartGrade = job.FittedGrade;
+                report.PartFitted = job.PartFitted;
                 return Finish(report, mood);
             }
 
@@ -106,7 +114,14 @@ namespace GarageTycoon.Core.Simulation
             float score = report.Accuracy * AccuracyWeight + report.Efficiency * EfficiencyWeight;
             score -= report.DamageRate * DamagePenalty;
 
+            // What went on the car counts, but only a little. A good part must not rescue sloppy
+            // work and a cheap one must not ruin careful work - the mini-game is still the repair.
+            if (job.PartFitted) score += job.FittedGrade.QualityModifier();
+
             report.Score = MathUtil.Clamp01(score);
+            report.PartGrade = job.FittedGrade;
+            report.PartFitted = job.PartFitted;
+
             return Finish(report, mood);
         }
 

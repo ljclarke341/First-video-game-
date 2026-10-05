@@ -66,9 +66,15 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 // A VIP pays over the odds for the same work, so the target is the blueprint value
                 // scaled by who turned up. Rounding each job to whole dollars drifts a little too.
+                //
+                // Payout is now the GROSS price and includes the part, so the blueprint value is
+                // compared against the LABOUR - which is what the blueprint has always described.
+                // See GameBalance.PartsPayoutCompensation.
+                double labour = sum / Core.Balance.GameBalance.PartsPayoutCompensation;
                 double expected = car.Definition.BasePayout * car.Mood.PayoutMultiplier();
-                Check.InRange(sum, expected - car.Jobs.Count, expected + car.Jobs.Count,
-                    "Job payouts should add up to roughly the car's base value for that customer");
+
+                Check.InRange(labour, expected - car.Jobs.Count, expected + car.Jobs.Count,
+                    "Job labour should add up to roughly the car's base value for that customer");
             }
         }
 

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using GarageTycoon.Core.Cars;
 using System;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Simulation;
@@ -16,6 +18,45 @@ namespace GarageTycoon.HeadlessTests
     /// </summary>
     public static class BalanceProbe
     {
+        /// <summary>
+        /// What a job of each part kind is actually worth, so the shelf price can be set against
+        /// real numbers rather than guessed. Printed by "probe parts".
+        /// </summary>
+        public static void MeasureParts()
+        {
+            Dictionary<Core.Parts.PartKind, double> total = new Dictionary<Core.Parts.PartKind, double>();
+            Dictionary<Core.Parts.PartKind, int> count = new Dictionary<Core.Parts.PartKind, int>();
+
+            for (int seed = 0; seed < 400; seed++)
+            {
+                GarageSimulation simulation = new GarageSimulation(9000 + seed);
+                for (int i = 0; i < 12; i++)
+                {
+                    ActiveCar car = simulation.SpawnCar();
+                    for (int j = 0; j < car.Jobs.Count; j++)
+                    {
+                        Core.Parts.PartKind kind = Core.Parts.PartKinds.For(car.Jobs[j].Type);
+                        if (kind == Core.Parts.PartKind.None) continue;
+
+                        if (!total.ContainsKey(kind)) { total[kind] = 0d; count[kind] = 0; }
+                        total[kind] += car.Jobs[j].Payout;
+                        count[kind]++;
+                    }
+                }
+            }
+
+            Console.WriteLine("kind                 avgGross   22% of it   refPrice      ratio");
+            foreach (KeyValuePair<Core.Parts.PartKind, double> pair in total)
+            {
+                double average = pair.Value / count[pair.Key];
+                double target = average * Core.Balance.GameBalance.PartCostFraction;
+                double weight = Core.Parts.PartsInventory.ReferencePrice(pair.Key);
+
+                Console.WriteLine("{0,-18} {1,9:0} {2,11:0.0} {3,8:0} {4,11:0.00}",
+                    pair.Key, average, target, weight, target / System.Math.Max(1d, weight));
+            }
+        }
+
         public static void Run()
         {
             Console.WriteLine("=====================================================");
@@ -41,12 +82,12 @@ namespace GarageTycoon.HeadlessTests
             {
                 GarageSimulation simulation = new GarageSimulation(9100 + i);
                 SessionReport report = GameplayHarness.Play(simulation, 180f, 0.8f);
-                totalPerMinute += report.CashPerMinute;
+                totalPerMinute += report.NetPerMinute;
                 totalCars += report.CarsCompleted;
                 totalLost += report.CarsLost;
             }
 
-            Console.WriteLine(string.Format("   income      ${0:0} per minute", totalPerMinute / Runs));
+            Console.WriteLine(string.Format("   income      ${0:0} per minute (after parts)", totalPerMinute / Runs));
             Console.WriteLine(string.Format("   cars        {0} served, {1} lost across {2} runs", totalCars, totalLost, Runs));
 
             UpgradeDefinition cheapest = null;
@@ -68,6 +109,10 @@ namespace GarageTycoon.HeadlessTests
             SessionReport report = GameplayHarness.Play(simulation, 1800f, 0.8f, true);
 
             Console.WriteLine(string.Format("   earned      ${0:0}", report.CashEarned));
+            Console.WriteLine(string.Format("   parts       ${0:0} of parts fitted", report.PartsSpend));
+            Console.WriteLine(string.Format("   kept        ${0:0} after parts", report.CashEarned - report.PartsSpend));
+            Console.WriteLine(string.Format("   per car     ${0:0} kept per car served",
+                report.CarsCompleted <= 0 ? 0d : (report.CashEarned - report.PartsSpend) / report.CarsCompleted));
             Console.WriteLine(string.Format("   cars        {0} served, {1} lost ({2:0}% satisfaction)",
                 report.CarsCompleted, report.CarsLost, simulation.Stats.SatisfactionRate * 100d));
             Console.WriteLine(string.Format("   bays        {0}", simulation.BayCount));

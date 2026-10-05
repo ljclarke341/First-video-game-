@@ -159,7 +159,11 @@ namespace GarageTycoon.Core.Cars
 
             CustomerMood mood = RollMood();
 
-            double payoutPool = definition.BasePayout * parameters.PayoutMultiplier * mood.PayoutMultiplier();
+            // GROSS, i.e. including the part. The compensation is what lets parts cost real
+            // money without moving the economy: a Standard-parts garage pays it straight back out
+            // and nets exactly what it netted before parts existed.
+            double payoutPool = definition.BasePayout * parameters.PayoutMultiplier
+                                * mood.PayoutMultiplier() * Balance.GameBalance.PartsPayoutCompensation;
 
             List<RepairJob> finalJobs = new List<RepairJob>();
             for (int i = 0; i < jobs.Count; i++)

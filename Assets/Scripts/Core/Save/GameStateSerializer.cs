@@ -18,7 +18,7 @@ namespace GarageTycoon.Core.Save
     public static class GameStateSerializer
     {
         /// <summary>Bumped whenever the save shape changes, so old files can be migrated or discarded.</summary>
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         /// <summary>
         /// The oldest save this build can still read. Anything older is refused rather than loaded
@@ -71,6 +71,22 @@ namespace GarageTycoon.Core.Save
                 upgrades.Add(pair.Key, pair.Value);
             }
             root.Add("upgrades", upgrades);
+
+            // --- the parts shelf ---
+            JsonValue parts = JsonValue.Object();
+            parts.Add("policy", (int)simulation.Inventory.Policy);
+            parts.Add("spent", simulation.Inventory.TotalSpent);
+            parts.Add("consumed", simulation.Inventory.TotalConsumedValue);
+            parts.Add("delivery", simulation.Inventory.DeliveryTimer);
+
+            JsonValue stock = JsonValue.Object();
+            foreach (KeyValuePair<string, int> pair in simulation.Inventory.ToDictionary())
+            {
+                stock.Add(pair.Key, pair.Value);
+            }
+            parts.Add("stock", stock);
+
+            root.Add("parts", parts);
 
             // --- random state, so the sequence of cars continues rather than restarting ---
             root.Add("randomState", simulation.Random.State);
@@ -152,6 +168,10 @@ namespace GarageTycoon.Core.Save
                 jobJson.Add("perfect", job.PerfectRounds);
                 jobJson.Add("damaged", job.DamagedRounds);
                 jobJson.Add("accepted", job.IsAccepted);
+                jobJson.Add("partFitted", job.PartFitted);
+                jobJson.Add("partGrade", (int)job.FittedGrade);
+                jobJson.Add("partCost", job.PartsCost);
+                jobJson.Add("partValue", job.PartValue);
                 jobs.Append(jobJson);
             }
             json.Add("jobs", jobs);
@@ -223,6 +243,28 @@ namespace GarageTycoon.Core.Save
                 levels[pair.Key] = pair.Value.AsInt(0);
             }
             simulation.Upgrades.Restore(levels);
+
+            // --- the parts shelf ---
+            // A save from before parts existed has no entry. Leaving the opening stock in place is
+            // the right default: an empty shelf would charge the player the counter surcharge on
+            // every job of a garage they had already built.
+            JsonValue parts = root["parts"];
+            if (parts.Type == JsonType.Object)
+            {
+                List<KeyValuePair<string, int>> stock = new List<KeyValuePair<string, int>>();
+                foreach (KeyValuePair<string, JsonValue> pair in parts["stock"].Fields)
+                {
+                    stock.Add(new KeyValuePair<string, int>(pair.Key, pair.Value.AsInt(0)));
+                }
+
+                simulation.Inventory.Restore(
+                    stock,
+                    (Parts.PartGrade)parts["policy"].AsInt((int)Parts.PartGrade.Standard),
+                    parts["spent"].AsDouble(0d),
+                    parts["consumed"].AsDouble(0d));
+
+                simulation.Inventory.DeliveryTimer = parts["delivery"].AsFloat(0f);
+            }
 
             // Effects (and therefore the bay count) must be current before cars are put back in bays.
             simulation.RefreshEffects();
@@ -369,6 +411,12 @@ namespace GarageTycoon.Core.Save
                     // Defaults to accepted, so every job in a save written before quotes existed
                     // comes back as work the customer wants doing - exactly as it behaved then.
                     jobJson["accepted"].AsBool(true));
+
+                job.RestorePart(
+                    jobJson["partFitted"].AsBool(false),
+                    (Parts.PartGrade)jobJson["partGrade"].AsInt((int)Parts.PartGrade.Standard),
+                    jobJson["partCost"].AsDouble(0d),
+                    jobJson["partValue"].AsDouble(0d));
 
                 jobs.Add(job);
             }

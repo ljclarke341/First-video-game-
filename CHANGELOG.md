@@ -6,6 +6,81 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1 — Parts and inventory (Core)
+
+A part for every repair, three grades to choose between, a shelf that runs down and refills, and a
+surcharge when it is bare. **238 tests passing** (up from 214). **Economy neutral to $2 over half an
+hour.**
+
+### The decision
+
+One garage-wide setting: **Budget / Standard / Performance**.
+
+| | Costs | Leaves in the till | Finishes |
+|---|---|---|---|
+| Budget | 0.55x | **more** | -10% quality |
+| Standard | 1.0x | the baseline | neutral |
+| Performance | 1.9x | **less** | +8% quality |
+
+Standard is the baseline in the strictest sense: fitting Standard leaves a job's labour *exactly*
+what it was before parts existed. Budget genuinely saves money at the cost of the finish;
+Performance genuinely costs money to buy the finish back.
+
+Eight kinds of part, one per fitting repair. A diagnostic scan fits nothing and is charged nothing.
+
+### How the economy stayed still
+
+Parts have to cost money or they are not a decision - but the brief was not to move the economy.
+Both hold because **the gross price was raised by exactly the share the part costs**
+(`PartsPayoutCompensation = 1 / (1 - 0.22)`), so a Standard-parts garage hands the raise straight
+back and nets what it always did.
+
+Getting there took **four separate leaks**, every one of which looked correct:
+
+1. **The shop could be arbitraged.** Stock sold at a fixed price list while jobs were charged a
+   share of their own value - so parts bought on hatchback money could be fitted to supercars.
+   Worth **+23%** over half an hour. Fixed by removing the shop: stock arrives free on a standing
+   order, and each job pays for its own part. There is now nothing to arbitrage.
+2. **Bonuses multiplied the part.** The flawless bonus and the work streak were applied to the whole
+   gross, paying the player a streak bonus on the supplier's margin. Worth **+17%**. Bonuses now
+   apply to the labour only.
+3. **The part's share went through the wallet.** The customer's money for the part and the bill from
+   the supplier are the same money; simulating the round trip inflated lifetime earnings, which is
+   what **garage rank** is built on, so ranks arrived 28% early. Worth **+37%**. Only the surcharge
+   is cash now.
+4. **Diagnostics kept the raise.** A scan fits nothing, but it was still recorded as "part fitted"
+   with a zero value - so its labour came out as the whole inflated gross. Worth **+6%**.
+
+Each has a test named after it.
+
+### Verified
+
+| | Phase A | Phase B.1 |
+|---|---|---|
+| Opening income | $503/min | **$504/min** |
+| Half-hour earnings | $17,422 | **$17,420** |
+| Cars served | 43 | **43** |
+| Customers lost | 16 | **16** |
+| Bays reached | 2 | **2** |
+| Upgrades bought | 27 | **27** |
+| Kept per car | $405 | **$405** |
+
+A control run with `PartCostFraction = 0` reproduces Phase A exactly, which is what proves the
+harness and probe changes are themselves neutral.
+
+### Saves
+
+Format version 3. A save from before parts opens with a **full shelf** rather than a bare one -
+an empty shelf would charge the counter surcharge on every job of a garage the player had already
+built. Both version 1 and version 2 saves still load; a newer one is still refused.
+
+### Not done yet
+
+**No UI, in either build.** The rules, the shelf, the deliveries and the save are all in Core and
+tested; nothing draws them, and the grade policy cannot be changed from the game. That is next.
+
+---
+
 ## V2 Phase A, part 3 — Unity catches up, and the two builds are checked against each other
 
 No new systems. This brings Unity level with the web build and puts machinery in place so the two

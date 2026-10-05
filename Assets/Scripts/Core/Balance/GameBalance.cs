@@ -50,6 +50,63 @@ namespace GarageTycoon.Core.Balance
         /// </summary>
         public const int MaxJobsPerCar = 4;
 
+        // ---------------------------------------------------------------------
+        // Parts
+        // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Roughly what share of a job's price goes on the part, at Standard grade.
+        ///
+        /// This is the number the parts economy is built around, and it exists so that the price
+        /// list and the payout compensation below are derived from ONE figure rather than two that
+        /// could drift apart.
+        /// </summary>
+        public const double PartCostFraction = 0.22d;
+
+        /// <summary>
+        /// Job payouts are scaled by this so a garage fitting Standard parts earns exactly what it
+        /// earned before parts existed.
+        ///
+        /// Parts have to cost money or they are not a decision - but the brief was not to move the
+        /// economy. Both are satisfied by charging for parts AND raising the gross price by the
+        /// same share, so Standard nets zero. Budget then genuinely saves money at the cost of
+        /// quality, and Performance genuinely costs money to buy it back. The probe is the proof:
+        /// a Standard-parts run has to report the same income as Phase A did.
+        /// </summary>
+        public const double PartsPayoutCompensation = 1d / (1d - PartCostFraction);
+
+        /// <summary>
+        /// What a part costs when you have not got one and it has to be bought at the counter.
+        ///
+        /// This is the entire reason to keep stock. Without it an inventory is bookkeeping with no
+        /// decision attached, because buying on demand would always be as good as planning ahead.
+        /// </summary>
+        public const double PartsCounterMarkup = 1.4d;
+
+        /// <summary>
+        /// How much dearer parts get per garage rank.
+        ///
+        /// Without this the whole system quietly switches itself off: by the time a player is on
+        /// supercars, a flat parts bill would round to nothing and the choice would stop mattering.
+        /// </summary>
+        public const double PartPricePerRank = 0.9d;
+
+        /// <summary>What the garage opens with on the shelf, per kind, at Standard.</summary>
+        public const int StartingPartStock = 3;
+
+        /// <summary>How many of one kind the shelf holds.</summary>
+        public const int PartShelfCap = 6;
+
+        /// <summary>
+        /// How often a part turns up on the standing order.
+        ///
+        /// Deliveries are free. The cost of parts is charged to the job that fits them, which is
+        /// the only arrangement where the compensation above cancels exactly - a shop selling at a
+        /// fixed price while jobs pay a share of their own value is arbitrage, and measured, it was
+        /// worth 23%. What stock buys you here is avoiding the counter markup, nothing else.
+        /// </summary>
+        public const float PartDeliverySeconds = 14f;
+
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const float PerfectProgress = 0.45f;
 

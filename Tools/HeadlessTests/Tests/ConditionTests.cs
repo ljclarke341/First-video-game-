@@ -208,7 +208,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
                 // Crude but exactly what an old file looks like: no condition, no complaint.
                 string old = StripField(StripField(json, "condition"), "complaint");
-                old = old.Replace("\"version\":2", "\"version\":1");
+                old = old.Replace("\"version\":" + GameStateSerializer.CurrentVersion, "\"version\":1");
 
                 GarageSimulation loaded = GameStateSerializer.Load(old, 1);
                 Check.IsTrue(loaded != null, "a version 1 save was refused");
@@ -227,7 +227,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 GarageSimulation simulation = new GarageSimulation(1234);
                 string json = GameStateSerializer.Save(simulation, 1000d);
-                string future = json.Replace("\"version\":2", "\"version\":99");
+                string future = json.Replace("\"version\":" + GameStateSerializer.CurrentVersion, "\"version\":99");
 
                 Check.IsTrue(GameStateSerializer.Load(future, 1) == null,
                     "a save from the future was loaded anyway, which is how saves get mangled");

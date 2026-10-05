@@ -55,6 +55,44 @@ namespace GarageTycoon.Core.Cars
         /// <summary>True when this job still needs work AND was actually quoted for.</summary>
         public bool NeedsWork { get { return IsAccepted && !IsComplete; } }
 
+        /// <summary>What was actually fitted, recorded when the job finished.</summary>
+        public Parts.PartGrade FittedGrade { get; private set; }
+
+        /// <summary>True once a part has been taken off the shelf for this job.</summary>
+        public bool PartFitted { get; private set; }
+
+        /// <summary>Cash that left the wallet at the moment of fitting. Zero for a shelf part.</summary>
+        public double PartsCost { get; private set; }
+
+        /// <summary>
+        /// What the part is WORTH, whether or not cash moved just now.
+        ///
+        /// Not the same as PartsCost: a part off our own shelf costs nothing today because it was
+        /// paid for at the shop, and it is still worth its list price.
+        /// </summary>
+        public double PartValue { get; private set; }
+
+        /// <summary>
+        /// The labour on this job - the gross price with the part's share taken out.
+        ///
+        /// THIS is what the perfect-job bonus and the work streak multiply, and the distinction
+        /// matters more than it looks. Payout is gross and includes the part (see
+        /// GameBalance.PartsPayoutCompensation), so letting the bonuses multiply all of it would
+        /// pay the player a streak bonus on the supplier's margin. Measured, that leak alone put
+        /// the half-hour economy 17% above where it had been.
+        ///
+        /// A job that never went through the parts path falls back to the pre-parts figure, so an
+        /// old save's half-finished car is neither over-paid nor over-tipped.
+        /// </summary>
+        public double LabourPayout
+        {
+            get
+            {
+                if (PartFitted) return Payout - PartValue;
+                return Payout / Balance.GameBalance.PartsPayoutCompensation;
+            }
+        }
+
         /// <summary>True when every single round on this job was perfect (and at least one was played).</summary>
         public bool IsFlawless { get { return RoundsPlayed > 0 && PerfectRounds == RoundsPlayed; } }
 
@@ -67,6 +105,7 @@ namespace GarageTycoon.Core.Cars
             Difficulty = difficulty;
             Progress = 0f;
             IsAccepted = true;
+            FittedGrade = Parts.PartGrade.Standard;
         }
 
         /// <summary>
@@ -96,6 +135,24 @@ namespace GarageTycoon.Core.Cars
         {
             if (!accepted && IsComplete) return;
             IsAccepted = accepted;
+        }
+
+        /// <summary>Records the part that went on, what it cost today, and what it is worth.</summary>
+        public void RecordPart(Parts.PartGrade grade, double cost, double value)
+        {
+            FittedGrade = grade;
+            PartFitted = true;
+            PartsCost = cost < 0d ? 0d : cost;
+            PartValue = value < 0d ? 0d : value;
+        }
+
+        /// <summary>Used by the save system to restore what was fitted.</summary>
+        public void RestorePart(bool fitted, Parts.PartGrade grade, double cost, double value)
+        {
+            PartFitted = fitted;
+            FittedGrade = grade;
+            PartsCost = cost < 0d ? 0d : cost;
+            PartValue = value < 0d ? 0d : value;
         }
 
         /// <summary>Used by the save system to restore a part-finished job.</summary>

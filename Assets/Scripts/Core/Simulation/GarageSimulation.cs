@@ -31,6 +31,9 @@ namespace GarageTycoon.Core.Simulation
         public CarSpawner Spawner { get; private set; }
         public GameStats Stats { get; private set; }
 
+        /// <summary>What is on the shelf, and what the garage fits by default.</summary>
+        public Parts.PartsInventory Inventory { get; private set; }
+
         /// <summary>The work streak. Landing rounds back to back pays more.</summary>
         public ComboTracker Combo { get; private set; }
 
@@ -131,6 +134,7 @@ namespace GarageTycoon.Core.Simulation
             Spawner = new CarSpawner(Random);
             Events = new RandomEventSystem(Random);
             Stats = new GameStats();
+            Inventory = new Parts.PartsInventory();
             Combo = new ComboTracker();
 
             Events.EventStarted += HandleEventStarted;
@@ -226,6 +230,7 @@ namespace GarageTycoon.Core.Simulation
             }
 
             Combo.Tick(deltaTime);
+            Inventory.TickDeliveries(deltaTime);
 
             // Ranking up is permanent progression, so it is checked wherever earnings move.
             int rank = RankLevel;
@@ -515,7 +520,36 @@ namespace GarageTycoon.Core.Simulation
 
             if (job.IsComplete)
             {
-                double payout = job.Payout;
+                // The part goes on as the job finishes. Nothing here can refuse: the inventory
+                // always returns something, buying it in at a markup if the shelf is bare, so a
+                // repair can never be blocked by stock - only made more expensive.
+                Parts.PartFitting fitting = Inventory.Fit(job.Type, job.Payout, RankLevel);
+
+                // A job that fits nothing - a diagnostic scan - must NOT be recorded as having
+                // had a part. Recording a zero-value one marked it as "part fitted", so its
+                // labour came out as the whole gross price, which includes the parts raise. Those
+                // jobs were quietly paying 28% over the odds and it was worth 6% of the economy.
+                if (!fitting.NoPartNeeded)
+                {
+                    job.RecordPart(fitting.Grade, fitting.Cost, fitting.Value);
+                }
+
+                // Only the surcharge moves money. The part's own share of the price came from the
+                // customer and goes to the supplier - routing it through the wallet would inflate
+                // lifetime earnings, and lifetime earnings are what garage rank is built on.
+                if (fitting.Cost > 0d)
+                {
+                    Wallet.TrySpend(fitting.Cost);
+                    Inventory.RecordSpend(fitting.Cost);
+
+                    Action<ActiveCar, RepairJob, Parts.PartFitting> boughtHandler = PartBoughtIn;
+                    if (boughtHandler != null) boughtHandler(car, job, fitting);
+                }
+
+                // Bonuses multiply the LABOUR only. The part's share of the gross is passed
+                // straight through: it is the customer paying for the part, and a flawless repair
+                // does not make the part itself worth more.
+                double payout = job.LabourPayout;
                 if (job.IsFlawless) payout *= GameBalance.PerfectJobCashBonus;
 
                 // The streak pays out on the player's own work, not on a mechanic's.
@@ -557,7 +591,9 @@ namespace GarageTycoon.Core.Simulation
             double basePayout = 0d;
             for (int i = 0; i < car.Jobs.Count; i++)
             {
-                if (car.Jobs[i].IsAccepted) basePayout += car.Jobs[i].Payout;
+                // LabourPayout, not Payout: the gross includes the part, and tipping on money
+                // that goes straight back out to the supplier would inflate every car.
+                if (car.Jobs[i].IsAccepted) basePayout += car.Jobs[i].LabourPayout;
             }
 
             double tip = MathUtil.RoundCash(
@@ -770,6 +806,9 @@ namespace GarageTycoon.Core.Simulation
 
         public event Action<ActiveCar, DiagnosisAction, MinigameResult> DiagnosisResolved;
 
+        /// <summary>Raised when a job had to buy its part at the counter, so the UI can say so.</summary>
+        public event Action<ActiveCar, RepairJob, Parts.PartFitting> PartBoughtIn;
+
         /// <summary>
         /// Starts an inspection on the car in a bay. Returns false when that check has already
         /// been run on this car, or there is nothing there to look at.
@@ -975,6 +1014,23 @@ namespace GarageTycoon.Core.Simulation
         // ------------------------------------------------------------------
 
         /// <summary>True when the player has earned enough to sell the garage.</summary>
+        /// <summary>
+        /// Has a shelf filled now rather than waiting for the van. Returns false when the garage
+        /// cannot afford it. The only thing this buys is avoiding the counter markup.
+        /// </summary>
+        public bool TryExpediteParts(Parts.PartKind kind)
+        {
+            if (kind == Parts.PartKind.None) return false;
+            if (Inventory.TotalStockOf(kind) >= GameBalance.PartShelfCap) return false;
+
+            double fee = Parts.PartsInventory.ExpediteFee(kind, RankLevel);
+            if (!Wallet.TrySpend(fee)) return false;
+
+            Inventory.Expedite(kind);
+            Inventory.RecordSpend(fee);
+            return true;
+        }
+
         public bool CanPrestige()
         {
             return Prestige.CanPrestige(Wallet.Cash, Wallet.LifetimeEarnings);
