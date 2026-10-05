@@ -103,20 +103,44 @@ namespace GarageTycoon.HeadlessTests
             Console.WriteLine(" PARTS: what each grade is worth");
             Console.WriteLine("=====================================================");
             Console.WriteLine();
-            Console.WriteLine("   grade          kept over half an hour   per car   avg stars");
-            Console.WriteLine("   ----------------------------------------------------------");
+            Console.WriteLine("   policy         kept over half an hour   per car   avg stars   avg mult");
+            Console.WriteLine("   ---------------------------------------------------------------------");
 
-            foreach (Core.Parts.PartGrade grade in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+            GradeRow("Budget", Core.Parts.PartGrade.Budget, false);
+            GradeRow("Standard", Core.Parts.PartGrade.Standard, false);
+            GradeRow("Performance", Core.Parts.PartGrade.Performance, false);
+            GradeRow("Mixed", Core.Parts.PartGrade.Standard, true);
+        }
+
+        /// <summary>
+        /// One play style. "Mixed" switches policy as the player plausibly would - cheap parts on
+        /// cheap cars, good parts on the ones worth the finish.
+        /// </summary>
+        private static void GradeRow(string label, Core.Parts.PartGrade grade, bool mixed)
+        {
             {
                 GarageSimulation simulation = new GarageSimulation(7400);
                 simulation.Inventory.Policy = grade;
 
-                double stars = 0d;
+                if (mixed)
+                {
+                    // Cheap parts on common cars, good parts on rare ones.
+                    simulation.CarEnteredBay += (car, bay) =>
+                    {
+                        simulation.Inventory.Policy = car.Definition.Rarity >= CarRarity.Rare
+                            ? Core.Parts.PartGrade.Performance
+                            : Core.Parts.PartGrade.Budget;
+                    };
+                }
+
+                double stars = 0d, mult = 0d;
                 int scored = 0;
 
                 simulation.JobCompleted += (car, job, payout) =>
                 {
-                    stars += RepairQuality.ForJob(job, car.Mood).Stars;
+                    QualityReport report = RepairQuality.ForJob(job, car.Mood);
+                    stars += report.Stars;
+                    mult += report.PayMultiplier;
                     scored++;
                 };
 
@@ -125,10 +149,11 @@ namespace GarageTycoon.HeadlessTests
                 SessionReport report = GameplayHarness.Play(simulation, 1800f, 0.85f);
                 double kept = report.CashEarned - report.PartsSpend;
 
-                Console.WriteLine(string.Format("   {0,-14} {1,20:0} {2,9:0} {3,11:0.00}",
-                    grade.DisplayName(), kept,
+                Console.WriteLine(string.Format("   {0,-14} {1,20:0} {2,9:0} {3,11:0.00} {4,10:0.000}",
+                    label, kept,
                     report.CarsCompleted <= 0 ? 0d : kept / report.CarsCompleted,
-                    scored == 0 ? 0d : stars / scored));
+                    scored == 0 ? 0d : stars / scored,
+                    scored == 0 ? 0d : mult / scored));
             }
         }
 

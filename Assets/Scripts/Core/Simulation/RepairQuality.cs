@@ -9,8 +9,14 @@ namespace GarageTycoon.Core.Simulation
     /// <summary>How a finished piece of work scored, and how the customer felt about it.</summary>
     public struct QualityReport
     {
-        /// <summary>The workmanship score, 0..1. Nothing else here is anything but a view of this.</summary>
-        public float Score;
+        /// <summary>
+        /// The workmanship score, 0..1. Nothing else here is anything but a view of this.
+        ///
+        /// DOUBLE, not float, for the same reason the tip multiplier is. A score of 0.475 held as
+        /// a float is 0.4749999940395355, so the percentage shown rounded to 47 here and 48 in the
+        /// web build, whose numbers are all doubles. The formula is untouched; only its precision.
+        /// </summary>
+        public double Score;
 
         /// <summary>The same score as whole percent, which is what the UI shows.</summary>
         public int Percent;
@@ -19,13 +25,13 @@ namespace GarageTycoon.Core.Simulation
         public int Stars;
 
         /// <summary>Share of rounds that were dead-on.</summary>
-        public float Accuracy;
+        public double Accuracy;
 
         /// <summary>How close the job came to the fewest rounds it could possibly have taken.</summary>
-        public float Efficiency;
+        public double Efficiency;
 
         /// <summary>Share of rounds that broke something.</summary>
-        public float DamageRate;
+        public double DamageRate;
 
         public int RoundsPlayed;
         public int PerfectRounds;
@@ -39,7 +45,7 @@ namespace GarageTycoon.Core.Simulation
         /// How happy this leaves the customer, 0..1 - the score judged against what THEY expected,
         /// not against perfection. A collector and a bloke in a hurry do not want the same thing.
         /// </summary>
-        public float Satisfaction;
+        public double Satisfaction;
 
         /// <summary>
         /// What this workmanship is worth as a multiple of the job's listed price.
@@ -64,14 +70,14 @@ namespace GarageTycoon.Core.Simulation
     public static class RepairQuality
     {
         /// <summary>How much of the score is workmanship rather than pace.</summary>
-        private const float AccuracyWeight = 0.55f;
-        private const float EfficiencyWeight = 0.45f;
+        private const double AccuracyWeight = 0.55d;
+        private const double EfficiencyWeight = 0.45d;
 
         /// <summary>Breaking something costs more than merely missing, so it is priced separately.</summary>
-        private const float DamagePenalty = 0.7f;
+        private const double DamagePenalty = 0.7d;
 
         /// <summary>Meeting a customer's expectation exactly lands here, not at 100%.</summary>
-        private const float SatisfactionAtExpectation = 0.8f;
+        private const double SatisfactionAtExpectation = 0.8d;
 
         /// <summary>
         /// The fewest rounds this job could ever have taken: every round perfect, no misses.
@@ -100,25 +106,25 @@ namespace GarageTycoon.Core.Simulation
             {
                 // Nothing was played - a mechanic's instant work, or a restored save. Treat it as
                 // competent rather than as a zero, which would read as a punishment for automating.
-                report.Score = MathUtil.Clamp01(
-                    0.6f + (job.PartFitted ? job.FittedGrade.QualityModifier() : 0f));
+                report.Score = Clamp01(
+                    0.6d + (job.PartFitted ? job.FittedGrade.QualityModifier() : 0f));
                 report.PartGrade = job.FittedGrade;
                 report.PartFitted = job.PartFitted;
                 return Finish(report, mood);
             }
 
-            report.Accuracy = job.PerfectRounds / (float)job.RoundsPlayed;
-            report.DamageRate = job.DamagedRounds / (float)job.RoundsPlayed;
-            report.Efficiency = MathUtil.Clamp01(MinimumRounds(job) / (float)job.RoundsPlayed);
+            report.Accuracy = job.PerfectRounds / (double)job.RoundsPlayed;
+            report.DamageRate = job.DamagedRounds / (double)job.RoundsPlayed;
+            report.Efficiency = Clamp01(MinimumRounds(job) / (double)job.RoundsPlayed);
 
-            float score = report.Accuracy * AccuracyWeight + report.Efficiency * EfficiencyWeight;
+            double score = report.Accuracy * AccuracyWeight + report.Efficiency * EfficiencyWeight;
             score -= report.DamageRate * DamagePenalty;
 
             // What went on the car counts, but only a little. A good part must not rescue sloppy
             // work and a cheap one must not ruin careful work - the mini-game is still the repair.
             if (job.PartFitted) score += job.FittedGrade.QualityModifier();
 
-            report.Score = MathUtil.Clamp01(score);
+            report.Score = Clamp01(score);
             report.PartGrade = job.FittedGrade;
             report.PartFitted = job.PartFitted;
 
@@ -134,15 +140,15 @@ namespace GarageTycoon.Core.Simulation
             QualityReport report = new QualityReport();
             if (car == null || car.Jobs.Count == 0) return report;
 
-            float weightedScore = 0f;
-            float totalWeight = 0f;
+            double weightedScore = 0d;
+            double totalWeight = 0d;
 
             for (int i = 0; i < car.Jobs.Count; i++)
             {
                 RepairJob job = car.Jobs[i];
                 QualityReport jobReport = ForJob(job, car.Mood);
 
-                float weight = job.WorkAmount;
+                double weight = job.WorkAmount;
                 weightedScore += jobReport.Score * weight;
                 totalWeight += weight;
 
@@ -151,12 +157,12 @@ namespace GarageTycoon.Core.Simulation
                 report.DamagedRounds += jobReport.DamagedRounds;
             }
 
-            report.Score = totalWeight <= 0f ? 0f : MathUtil.Clamp01(weightedScore / totalWeight);
+            report.Score = totalWeight <= 0d ? 0d : Clamp01(weightedScore / totalWeight);
 
             if (report.RoundsPlayed > 0)
             {
-                report.Accuracy = report.PerfectRounds / (float)report.RoundsPlayed;
-                report.DamageRate = report.DamagedRounds / (float)report.RoundsPlayed;
+                report.Accuracy = report.PerfectRounds / (double)report.RoundsPlayed;
+                report.DamageRate = report.DamagedRounds / (double)report.RoundsPlayed;
             }
 
             return Finish(report, car.Mood);
@@ -168,36 +174,43 @@ namespace GarageTycoon.Core.Simulation
         /// This is the whole point of customer types being more than a tip multiplier: the SAME
         /// piece of work can delight one customer and disappoint another.
         /// </summary>
-        public static float ExpectationOf(CustomerMood mood)
+        public static double ExpectationOf(CustomerMood mood)
         {
             switch (mood)
             {
-                case CustomerMood.Relaxed: return 0.42f;      // no rush, no fuss
-                case CustomerMood.Ordinary: return 0.55f;
-                case CustomerMood.Impatient: return 0.48f;    // wants it done, not done beautifully
-                case CustomerMood.BigTipper: return 0.62f;
-                case CustomerMood.Vip: return 0.78f;          // expects the best, and notices
-                default: return 0.55f;
+                case CustomerMood.Relaxed: return 0.42d;      // no rush, no fuss
+                case CustomerMood.Ordinary: return 0.55d;
+                case CustomerMood.Impatient: return 0.48d;    // wants it done, not done beautifully
+                case CustomerMood.BigTipper: return 0.62d;
+                case CustomerMood.Vip: return 0.78d;          // expects the best, and notices
+                default: return 0.55d;
             }
         }
 
         /// <summary>Fills in the parts of the report that are the same whatever was scored.</summary>
         private static QualityReport Finish(QualityReport report, CustomerMood mood)
         {
-            report.Percent = (int)(report.Score * 100f + 0.5f);
+            report.Percent = (int)Math.Floor(report.Score * 100d + 0.5d);
 
             // 1 star for finishing at all, 5 for near-perfect work.
-            report.Stars = MathUtil.ClampInt((int)(report.Score * 5f) + 1, 1, 5);
+            report.Stars = MathUtil.ClampInt((int)(report.Score * 5d) + 1, 1, 5);
 
-            float expectation = ExpectationOf(mood);
-            report.Satisfaction = MathUtil.Clamp01(
-                SatisfactionAtExpectation + (report.Score - expectation) * 0.8f);
+            double expectation = ExpectationOf(mood);
+            report.Satisfaction = Clamp01(
+                SatisfactionAtExpectation + (report.Score - expectation) * 0.8d);
 
             // Centred so that typical work pays what it always did: only genuinely good or
             // genuinely poor work moves the number.
             report.PayMultiplier = 0.75d + report.Score * 0.5d;
 
             return report;
+        }
+
+        /// <summary>Clamp to 0..1 in double. MathUtil's is float, which is what caused the drift.</summary>
+        private static double Clamp01(double value)
+        {
+            if (value < 0d) return 0d;
+            return value > 1d ? 1d : value;
         }
 
         /// <summary>The star row as text, for places that cannot draw one.</summary>

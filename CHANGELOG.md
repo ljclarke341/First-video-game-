@@ -6,6 +6,88 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1e — Quality is paid on
+
+`QualityReport.PayMultiplier` was computed, parity-tested and never applied. It is now applied to
+the repair payout, exactly once, and the formula is untouched.
+
+### Where it lands
+
+```
+payout = labour (gross - part)        the part's share passes through to the supplier
+       x quality multiplier           0.75 + score x 0.5, scored AFTER the part was recorded
+       x flawless bonus               unchanged
+       x work streak                  unchanged, player only
+```
+
+The multiplier is applied to the **labour**, not the gross, so a good repair is not paid a bonus on
+the supplier's margin. The car's finishing tip still comes from `LabourPayout`, so good work is not
+paid for twice on the same car. Both are tested directly.
+
+### It does NOT close the hole
+
+The honest result. Measured over half an hour, same seed, no upgrade buying so the runs cannot
+diverge:
+
+| Policy | Kept per car | Avg stars | Avg multiplier |
+|---|---|---|---|
+| **Budget** | **$296** | 4.45 | 1.153 |
+| Standard | $251 | 4.68 | 1.198 |
+| Performance | $175 | 4.79 | 1.210 |
+| Mixed (cheap on common, good on rare) | $227 | 4.63 | 1.174 |
+
+Budget still leads, by about 18%. The arithmetic says why: **the grade moves cost three times as
+hard as it moves quality.**
+
+- Budget leaves **12.7%** more labour (0.879 of gross against 0.78)
+- Budget's quality penalty costs **3.9%** of the multiplier (1.153 against 1.198)
+
+The multiplier only spans 0.75-1.25, so a 0.10 shift in score is worth 0.05 - about 4% of a typical
+1.2. Against a 12.7% cost swing it cannot win.
+
+**Two ways to balance it, neither applied** (the brief was not to redesign quality or rebalance the
+grades):
+
+1. **Widen the multiplier** - `0.5 + score` spans 0.5-1.5, doubling quality's leverage to ~8%
+2. **Narrow the grades** - Budget 0.8 and Performance 1.3 instead of 0.55 and 1.9 halves the cost
+   swing to ~6%
+
+Either brings the two within a few percent. Option 2 is the smaller change and leaves the quality
+curve alone.
+
+### A note on Performance
+
+On a **flawless** repair, Performance gains nothing: the score clamps at 100%, so Standard already
+reaches the ceiling and the better part only costs money. It earns its keep on imperfect work,
+where the +0.08 has somewhere to go. Worth knowing before tuning.
+
+### Two more float-vs-double bugs, same family as the tip
+
+The cross-build diff caught both, in the 44 new payout cases:
+
+- **`QualityReport.Score` was a `float`.** 0.475 held as a float is 0.4749999940395355, so a job
+  showed 47% here and 48% in the web build. The whole report is now computed in double.
+- **`PartGrade.QualityModifier()` was a `float`.** `-0.1f` widened is -0.10000000149011612, which
+  shifted a flawless Budget job's payout by a pound. Now double.
+
+Neither changes a formula - only its precision. That is three bugs of exactly this shape now
+(the tip multiplier was the first), which is a strong argument for every shared number being a
+double from the outset.
+
+### Verified
+
+- **256 C# tests**, 13 new covering the grades on an identical repair, low/high/perfect quality,
+  five job sizes, order of operations, single application, Standard neutrality at the formula's
+  baseline, mechanics, and one end-to-end test asserting the finished payout respects the part,
+  the grade, the surcharge, the quality multiplier, the tip and the flawless bonus
+- **364 cross-build cases identical** (up from 319) - 45 new ones cover the finished payout across
+  five job sizes x three grades x three quality mixes
+- **Web soak, four garage sizes**: 59/69/67/85 cars, no errors, no bay stuck
+- **Saves**: policy, stock and delivery survive; pre-parts saves open with a full shelf; version 1
+  saves still return every job accepted with no part recorded
+
+---
+
 ## Phase B.1d — Deliveries scale with the crew
 
 `PartDeliveryPerMechanic = 0.45`, applied to both builds from one shared formula

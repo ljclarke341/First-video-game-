@@ -278,6 +278,50 @@ namespace GarageTycoon.HeadlessTests
                     .Append('}');
             }
 
+            json.Append("\n],\n");
+
+            // --- the finished payout: labour, part, quality and the flawless bonus together ---
+            json.Append("\"payout\":[\n");
+            first = true;
+
+            foreach (double gross in new[] { 37d, 100d, 413d, 1000d, 7391d })
+            {
+                foreach (Core.Parts.PartGrade grade in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+                {
+                    foreach (int[] mix in new[]
+                             {
+                                 new[] { 3, 0, 0 },   // flawless
+                                 new[] { 1, 2, 1 },   // ordinary
+                                 new[] { 0, 0, 8 }    // scrappy
+                             })
+                    {
+                        RepairJob job = new RepairJob(JobType.Brakes, MinigameType.TimingBar, 1f, gross, 1f);
+
+                        for (int i = 0; i < mix[0]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Perfect, ""));
+                        for (int i = 0; i < mix[1]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Good, ""));
+                        for (int i = 0; i < mix[2]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Weak, ""));
+
+                        job.RecordPart(grade, 0d, Core.Parts.PartsInventory.ValueOnJob(gross, grade));
+
+                        QualityReport report = RepairQuality.ForJob(job, CustomerMood.Ordinary);
+
+                        double payout = job.LabourPayout * report.PayMultiplier;
+                        if (job.IsFlawless) payout *= Core.Balance.GameBalance.PerfectJobCashBonus;
+
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"gross\":").Append(F((float)gross))
+                            .Append(",\"g\":").Append((int)grade)
+                            .Append(",\"mix\":\"").Append(mix[0]).Append('-').Append(mix[1]).Append('-').Append(mix[2])
+                            .Append("\",\"pct\":").Append(report.Percent)
+                            .Append(",\"mult\":").Append(F((float)Math.Round(report.PayMultiplier, 4)))
+                            .Append(",\"pay\":").Append(F((float)Core.Util.MathUtil.RoundCash(payout)))
+                            .Append('}');
+                    }
+                }
+            }
+
             json.Append("\n]\n}");
 
             Console.WriteLine(json.ToString());

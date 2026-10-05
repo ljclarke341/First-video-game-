@@ -56,13 +56,19 @@ namespace GarageTycoon.Core.Parts
         /// Modest on purpose. A good part should not rescue sloppy work and a cheap one should not
         /// ruin careful work - the mini-game is still what decides the repair.
         /// </summary>
-        public static float QualityModifier(this PartGrade grade)
+        /// <remarks>
+        /// DOUBLE, like the cost multiplier and for the same reason: -0.1f widened to double is
+        /// -0.10000000149011612, which shifted the finished score just far enough to show a
+        /// different whole percentage, and on a flawless Budget job a different payout, from the
+        /// web build. The values are unchanged; only their precision.
+        /// </remarks>
+        public static double QualityModifier(this PartGrade grade)
         {
             switch (grade)
             {
-                case PartGrade.Budget: return -0.1f;
-                case PartGrade.Performance: return 0.08f;
-                default: return 0f;
+                case PartGrade.Budget: return -0.1d;
+                case PartGrade.Performance: return 0.08d;
+                default: return 0d;
             }
         }
 

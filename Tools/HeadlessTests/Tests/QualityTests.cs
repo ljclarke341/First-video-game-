@@ -90,8 +90,8 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // This is what makes customer types more than a tip multiplier.
                 RepairJob job = Play(1.0f, perfect: 1, good: 2, weak: 1, damage: 0);
 
-                float relaxed = RepairQuality.ForJob(job, CustomerMood.Relaxed).Satisfaction;
-                float vip = RepairQuality.ForJob(job, CustomerMood.Vip).Satisfaction;
+                double relaxed = RepairQuality.ForJob(job, CustomerMood.Relaxed).Satisfaction;
+                double vip = RepairQuality.ForJob(job, CustomerMood.Vip).Satisfaction;
 
                 Check.IsTrue(relaxed > vip,
                     "a VIP should be harder to please than someone with no rush: "
@@ -110,9 +110,9 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 foreach (CustomerMood mood in Enum.GetValues(typeof(CustomerMood)))
                 {
-                    float expectation = RepairQuality.ExpectationOf(mood);
+                    double expectation = RepairQuality.ExpectationOf(mood);
 
-                    Check.IsTrue(expectation > 0f && expectation < 1f,
+                    Check.IsTrue(expectation > 0d && expectation < 1d,
                         mood + " expects " + expectation + ", which is not a reachable standard");
                 }
             });

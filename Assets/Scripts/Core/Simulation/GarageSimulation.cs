@@ -550,6 +550,18 @@ namespace GarageTycoon.Core.Simulation
                 // straight through: it is the customer paying for the part, and a flawless repair
                 // does not make the part itself worth more.
                 double payout = job.LabourPayout;
+
+                // The customer pays for how well it was done. This is scored AFTER the part was
+                // recorded, so the grade that went on is already in the number - which is the
+                // whole point: without it, a cheap part cost the player nothing but a figure on a
+                // toast, and Budget was a free 13% a car.
+                //
+                // Applied exactly ONCE, here, to the labour. Nothing downstream multiplies by it
+                // again, and the car's finishing tip is taken from LabourPayout rather than from
+                // this, so a good repair is not paid for twice.
+                QualityReport quality = RepairQuality.ForJob(job, car.Mood);
+                payout *= quality.PayMultiplier;
+
                 if (job.IsFlawless) payout *= GameBalance.PerfectJobCashBonus;
 
                 // The streak pays out on the player's own work, not on a mechanic's.

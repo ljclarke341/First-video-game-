@@ -271,10 +271,15 @@ namespace GarageTycoon.Core.Cars
             return mood == CustomerMood.Vip ? -0.12f : -0.06f;
         }
 
-        /// <summary>Satisfaction for finished work, adjusted for how it was quoted.</summary>
-        public static float AdjustSatisfaction(float satisfaction, CustomerMood mood, QuoteOption chosen)
+        /// <summary>
+        /// Satisfaction for finished work, adjusted for how it was quoted.
+        /// Double, to match QualityReport.Satisfaction - see the note on its Score field.
+        /// </summary>
+        public static double AdjustSatisfaction(double satisfaction, CustomerMood mood, QuoteOption chosen)
         {
-            return MathUtil.Clamp01(satisfaction + SatisfactionModifier(mood, chosen));
+            double adjusted = satisfaction + SatisfactionModifier(mood, chosen);
+            if (adjusted < 0d) return 0d;
+            return adjusted > 1d ? 1d : adjusted;
         }
     }
 }
