@@ -38,6 +38,7 @@ namespace GarageTycoon.Unity.UI
         private Text _wantHint;
         private Text _partsEverything;
         private Text _partsEssential;
+        private Text _expectation;
         private Button _everythingButton;
         private Button _essentialButton;
         private Button _backButton;
@@ -76,6 +77,13 @@ namespace GarageTycoon.Unity.UI
             _partsEssential = UIFactory.CreateText("PartsEssential", _root, string.Empty,
                 Theme.FontTiny, Theme.TextMuted, TextAnchor.MiddleLeft);
             UIFactory.AnchorBottom(_partsEssential.rectTransform, 24f, 136f, 6f);
+
+            // The whole decision on a performance job, said out loud BEFORE the player commits:
+            // what this customer expects, what they are about to get, and what the gap costs in
+            // quality. Without it the trade-off is only discoverable by losing money on it once.
+            _expectation = UIFactory.CreateText("Expectation", _root, string.Empty,
+                Theme.FontTiny, Theme.TextMuted, TextAnchor.MiddleLeft);
+            UIFactory.AnchorBottom(_expectation.rectTransform, 24f, 188f, 6f);
 
             _wantHint = UIFactory.CreateText("WantHint", _root, string.Empty, Theme.FontTiny,
                 Theme.TextMuted, TextAnchor.MiddleCenter);
@@ -207,6 +215,7 @@ namespace GarageTycoon.Unity.UI
 
             RefreshPartsLine(_partsEverything, "Everything", false);
             RefreshPartsLine(_partsEssential, "Essentials", true);
+            RefreshExpectation();
 
             _everythingPrice.text = "$" + CashFormat.Short(_quote.EverythingPrice);
             _essentialPrice.text = "$" + CashFormat.Short(_quote.EssentialPrice);
@@ -235,6 +244,38 @@ namespace GarageTycoon.Unity.UI
                 _wantHint.text = hint + " - " + _car.Special.Tagline;
                 _wantHint.color = Theme.Hex(_car.Special.ColorHex);
             }
+        }
+
+        /// <summary>
+        /// Says what grade this customer expects and what they are about to get.
+        ///
+        /// Hidden entirely for the customers who have no opinion, which is almost all of them -
+        /// a line that says "no expectation" on every ordinary car is noise.
+        /// </summary>
+        private void RefreshExpectation()
+        {
+            Core.Parts.PartGrade? expected = _car.ExpectedPartGrade;
+
+            _expectation.gameObject.SetActive(expected.HasValue);
+            if (!expected.HasValue) return;
+
+            Core.Parts.PartGrade fitting = _simulation.Inventory.Policy;
+            int stepsBelow = (int)expected.Value - (int)fitting;
+
+            if (stepsBelow <= 0)
+            {
+                _expectation.text = "Wants " + expected.Value.DisplayName().ToLowerInvariant()
+                    + " parts - that is what is going on";
+                _expectation.color = Theme.Success;
+                return;
+            }
+
+            int penalty = (int)Math.Round(stepsBelow * Core.Balance.GameBalance.GradeShortfallPenalty * 100d);
+
+            _expectation.text = "Wants " + expected.Value.DisplayName().ToLowerInvariant()
+                + " parts, fitting " + fitting.DisplayName().ToLowerInvariant()
+                + "  -" + penalty + "% quality";
+            _expectation.color = Theme.Warning;
         }
 
         /// <summary>

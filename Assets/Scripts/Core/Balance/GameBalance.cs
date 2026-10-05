@@ -147,6 +147,19 @@ namespace GarageTycoon.Core.Balance
         /// </summary>
         public const float SpecialJobChance = 0.12f;
 
+        /// <summary>
+        /// What one grade of part BELOW what the customer expected costs you in quality.
+        ///
+        /// On an ordinary car nobody expects anything, so this never fires: the expectation is
+        /// Standard and fitting Standard is no shortfall. It exists for the customers who care -
+        /// a performance job turns up expecting performance parts, and cheaping out on one shows
+        /// in the finished work.
+        ///
+        /// This is the whole decision on those cars: a dearer part costs real money up front
+        /// against a quality score you only find out about at the end.
+        /// </summary>
+        public const double GradeShortfallPenalty = 0.13d;
+
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const double PerfectProgress = 0.45d;
 

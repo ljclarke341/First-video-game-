@@ -6,6 +6,7 @@ using GarageTycoon.Core.Cars;
 using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Minigames;
 using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Special;
 using GarageTycoon.Core.Vehicle;
 
 namespace GarageTycoon.HeadlessTests
@@ -346,7 +347,7 @@ namespace GarageTycoon.HeadlessTests
                     .Append(",\"tip\":").Append(F((float)definition.SpeedTipMultiplier))
                     .Append(",\"quality\":").Append(F((float)definition.QualityWeight))
                     .Append(",\"extraJobs\":").Append(definition.ExtraJobs)
-                    .Append(",\"grade\":").Append((int)definition.ExpectedGrade)
+                    .Append(",\"grade\":").Append(definition.ExpectedGrade.HasValue ? (int)definition.ExpectedGrade.Value : -1)
                     .Append(",\"weight\":").Append(F(definition.SpawnWeight))
                     .Append(",\"minRank\":").Append(definition.MinRankLevel)
                     .Append('}');
@@ -513,6 +514,66 @@ namespace GarageTycoon.HeadlessTests
                     .Append(",\"accepted\":").Append(skipCar.AcceptedJobCount)
                     .Append(",\"bonus\":").Append(D(skipCar.Diagnosis.PayoutBonus(skipCar.Condition)))
                     .Append('}');
+            }
+
+            json.Append("\n],\n");
+
+            // --- the grade expectation: what falling short of it costs ---
+            //
+            // Every combination of fitted grade against expected grade, including "no expectation",
+            // which is every ordinary car. The null row matters most: if the two builds disagree
+            // about what a customer with no opinion does to a budget part, the whole parts economy
+            // has quietly forked.
+            json.Append("\"gradeExpectation\":[\n");
+            first = true;
+
+            foreach (int expected in new[] { -1, 0, 1, 2 })        // -1 = no expectation
+            {
+                foreach (Core.Parts.PartGrade fitted in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+                {
+                    foreach (int[] mix in new[]
+                             {
+                                 new[] { 4, 0, 0 },
+                                 new[] { 2, 2, 0 },
+                                 new[] { 1, 1, 2 }
+                             })
+                    {
+                        const double Gross = 1000d;
+
+                        RepairJob job = new RepairJob(JobType.Engine, MinigameType.TimingBar, 1.4f, Gross, 1f);
+
+                        for (int i = 0; i < mix[0]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Perfect, ""));
+                        for (int i = 0; i < mix[1]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Good, ""));
+                        for (int i = 0; i < mix[2]; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Weak, ""));
+
+                        job.RecordPart(fitted, 0d, Core.Parts.PartsInventory.ValueOnJob(Gross, fitted));
+
+                        Core.Parts.PartGrade? expectation =
+                            expected < 0 ? (Core.Parts.PartGrade?)null : (Core.Parts.PartGrade)expected;
+
+                        QualityReport quality = RepairQuality.ForJob(job, CustomerMood.Ordinary, expectation);
+
+                        // And the finished pay at the performance job's weighting, so the rule is
+                        // compared where it actually bites rather than only in isolation.
+                        double weight = SpecialJobCatalog
+                            .FindByType(SpecialJobType.Performance).QualityWeight;
+
+                        double pay = job.LabourPayout * (1d + (quality.PayMultiplier - 1d) * weight);
+                        if (job.IsFlawless) pay *= Core.Balance.GameBalance.PerfectJobCashBonus;
+
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"expected\":").Append(expected)
+                            .Append(",\"fitted\":").Append((int)fitted)
+                            .Append(",\"mix\":\"").Append(mix[0]).Append('-').Append(mix[1]).Append('-').Append(mix[2])
+                            .Append("\",\"score\":").Append(D(Math.Round(quality.Score, 6)))
+                            .Append(",\"pct\":").Append(quality.Percent)
+                            .Append(",\"sat\":").Append(D(Math.Round(quality.Satisfaction, 6)))
+                            .Append(",\"pay\":").Append(D(Core.Util.MathUtil.RoundCash(pay)))
+                            .Append('}');
+                    }
+                }
             }
 
             json.Append("\n],\n");

@@ -563,7 +563,7 @@ namespace GarageTycoon.Core.Simulation
                 // A fussier customer cares MORE about the same score. This stretches the existing
                 // curve around 1.0 rather than redefining it, so quality still means exactly what
                 // it meant - it is simply worth more to this particular customer.
-                QualityReport quality = RepairQuality.ForJob(job, car.Mood);
+                QualityReport quality = RepairQuality.ForJob(job, car.Mood, car.ExpectedPartGrade);
                 payout *= 1d + (quality.PayMultiplier - 1d) * car.QualityWeight;
 
                 if (job.IsFlawless) payout *= GameBalance.PerfectJobCashBonus;

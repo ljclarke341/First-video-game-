@@ -80,6 +80,18 @@ namespace GarageTycoon.Core.Cars
             get { return Special == null ? 1d : Special.QualityWeight; }
         }
 
+        /// <summary>
+        /// The grade of part this customer turned up expecting.
+        ///
+        /// Null for everybody ordinary - they have no opinion, so nothing they are fitted counts
+        /// as falling short. A performance job expects performance parts, and anything cheaper
+        /// shows in the finished work.
+        /// </summary>
+        public Parts.PartGrade? ExpectedPartGrade
+        {
+            get { return Special == null ? null : Special.ExpectedGrade; }
+        }
+
         /// <summary>True once the customer has been given a bill and answered it.</summary>
         public bool Quoted { get; private set; }
 

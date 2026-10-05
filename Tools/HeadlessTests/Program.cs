@@ -27,6 +27,12 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            if (args != null && args.Length > 1 && args[0] == "probe" && args[1] == "performance")
+            {
+                PerformanceJobProbe.Run();
+                return 0;
+            }
+
             if (args != null && args.Length > 1 && args[0] == "probe" && args[1] == "inspect")
             {
                 InspectionProbe.Run();

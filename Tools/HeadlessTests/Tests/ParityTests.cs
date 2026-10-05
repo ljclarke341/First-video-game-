@@ -426,7 +426,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             {
                 // web: SPECIAL_ORDER - the order decides which job a weighted roll lands on, so
                 // two builds listing the same jobs in a different order spawn different cars.
-                int[] expected = { (int)SpecialJobType.Urgent };
+                int[] expected = { (int)SpecialJobType.Urgent, (int)SpecialJobType.Performance };
 
                 Check.AreEqual(expected.Length, SpecialJobCatalog.All.Count,
                     "the two builds offer a different number of special jobs");
@@ -436,6 +436,35 @@ namespace GarageTycoon.HeadlessTests.Tests
                     Check.AreEqual(expected[i], (int)SpecialJobCatalog.All[i].Type,
                         "special job " + i + " is a different kind in the web build");
                 }
+            });
+
+            suite.Add("Performance's dials match the web build", () =>
+            {
+                // web: SPECIAL_JOBS.performance
+                SpecialJobDefinition performance =
+                    SpecialJobCatalog.FindByType(SpecialJobType.Performance);
+
+                Check.IsTrue(performance != null, "the web build has a performance job and this one does not");
+
+                Check.IsTrue(Math.Abs(performance.PatienceMultiplier - 1d) < 0.0001d,
+                    "performance patience is " + performance.PatienceMultiplier + ", the web build has 1");
+                Check.IsTrue(Math.Abs(performance.PayoutMultiplier - 1.15d) < 0.0001d,
+                    "performance payout is " + performance.PayoutMultiplier + ", the web build has 1.15");
+                Check.IsTrue(Math.Abs(performance.QualityWeight - 1.8d) < 0.0001d,
+                    "performance quality weight is " + performance.QualityWeight + ", the web build has 1.8");
+                Check.IsTrue(performance.ExpectedGrade.HasValue
+                        && performance.ExpectedGrade.Value == PartGrade.Performance,
+                    "performance should expect performance parts, as it does in the web build");
+                Check.AreEqual(2, performance.MinRankLevel,
+                    "performance unlocks at a different rank in the web build");
+            });
+
+            suite.Add("The grade shortfall penalty matches the web build", () =>
+            {
+                // web: B.gradeShortfall
+                Check.IsTrue(Math.Abs(GameBalance.GradeShortfallPenalty - 0.13d) < 0.0001d,
+                    "the shortfall penalty is " + GameBalance.GradeShortfallPenalty
+                        + ", the web build has 0.13");
             });
 
             return suite;

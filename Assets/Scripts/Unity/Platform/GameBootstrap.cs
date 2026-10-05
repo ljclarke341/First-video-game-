@@ -341,7 +341,7 @@ namespace GarageTycoon.Unity.Platform
                 Theme.Cash, new Vector2(0f, -120f));
 
             // How well it was done, not just what it paid.
-            QualityReport quality = RepairQuality.ForJob(job, car.Mood);
+            QualityReport quality = RepairQuality.ForJob(job, car.Mood, car.ExpectedPartGrade);
             _toasts.Show(RepairQuality.StarsText(quality.Stars) + "  " + quality.Percent + "%",
                 quality.Stars >= 4 ? Theme.PerfectZone : Theme.TextSecondary, new Vector2(0f, -180f));
 

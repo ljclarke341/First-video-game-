@@ -37,9 +37,39 @@ namespace GarageTycoon.Core.Special
                 speedTipMultiplier: 2d,
                 qualityWeight: 1d,
                 extraJobs: 0,
-                expectedGrade: PartGrade.Standard,
+                expectedGrade: null,                 // an urgent customer wants it back, not perfect
                 spawnWeight: 1f,
-                minRankLevel: 1)
+                minRankLevel: 1),
+
+            // PERFORMANCE: the parts bill is the whole problem.
+            //
+            // This customer knows what went on their car. They expect performance parts, and
+            // anything cheaper shows in the finished work - see GameBalance.GradeShortfallPenalty.
+            // Quality also counts for nearly twice as much here as it does on an ordinary car, so
+            // the two things that normally sit in the background, what you fit and how well you
+            // fit it, are the whole job.
+            //
+            // The decision: a performance part costs 30% more than standard, which is about 6.6%
+            // of the car's gross. Fitting one earns that back through the quality curve - but only
+            // if you then do the work well enough for the better part to show. Fit budget and you
+            // take two grades of shortfall on a customer who is paying attention.
+            //
+            // The payout multiplier is deliberately small. This is not meant to be the job you
+            // hope for because it pays; it is meant to be the job where your parts policy stops
+            // being a setting you picked once and forgot.
+            new SpecialJobDefinition(
+                SpecialJobType.Performance,
+                "Performance",
+                "Knows their engine. Expects the good parts, and will notice.",
+                "#F2994A",
+                patienceMultiplier: 1d,
+                payoutMultiplier: 1.15d,
+                speedTipMultiplier: 1d,
+                qualityWeight: 1.8d,
+                extraJobs: 0,
+                expectedGrade: PartGrade.Performance,
+                spawnWeight: 1f,
+                minRankLevel: 2)
         };
 
         /// <summary>The definitions as shipped, so a measurement run can always put them back.</summary>

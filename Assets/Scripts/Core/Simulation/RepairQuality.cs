@@ -101,8 +101,20 @@ namespace GarageTycoon.Core.Simulation
             return rounds < 1 ? 1 : rounds;
         }
 
-        /// <summary>Scores one finished job.</summary>
+        /// <summary>Scores one finished job for a customer who expects nothing in particular.</summary>
         public static QualityReport ForJob(RepairJob job, CustomerMood mood)
+        {
+            return ForJob(job, mood, null);
+        }
+
+        /// <summary>
+        /// Scores one finished job against what this customer expected to be fitted.
+        ///
+        /// Ordinary customers have no expectation at all, so the shortfall term is zero for them
+        /// and the score is exactly what it has always been. A customer who turned up asking for
+        /// performance parts and got budget ones notices.
+        /// </summary>
+        public static QualityReport ForJob(RepairJob job, CustomerMood mood, Parts.PartGrade? expectedGrade)
         {
             QualityReport report = new QualityReport();
             if (job == null) return report;
@@ -116,7 +128,8 @@ namespace GarageTycoon.Core.Simulation
                 // Nothing was played - a mechanic's instant work, or a restored save. Treat it as
                 // competent rather than as a zero, which would read as a punishment for automating.
                 report.Score = Clamp01(
-                    0.6d + (job.PartFitted ? job.FittedGrade.QualityModifier() : 0f));
+                    0.6d + (job.PartFitted ? job.FittedGrade.QualityModifier() : 0d)
+                        - ShortfallPenalty(job, expectedGrade));
                 report.PartGrade = job.FittedGrade;
                 report.PartFitted = job.PartFitted;
                 return Finish(report, mood);
@@ -132,6 +145,9 @@ namespace GarageTycoon.Core.Simulation
             // What went on the car counts, but only a little. A good part must not rescue sloppy
             // work and a cheap one must not ruin careful work - the mini-game is still the repair.
             if (job.PartFitted) score += job.FittedGrade.QualityModifier();
+
+            // And for a customer who asked for something better, falling short of it shows.
+            score -= ShortfallPenalty(job, expectedGrade);
 
             report.Score = Clamp01(score);
             report.PartGrade = job.FittedGrade;
@@ -155,7 +171,7 @@ namespace GarageTycoon.Core.Simulation
             for (int i = 0; i < car.Jobs.Count; i++)
             {
                 RepairJob job = car.Jobs[i];
-                QualityReport jobReport = ForJob(job, car.Mood);
+                QualityReport jobReport = ForJob(job, car.Mood, car.ExpectedPartGrade);
 
                 double weight = job.WorkAmount;
                 weightedScore += jobReport.Score * weight;
@@ -197,6 +213,23 @@ namespace GarageTycoon.Core.Simulation
         }
 
         /// <summary>Fills in the parts of the report that are the same whatever was scored.</summary>
+        /// <summary>
+        /// How far below the customer's expectation this part fell, in quality.
+        ///
+        /// Only ever a penalty, never a reward: fitting something dearer than was asked for is
+        /// already paid for by PartGrade.QualityModifier, and paying twice for it would make the
+        /// top grade an obvious auto-buy rather than a decision.
+        /// </summary>
+        private static double ShortfallPenalty(RepairJob job, Parts.PartGrade? expectedGrade)
+        {
+            if (job == null || !job.PartFitted || !expectedGrade.HasValue) return 0d;
+
+            int stepsBelow = (int)expectedGrade.Value - (int)job.FittedGrade;
+            if (stepsBelow <= 0) return 0d;
+
+            return stepsBelow * GameBalance.GradeShortfallPenalty;
+        }
+
         private static QualityReport Finish(QualityReport report, CustomerMood mood)
         {
             report.Percent = (int)Math.Floor(report.Score * 100d + 0.5d);

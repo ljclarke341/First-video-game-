@@ -46,7 +46,15 @@ namespace GarageTycoon.Core.Special
         public int ExtraJobs { get; private set; }
 
         /// <summary>The grade this customer expects. Fitting below it disappoints them.</summary>
-        public PartGrade ExpectedGrade { get; private set; }
+/// <summary>
+        /// The grade of part this customer turned up expecting, or null if they do not care.
+        ///
+        /// Nullable on purpose, and it matters. "Expects Standard" is NOT the same as "has no
+        /// opinion": the first penalises a budget part, the second does not. Modelling ordinary
+        /// customers as expecting Standard quietly made budget parts worse on every car in the
+        /// game, which is an economy change nobody asked for.
+        /// </summary>
+        public PartGrade? ExpectedGrade { get; private set; }
 
         /// <summary>How often this turns up, relative to the other special jobs.</summary>
         public float SpawnWeight { get; private set; }
@@ -62,7 +70,7 @@ namespace GarageTycoon.Core.Special
         public SpecialJobDefinition(SpecialJobType type, string displayName, string tagline,
             string colorHex, double patienceMultiplier, double payoutMultiplier,
             double speedTipMultiplier, double qualityWeight, int extraJobs,
-            PartGrade expectedGrade, float spawnWeight, int minRankLevel)
+            PartGrade? expectedGrade, float spawnWeight, int minRankLevel)
         {
             Type = type;
             DisplayName = displayName;

@@ -6,6 +6,64 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2e — Special jobs: PERFORMANCE
+
+The second of the five. Its decision is **which grade of part to fit**, and it is built entirely
+out of machinery that already existed: the same shelf, the same mini-games, the same quality curve,
+the same quote.
+
+One new rule: a customer can **expect** a grade of part, and falling short of it costs quality -
+`GameBalance.GradeShortfallPenalty`, 0.13 per grade below. Performance expects performance parts
+and weights quality at 1.8x, so what you fit and how well you fit it are the whole job. The payout
+multiplier is a deliberately small 1.15: this is not meant to be the job you hope for because it
+pays.
+
+### The trade-off, measured
+
+One $1,000 job, each grade fitted, net of the part's share:
+
+| how it was played | Budget | Standard | Performance | best |
+|---|---|---|---|---|
+| 4 perfect (clean) | $907 | $1,091 | $1,119 | Performance, by **2.6%** |
+| 2 perfect 2 good | $491 | $651 | $751 | Performance, by **15.4%** |
+| 1 perfect 1 good 2 weak | $374 | $540 | $649 | Performance, by **20.2%** |
+
+The shape is the point: **the better part is insurance against your own mistakes.** Play the
+mini-games cleanly and standard parts are fine - the quality curve is already near its ceiling and
+the premium buys almost nothing. Play scrappily and the part covers for you. That is a judgement
+about your own skill, made before you know how the rounds will go.
+
+### A bug I introduced and caught
+
+The first version modelled ordinary customers as expecting Standard. That is not the same as having
+no opinion: it quietly made budget parts worse on **every car in the game**, which is an economy
+change nobody asked for. `ExpectedGrade` is now nullable and null means "does not care" - which is
+every ordinary car, and urgent ones too. There is a test pinning ordinary scores to exactly what
+they were.
+
+### Played, 120 seeds x 15 minutes
+
+| policy | income/min | perf $/car | ordinary $/car | perf quality | perf satisfaction | grades fitted B/S/P |
+|---|---|---|---|---|---|---|
+| Budget | $920 | $274 | $354 | 0.604 | 0.833 | 76/24/0 |
+| Standard | $920 | $316 | $352 | 0.768 | 0.931 | 0/100/0 |
+| Performance | $876 | $332 | $335 | 0.884 | 0.967 | 0/24/76 |
+| **Mixed (switches)** | **$920** | **$324** | $352 | 0.824 | 0.950 | 0/96/4 |
+
+Running performance parts across the board costs 4.8% of income, because the premium is wasted on
+the 94% of cars nobody is fussy about. Running budget across the board costs you 13% on the cars
+that are. Switching for the car in front of you is the best play, which is what the job is for.
+
+### Verified
+
+- **311 tests pass** (13 new).
+- **546 cross-build parity cases, all identical** (up from 509), including 36 new `gradeExpectation`
+  cases covering every fitted grade against every expectation, the "no expectation" row included.
+- Compile check clean, 20-minute soak clean, saves round-trip, skip/commit and urgent both pinned
+  unchanged by their own tests.
+
+---
+
 ## Phase B.2d — "Just get stuck in" means getting stuck in (Option B)
 
 The hole in the previous entry, closed. Skipping the inspection used to call `RevealAll(true)` and
@@ -1366,6 +1424,13 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+23. **The parts policy is one global setting, which blunts the performance job.** Fitting
+   performance parts is worth 5.1% on a performance car, but the player can only change the policy
+   for the car in their own hands - mechanics keep fitting whatever the setting says. The mixed
+   player captures about half the available gain. A per-car grade choice on the quote screen would
+   make the decision land properly; it is a new piece of UI rather than a balance change, so I have
+   not built it. Worth deciding before the remaining three jobs, since VIP will have the same shape.
+
 22. **Inspecting is now competitive but still slightly behind.** With the skip hole closed, the
    spread is 5-7% rather than 39%, and targeted inspection finishes the most cars of any strategy
    (45.4 a session against 36.7) at a third of the loss rate. But not looking still earns the most
