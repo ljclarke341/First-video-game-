@@ -6,6 +6,57 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2 interlude — Measuring the inspection incentive
+
+**No balance value was changed by this work.** Two new measuring rigs, and the numbers they
+produced. `dotnet run --project Tools/HeadlessTests -- probe inspect`.
+
+Six strategies, each playing the same 120 seeds for 15 simulated minutes at skill 0.85, so the
+cars, faults, moods, part deliveries and mini-game rolls are identical between columns. The only
+difference is what the player chose to do on the ramp.
+
+| strategy | profit/car | profit/min | session income | vs never |
+|---|---|---|---|---|
+| never inspect | $374 | **$915** | $13,845 | — |
+| inspect every car fully | **$559** | $558 | $8,369 | **-39.6%** |
+| stop at the first fault | $425 | $756 | $11,344 | -18.1% |
+| only urgent jobs | $398 | $877 | $13,217 | -4.5% |
+| only rare and above | $391 | $857 | $12,918 | -6.7% |
+| only multi-symptom complaints | $540 | $563 | $8,444 | -39.0% |
+
+Inspecting makes each car worth **50% more** and costs you **40% of your income**, because a car
+you are inspecting is a car you are not repairing. Cars completed drops 36.7 to 15.0 per session
+and the loss rate goes 12.8% to 49.7%.
+
+### The information is free already
+
+Paired comparison on 4,800 cars: every decision after the ramp, worked out once knowing nothing and
+once knowing everything.
+
+| | |
+|---|---|
+| prevents an unnecessary repair | **0.0%** |
+| finds an additional repair | **0.0%** |
+| changes the quote decision | **0.0%** |
+| changes the chosen parts grade | **0.0%** |
+| changes the repair outcome | **0.0%** |
+
+Not a sampling problem — it is structural. `Quote.For()` reads `car.Condition` directly and never
+looks at `car.Diagnosis`, so the quote screen shows every fault at its true percentage whether or
+not you inspected. `PartsInventory.Fit()` takes no condition argument. Mini-game difficulty comes
+from the car's rarity. Diagnosis changes exactly two things: the payout bonus (max 1.12x), and
+whether the job chips on the bay card are greyed out.
+
+Context on the same cars: 93.0% carry work that could be declined, and **97.9% of complaints
+already name two symptoms** - which is why "only inspect multi-symptom complaints" ran 6.81 checks
+per car and performed identically to inspecting everything. That filter does not filter.
+
+### Verdict: (B) strategically worthwhile but currently under-rewarded
+
+The full write-up is in the session notes. Nothing has been changed pending your decision.
+
+---
+
 ## Phase B.2a — Special jobs: URGENT
 
 The first of the five special job types. It is a **modifier on the ordinary car, not a second kind
