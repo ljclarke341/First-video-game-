@@ -230,7 +230,7 @@ namespace GarageTycoon.Core.Simulation
             }
 
             Combo.Tick(deltaTime);
-            Inventory.TickDeliveries(deltaTime);
+            Inventory.TickDeliveries(deltaTime, Effects.MechanicCount);
 
             // Ranking up is permanent progression, so it is checked wherever earnings move.
             int rank = RankLevel;

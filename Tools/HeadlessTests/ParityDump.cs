@@ -262,6 +262,22 @@ namespace GarageTycoon.HeadlessTests
                 }
             }
 
+            json.Append("\n],\n");
+
+            // --- how fast parts arrive for a garage of a given size ---
+            json.Append("\"delivery\":[\n");
+            first = true;
+            for (int mechanics = 0; mechanics <= 6; mechanics++)
+            {
+                if (!first) json.Append(",\n");
+                first = false;
+
+                json.Append("  {\"m\":").Append(mechanics)
+                    .Append(",\"interval\":").Append(F((float)Math.Round(
+                        Core.Balance.GameBalance.PartDeliveryInterval(mechanics), 4)))
+                    .Append('}');
+            }
+
             json.Append("\n]\n}");
 
             Console.WriteLine(json.ToString());

@@ -107,6 +107,32 @@ namespace GarageTycoon.Core.Balance
         /// </summary>
         public const float PartDeliverySeconds = 14f;
 
+        /// <summary>
+        /// Extra deliveries per hired mechanic, as a share of the base rate.
+        ///
+        /// Deliveries used to be a flat 4.3 a minute while consumption scaled with every bay and
+        /// every mechanic - 6.6 a minute in a one-bay garage, 16.4 at four bays and four trained
+        /// mechanics. The result was that the counter surcharge went from 15% of parts to 64% as
+        /// the player succeeded, with no lever to pull, because the delivery rate was not something
+        /// they could improve. The system punished growth.
+        ///
+        /// 0.45 was measured, not guessed. It holds the surcharge flat at roughly 10-20% across
+        /// every garage size: enough that an empty shelf still costs something, not so much that
+        /// expanding is a penalty. 0.7 and above switch the mechanic off entirely, reaching 0%.
+        /// "dotnet run --project Tools/HeadlessTests -- probe stock" re-runs the measurement.
+        /// </summary>
+        public const double PartDeliveryPerMechanic = 0.45d;
+
+        /// <summary>
+        /// How long between deliveries for a garage with this many people working in it.
+        /// One function, so Core, Unity and the web build cannot each round it differently.
+        /// </summary>
+        public static float PartDeliveryInterval(int mechanicCount)
+        {
+            if (mechanicCount < 0) mechanicCount = 0;
+            return (float)(PartDeliverySeconds / (1d + mechanicCount * PartDeliveryPerMechanic));
+        }
+
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const float PerfectProgress = 0.45f;
 

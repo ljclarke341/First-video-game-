@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Parts;
 using System;
 using GarageTycoon.Core.Economy;
 using GarageTycoon.Core.Simulation;
@@ -70,10 +71,14 @@ namespace GarageTycoon.HeadlessTests
             Console.WriteLine(" PARTS: does the shelf ever run dry?");
             Console.WriteLine("=====================================================");
             Console.WriteLine();
-            Console.WriteLine(string.Format(
-                "   delivery rate   1 part every {0:0}s  =  {1:0.0} parts per minute",
-                Core.Balance.GameBalance.PartDeliverySeconds,
-                60f / Core.Balance.GameBalance.PartDeliverySeconds));
+            Console.WriteLine("   delivery rate   scales with the crew:");
+            for (int mechanics = 0; mechanics <= 4; mechanics++)
+            {
+                float interval = Core.Balance.GameBalance.PartDeliveryInterval(mechanics);
+                Console.WriteLine(string.Format(
+                    "                   {0} mechanics  ->  1 part every {1,4:0.0}s  =  {2,4:0.0} per minute",
+                    mechanics, interval, 60f / interval));
+            }
             Console.WriteLine(string.Format("   shelf cap       {0} per kind, {1} kinds",
                 Core.Balance.GameBalance.PartShelfCap, Core.Parts.PartKinds.Count));
             Console.WriteLine();
@@ -85,6 +90,46 @@ namespace GarageTycoon.HeadlessTests
             Row("2 bays + 1 mechanic", 1, 1, 2);
             Row("4 bays + 2 mechanics", 3, 2, 4);
             Row("4 bays + 4 mechanics, trained", 3, 4, 6);
+        }
+
+        /// <summary>
+        /// Whether the grade a garage fits changes what it earns, beyond the intended trade.
+        /// Budget should keep more and finish worse; Performance the reverse; Standard should land
+        /// exactly where the game sat before parts existed.
+        /// </summary>
+        public static void MeasureGrades()
+        {
+            Console.WriteLine("=====================================================");
+            Console.WriteLine(" PARTS: what each grade is worth");
+            Console.WriteLine("=====================================================");
+            Console.WriteLine();
+            Console.WriteLine("   grade          kept over half an hour   per car   avg stars");
+            Console.WriteLine("   ----------------------------------------------------------");
+
+            foreach (Core.Parts.PartGrade grade in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+            {
+                GarageSimulation simulation = new GarageSimulation(7400);
+                simulation.Inventory.Policy = grade;
+
+                double stars = 0d;
+                int scored = 0;
+
+                simulation.JobCompleted += (car, job, payout) =>
+                {
+                    stars += RepairQuality.ForJob(job, car.Mood).Stars;
+                    scored++;
+                };
+
+                // NO upgrade buying. With it on, a richer policy buys more upgrades and the runs
+                // diverge, which flatters the cheaper grade twice over. This isolates the trade.
+                SessionReport report = GameplayHarness.Play(simulation, 1800f, 0.85f);
+                double kept = report.CashEarned - report.PartsSpend;
+
+                Console.WriteLine(string.Format("   {0,-14} {1,20:0} {2,9:0} {3,11:0.00}",
+                    grade.DisplayName(), kept,
+                    report.CarsCompleted <= 0 ? 0d : kept / report.CarsCompleted,
+                    scored == 0 ? 0d : stars / scored));
+            }
         }
 
         private static void Row(string label, int bays, int mechanics, int training)

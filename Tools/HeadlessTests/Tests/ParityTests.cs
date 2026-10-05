@@ -343,6 +343,25 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.AreEqual(3, GameBalance.StartingPartStock, "opening stock differs from the web");
             });
 
+            suite.Add("Delivery rate scales with the crew, identically in both builds", () =>
+            {
+                // web: B.partDeliveryPerMechanic and partDeliveryInterval()
+                Check.IsTrue(Math.Abs(GameBalance.PartDeliveryPerMechanic - 0.45d) < 0.0001d,
+                    "PartDeliveryPerMechanic is " + GameBalance.PartDeliveryPerMechanic
+                        + "; the web's B.partDeliveryPerMechanic is 0.45");
+
+                // The interval is one function in each build rather than an expression written
+                // twice, so these pin the shape as well as the constant.
+                Check.IsTrue(Math.Abs(GameBalance.PartDeliveryInterval(0) - 14f) < 0.0001f,
+                    "a garage with no mechanics should keep the base rate");
+
+                Check.IsTrue(GameBalance.PartDeliveryInterval(4) < GameBalance.PartDeliveryInterval(1),
+                    "a bigger crew must be supplied faster, or expanding is a penalty");
+
+                Check.IsTrue(Math.Abs(GameBalance.PartDeliveryInterval(4) - 14f / 2.8f) < 0.001f,
+                    "four mechanics should give 14 / (1 + 4 x 0.45) seconds");
+            });
+
             suite.Add("Standard parts are economically invisible, in both builds", () =>
             {
                 // The single most important property of the whole parts system: fitting Standard

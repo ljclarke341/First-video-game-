@@ -306,14 +306,18 @@ namespace GarageTycoon.Core.Parts
         ///
         /// Stock still matters, because running dry costs the counter markup.
         /// </summary>
-        public void TickDeliveries(float deltaTime)
+        /// <param name="mechanicCount">
+        /// How many mechanics are on the books. A bigger garage gets its parts faster, because a
+        /// flat rate meant the surcharge grew from 15% to 64% of parts as the player expanded.
+        /// </param>
+        public void TickDeliveries(float deltaTime, int mechanicCount = 0)
         {
             if (deltaTime <= 0f) return;
 
             DeliveryTimer -= deltaTime;
             if (DeliveryTimer > 0f) return;
 
-            DeliveryTimer = GameBalance.PartDeliverySeconds;
+            DeliveryTimer = GameBalance.PartDeliveryInterval(mechanicCount);
 
             // One part, to whichever shelf is barest. A garage that never looks at the parts
             // screen still slowly fills up; one that does can expedite what it actually needs.

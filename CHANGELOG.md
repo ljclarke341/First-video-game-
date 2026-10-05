@@ -6,6 +6,77 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.1d — Deliveries scale with the crew
+
+`PartDeliveryPerMechanic = 0.45`, applied to both builds from one shared formula
+(`GameBalance.PartDeliveryInterval` / `partDeliveryInterval`). Nothing else about Parts was touched.
+
+### New delivery rate
+
+| Mechanics | Interval | Parts/min |
+|---|---|---|
+| 0 | 14.0s | 4.3 |
+| 1 | 9.7s | 6.2 |
+| 2 | 7.4s | 8.1 |
+| 3 | 6.0s | 10.1 |
+| 4 | 5.0s | 12.0 |
+
+### Surcharge exposure, before and after
+
+| Garage | Parts/min | Before | **After** | Surcharge /15 min |
+|---|---|---|---|---|
+| 1 bay, by hand | 6.6 | 15% | **15%** | $79 |
+| 2 bays, by hand | 6.5 | 14% | **14%** | $55 |
+| 2 bays + 1 mechanic | 8.3 | 30% | **10%** | $44 |
+| 4 bays + 2 mechanics | 11.6 | 50% | **17%** | $179 |
+| 4 bays + 4 mechanics, trained | 16.4 | 64% | **19%** | $263 |
+
+Flat at 10-19% across every size, against 15%-64% before. Growing the garage no longer makes parts
+progressively punishing, and a bare shelf still costs real money.
+
+### Something this turned up: quality is free
+
+Measuring the grades in isolation - same seed, no upgrade buying, so the runs cannot diverge:
+
+| Grade | Kept per car | Avg stars |
+|---|---|---|
+| Budget | **$244** | 4.50 |
+| Standard | $216 | 4.69 |
+| Performance | $167 | 4.77 |
+
++13% and -23% against Standard, exactly the designed ratios. But **the star rating has no
+mechanical consequence anywhere in the game.** `QualityReport.PayMultiplier` is computed, parity
+tested, and never applied - that was the deliberate Phase A decision to defer paying on quality
+until it could be measured, and nothing has consumed it since.
+
+So the grade choice is not currently a decision: **Budget is a free 13% per car** and the only
+thing it costs is a number on a toast. Performance is a pure 23% loss.
+
+**Not fixed here** - the brief was not to rebalance Parts, and wiring quality to payment is a
+balance change in its own right. But Parts cannot be called finished while one of its three options
+strictly dominates. Options, cheapest first:
+
+1. **Apply `PayMultiplier`** (0.75 + score x 0.5). One line, already computed. Needs the probe open.
+2. **Let satisfaction feed the tip**, so good work pays through the customer rather than directly.
+3. **Make quality affect reputation** - the rarity bias that decides which cars turn up.
+
+### Verified
+
+- **243 C# tests**, 23 parity tests, all passing
+- **319 cross-build cases identical** (up from 312) - 7 new ones cover the delivery interval at
+  every crew size from 0 to 6
+- **Economy unchanged**: $504/min, $17,420, 43 cars, 16 lost, 2 bays, 27 upgrades
+- **Web soak, four garage sizes, 20 minutes each**: 75/68/74/82 cars, no errors. Shortage rates run
+  24%/15%/5%/0% - lower than the C# figures because that harness also trains its mechanics, which
+  raises consumption; the rule itself is identical and parity-checked
+- **No bay ever stuck**: worst occupancy 390s against a 900s threshold, with 2 mechanics, 4 bays and
+  declined work in play
+- **Saves**: policy, stock and delivery timer survive a round trip; a pre-parts save opens with a
+  full shelf and the Standard policy; a version 1 save still comes back with every job accepted and
+  no part recorded
+
+---
+
 ## Phase B.1c — Unity Parts, and what the stock rate actually does
 
 Unity now has everything the web build has, consuming the same Core rules. **242 tests passing**,
