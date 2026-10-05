@@ -6,6 +6,68 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## V2 Phase A, part 2 — The flow you can actually play
+
+Phase A built condition, diagnosis, quotes and quality in Core with 60 tests. This is the part
+that puts them on screen, in the web build, so the loop is playable rather than merely proven.
+
+### The new loop
+
+Tapping a car no longer picks up a spanner. It puts the car **on the ramp**:
+
+1. **The customer's complaint**, in their words — *"The brakes feel soft, and it's looking rough
+   down one side."* The bay card just says the jobs have not been looked at.
+2. **A condition sheet** across all seven systems. Everything reads `--` until you find it out.
+3. **Seven checks**, each a short mini-game. Play one well and it tells you something; botch it
+   and it tells you nothing. The sheet fills in as you go, colour-coded red / amber / green, and
+   the bay card's job chips turn from "Not looked at" into real jobs as you find them.
+4. **The quote** — every outstanding repair with the reading that justifies it (*"Brakes at 34%"*),
+   the ones marked **Needed** in red, and three answers: everything, essentials only, or back to
+   the ramp for another look. The option that particular customer was hoping for is outlined green.
+5. **The work**, exactly as before, on only the jobs they agreed to. Declined jobs show struck
+   through on the card. Every finished job now reports its star rating alongside the payout.
+
+Both new screens live in the workbench rather than in an overlay, so the whole job stays in one
+place on a phone — and the diagnosis mini-games play in exactly the spot the repairs do.
+
+### Skipping is always free
+
+The ramp has a **Just get stuck in** button, and it is not a trap. It reveals everything instantly
+and starts the work. The only thing it costs is the small bonus for a thorough inspection. A player
+who never inspects anything has exactly the game they had before, which is the rule the whole
+system was built around.
+
+### A bug this found: the speed tip has never paid out
+
+`completeCar` read `B.tipFraction`, which **does not exist**. The constant is called
+`tipPerSecond` — a leftover from the flat-rate tip that Stage 6 replaced with a fraction of the
+car's payout. So the tip computed as `NaN`, failed the `> 0` check, and silently paid nothing.
+
+Nobody noticed because a tip that never arrives looks exactly like a tip you did not earn.
+
+It is fixed: `tipFraction: 0.25`, matching `GameBalance.SpeedTipFraction` in the C#. **This does
+raise web-build income** — finishing a car quickly now pays what it was always supposed to. It is a
+bug fix rather than a balance change, and it brings the web build in line with the C# the economy
+was actually measured on, but it is a real change to how much you earn and you should know about it.
+
+### Verified
+
+- **A 20-minute soak run** with a player that inspects, quotes and works every car: 43 cars
+  completed, 2 lost, 46 quotes written, 92 checks run, no car occupying a bay longer than 90
+  seconds, no console errors.
+- **Quoting small genuinely earns less** - $120 against $360 on the same car, tip included.
+- **A car with nothing accepted retires immediately** rather than sitting in the bay forever.
+- **Old saves load**: the version 1 format comes back with a derived condition, every job accepted
+  and the diagnosis marked skipped, so nobody is paid a bonus they never earned.
+- **No horizontal overflow** anywhere at phone width.
+
+### Still to do
+
+**Unity has none of this.** The Core systems are shared, but every screen described above exists
+only in the web build. That is the next chunk.
+
+---
+
 ## V2 Phase A — The garage becomes a business
 
 **What you asked for:** turn `CAR ARRIVES → PLAY MINI-GAMES → GET MONEY` into
@@ -557,6 +619,10 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+17. **The web build is still not in the repo**, and V2 makes that cost much higher than it was.
+   Every system now has to be written twice by hand - once in C#, once in JavaScript - and the two
+   have already diverged once (the missing tip constant was a web-only bug the C# never had).
+   Worth deciding deliberately now rather than at Phase C.
 15. **Quality is scored but not paid on.** See V2 Phase A. One line turns it on; it needs a
    balance measurement first, and I would rather you knew that was a pending decision than find
    your income had quietly moved.
