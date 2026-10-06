@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Events;
 using GarageTycoon.Core.Diagnosis;
 using GarageTycoon.Core.Minigames;
 using GarageTycoon.Core.Simulation;
@@ -252,6 +253,33 @@ namespace GarageTycoon.HeadlessTests
                             .Append(",\"canQuote\":").Append(state == 2 ? 1 : 0)
                             .Append('}');
                     }
+                }
+            }
+            json.Append("\n],\n");
+
+            // --- restoring an event from a save ---
+            // Driven through the shipped Core rule, not a copy of it: whatever
+            // RandomEventSystem.RestoredRemaining decides is what the web must decide too.
+            json.Append("\"eventRestore\":[\n");
+            first = true;
+            foreach (GameEventDefinition definition in GameEventCatalog.All)
+            {
+                // Doubles, so the dump prints 34.9 rather than a float's 34.900002 - the web
+                // has no floats to widen and the keys have to match exactly.
+                foreach (double saved in new[] { -5d, 0d, 0.5d, 10d, 34.9d, 40d, 59.5d, 60d, 9999d })
+                {
+                    float restored = RandomEventSystem.RestoredRemaining(
+                        (float)saved, definition.DurationSeconds);
+
+                    if (!first) json.Append(",\n");
+                    first = false;
+
+                    json.Append("  {\"id\":").Append((int)definition.Id)
+                        .Append(",\"dur\":").Append(D(definition.DurationSeconds))
+                        .Append(",\"saved\":").Append(D(saved))
+                        .Append(",\"restored\":").Append(D(Math.Round((double)restored, 4)))
+                        .Append(",\"active\":").Append(restored > 0f ? 1 : 0)
+                        .Append('}');
                 }
             }
             json.Append("\n],\n");

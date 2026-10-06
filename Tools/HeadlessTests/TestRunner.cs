@@ -98,6 +98,7 @@ namespace GarageTycoon.HeadlessTests
                 Tests.EconomyTests.Build(),
                 Tests.SimulationTests.Build(),
                 Tests.SaveTests.Build(),
+                Tests.EventSaveTests.Build(),
                 Tests.BalanceTests.Build(),
                 Tests.EdgeCaseTests.Build(),
                 Tests.FeatureTests.Build(),

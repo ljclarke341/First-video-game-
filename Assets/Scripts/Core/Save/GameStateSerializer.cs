@@ -308,7 +308,15 @@ namespace GarageTycoon.Core.Save
             if (activeEventId != 0)
             {
                 GameEventDefinition definition = GameEventCatalog.FindById((GameEventId)activeEventId);
-                if (definition != null) simulation.Events.StartEvent(definition);
+                if (definition != null)
+                {
+                    // activeRemaining has always been written; it was simply never read back,
+                    // so every reload used to hand the event its full duration again. Falling
+                    // back to the duration keeps a save that somehow lacks the field behaving
+                    // exactly as it did before.
+                    simulation.Events.RestoreActive(definition,
+                        events["activeRemaining"].AsFloat(definition.DurationSeconds));
+                }
             }
             simulation.Events.TimeUntilNext = events["timeUntilNext"].AsFloat(90f);
 

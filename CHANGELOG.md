@@ -6,6 +6,98 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Active event save/load — the event that vanished, and the one that never ended
+
+The web save left the active random event out entirely. Investigating it turned up a second,
+opposite bug in Core, so the two builds were failing in *different directions*.
+
+### Root cause — one field written and never read, one field never written
+
+**Core** wrote the event's remaining time and then threw it away on load. `activeRemaining` went
+into the save file; the load path called `StartEvent(definition)`, which sets the clock back to the
+event's full duration. Measured, not assumed:
+
+```
+before save: ToolSale remaining=40  timeUntilNext=78.37
+saved json  : "activeId":4,"activeRemaining":40,"timeUntilNext":78.37
+after load  : ToolSale remaining=60  timeUntilNext=78.37     <- 40 went in, 60 came out
+```
+
+So a 60-second Tool Sale could be held open indefinitely by reloading. Nothing caught it because
+`SaveTests` never touched the events block.
+
+**Web** saved no event fields at all, so a reload cancelled the event *and* re-rolled the gap to the
+next one. Measured in a real browser across a real page reload:
+
+| | before save | after reload |
+|---|---|---|
+| event | Parts Shortage, 34.9s left | none |
+| modifier | `extraJob 0.6` | neutral |
+| banner | shown | gone |
+| next event in | — | re-rolled to 94.97s |
+
+That last row is the one that matters: setting the next-event gap to 5s, saving and reloading gave
+**100.97s**. An unwanted event could be dodged by restarting the game.
+
+### The rule lives in Core
+
+`RandomEventSystem.RestoredRemaining(savedRemaining, duration)` — three cases, and none of them is
+"start it again from the top": a zero-duration event was never running; zero or less had already
+expired; anything above the event's own duration is a stale or edited save and is capped, so
+reloading can never buy more of an event than it was worth.
+
+`RandomEventSystem.RestoreActive(definition, remaining)` adopts that state. Deliberately not
+`StartEvent`: starting would reset the clock and announce the event a second time. A reload is not
+a new event. It mirrors the existing `RestoreFleet` precedent.
+
+### Save fields
+
+Core's three fields were already there and are unchanged on disk; the load path now reads the one
+it was ignoring. The web save gains the same three:
+
+| web field | C# equivalent | meaning |
+|---|---|---|
+| `ev` | `events.activeId` | which event is running (null / 0 for none) |
+| `evLeft` | `events.activeRemaining` | seconds it has left |
+| `evNext` | `events.timeUntilNext` | seconds until the next one rolls |
+
+`SAVE_KEY` is unchanged and the save version stays at 3 — the fields are optional and absent-means-no-event,
+the same way fleets, standing and parts were each added.
+
+### Changed
+
+- `Assets/Scripts/Core/Events/RandomEventSystem.cs` — `RestoredRemaining`, `RestoreActive`.
+- `Assets/Scripts/Core/Save/GameStateSerializer.cs` — reads `activeRemaining` instead of discarding it.
+- `garage-tycoon.html` (web) — `restoredEventRemaining`, the three save fields, and the load path.
+- `Tools/HeadlessTests/Tests/EventSaveTests.cs` — new, 14 tests.
+- `ParityDump.cs`, `vparity.js`, `diffparity.py` — new `eventRestore` section, 63 cases.
+
+### Verified
+
+- **431 tests pass** (was 417) — 14 new.
+- **1,312 parity cases identical** (was 1,249) — 63 new, driven through the shipped Core function
+  rather than a copy of its arithmetic.
+- Unity compile check: 0 errors. Web syntax check: OK.
+- **Real browser, real page reloads, 21/21 checks.** An active Tool Sale came back as Tool Sale with
+  its banner, its 25% discount and 53.9s of its 54.8s left (the 0.9s is real time that passed while
+  the page reloaded, and the clock is supposed to keep running). It then expired on its own schedule
+  rather than a fresh duration later. Five reloads mid-event: one event, never two, and the clock only
+  ever fell — 42.9, 42.0, 41.1, 40.2, 39.4, 38.5. The next-event gap counted down instead of being
+  re-rolled. An expired event stayed expired.
+- **Backward compatibility**, tested by seeding a save with the three fields deleted into a fresh
+  browser profile before any page script ran: it loads, has no active event, and its cash, all-time
+  earnings, standing and upgrade levels all come back untouched.
+- **Both builds, same scenario, same answer.** Tool Sale with 20 of its 60 seconds spent reads **40**
+  after a save and load in C# and **40** in the browser. Every event round-trips its remaining time
+  exactly, and the Coffee Run — which has no duration — never restores as active in either build.
+
+### Noticed, not changed
+
+The web save still omits `spawnTimer`, which Core persists. Out of scope for this pass; it means the
+gap to the next *car* is re-rolled by a reload, which is a much smaller effect than the event was.
+
+---
+
 ## Quote bypass fix — the button that accepted work nobody quoted
 
 A QA pass found the quote button acting on a car with **nothing repairable revealed**: it opened an

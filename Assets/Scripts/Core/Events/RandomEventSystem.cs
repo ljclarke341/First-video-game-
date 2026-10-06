@@ -111,6 +111,49 @@ namespace GarageTycoon.Core.Events
             if (startHandler != null) startHandler(definition);
         }
 
+        /// <summary>
+        /// How much time an event read back from a save legitimately has left.
+        ///
+        /// The one rule both builds share, so a reloaded event cannot mean two different things.
+        /// Three cases, and none of them is "start it again from the top":
+        ///   - an instant event (zero duration) was never running, so it has nothing left;
+        ///   - a remaining time of zero or less had already expired before the save was written;
+        ///   - anything longer than the event's own duration is a stale or edited save, and is
+        ///     capped, so reloading can never buy more of an event than it was ever worth.
+        /// </summary>
+        public static float RestoredRemaining(float savedRemaining, float durationSeconds)
+        {
+            if (durationSeconds <= 0f) return 0f;
+            if (savedRemaining <= 0f) return 0f;
+            return savedRemaining > durationSeconds ? durationSeconds : savedRemaining;
+        }
+
+        /// <summary>
+        /// Puts a saved event back exactly as the player left it.
+        ///
+        /// Deliberately NOT <see cref="StartEvent"/>: starting it would reset the clock to the
+        /// full duration, and would announce it a second time as though it had just begun. A
+        /// reload is not a new event. Mirrors RestoreFleet - the save tells us the state, we
+        /// adopt it rather than re-deriving it.
+        /// </summary>
+        public void RestoreActive(GameEventDefinition definition, float remaining)
+        {
+            float left = definition == null
+                ? 0f
+                : RestoredRemaining(remaining, definition.DurationSeconds);
+
+            if (left <= 0f)
+            {
+                // Nothing to restore. TimeUntilNext is the save's business, so it is left alone.
+                Active = null;
+                ActiveRemaining = 0f;
+                return;
+            }
+
+            Active = definition;
+            ActiveRemaining = left;
+        }
+
         /// <summary>Cancels anything running, e.g. on a prestige reset.</summary>
         public void ClearActive()
         {
