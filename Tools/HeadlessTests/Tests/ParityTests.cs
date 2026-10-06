@@ -431,7 +431,8 @@ namespace GarageTycoon.HeadlessTests.Tests
                     (int)SpecialJobType.Urgent,
                     (int)SpecialJobType.Performance,
                     (int)SpecialJobType.Restoration,
-                    (int)SpecialJobType.Fleet
+                    (int)SpecialJobType.Fleet,
+                    (int)SpecialJobType.Vip
                 };
 
                 Check.AreEqual(expected.Length, SpecialJobCatalog.All.Count,
@@ -515,6 +516,33 @@ namespace GarageTycoon.HeadlessTests.Tests
                 Check.IsTrue(Math.Abs(fleet.WorkMultiplier - 1d) < 0.0001d, "fleet work length should be ordinary");
                 Check.AreEqual(0, fleet.ExtraJobs, "fleet should not add jobs");
                 Check.IsFalse(fleet.ExpectedGrade.HasValue, "fleet should have no grade expectation");
+            });
+
+            suite.Add("The collector's dials match the web build", () =>
+            {
+                // web: SPECIAL_JOBS.collector
+                SpecialJobDefinition collector = SpecialJobCatalog.FindByType(SpecialJobType.Vip);
+                Check.IsTrue(collector != null, "the web build has a collector and this one does not");
+
+                Check.IsTrue(Math.Abs(collector.PayoutMultiplier - 1.45d) < 0.0001d,
+                    "collector payout is " + collector.PayoutMultiplier + ", the web build has 1.45");
+                Check.IsTrue(Math.Abs(collector.QualityWeight - 1.3d) < 0.0001d,
+                    "collector quality weight is " + collector.QualityWeight + ", the web build has 1.3");
+                Check.IsTrue(Math.Abs(collector.ReputationWeight - 6d) < 0.0001d,
+                    "collector reputation weight is " + collector.ReputationWeight + ", the web build has 6");
+                Check.AreEqual(4, collector.MinRankLevel, "the collector unlocks at a different rank in the web build");
+                Check.AreEqual("Collector", collector.DisplayName, "the badge reads differently in the web build");
+            });
+
+            suite.Add("The standing dials match the web build", () =>
+            {
+                // web: B.neutralSatisfaction / B.standingStep / B.standingBiasRange
+                Check.IsTrue(Math.Abs(GameBalance.NeutralSatisfaction - 0.93d) < 0.0001d,
+                    "neutral satisfaction is " + GameBalance.NeutralSatisfaction + ", the web build has 0.93");
+                Check.IsTrue(Math.Abs(GameBalance.StandingStep - 0.04d) < 0.0001d,
+                    "the standing step is " + GameBalance.StandingStep + ", the web build has 0.04");
+                Check.IsTrue(Math.Abs(GameBalance.StandingBiasRange - 0.25f) < 0.0001f,
+                    "the standing bias range is " + GameBalance.StandingBiasRange + ", the web build has 0.25");
             });
 
             return suite;

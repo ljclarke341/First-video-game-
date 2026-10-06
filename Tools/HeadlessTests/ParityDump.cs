@@ -352,6 +352,7 @@ namespace GarageTycoon.HeadlessTests
                     .Append(",\"minJobs\":").Append(definition.MinimumJobs)
                     .Append(",\"maxJobs\":").Append(definition.MaximumJobs)
                     .Append(",\"fleet\":").Append(definition.FleetSize)
+                    .Append(",\"rep\":").Append(D(definition.ReputationWeight))
                     .Append(",\"weight\":").Append(F(definition.SpawnWeight))
                     .Append(",\"minRank\":").Append(definition.MinRankLevel)
                     .Append('}');
@@ -575,6 +576,42 @@ namespace GarageTycoon.HeadlessTests
                             .Append(",\"pct\":").Append(quality.Percent)
                             .Append(",\"sat\":").Append(D(Math.Round(quality.Satisfaction, 6)))
                             .Append(",\"pay\":").Append(D(Core.Util.MathUtil.RoundCash(pay)))
+                            .Append('}');
+                    }
+                }
+            }
+
+            json.Append("\n],\n");
+
+            // --- standing: what one customer does to the garage's name ---
+            //
+            // The satisfaction figure is the existing one; all that is new is how far it moves the
+            // needle. Compared across a spread of satisfactions and weights, because a build that
+            // agreed on the weight and disagreed on the arithmetic would drift apart over a
+            // session rather than at once.
+            json.Append("\"standing\":[\n");
+            first = true;
+
+            foreach (double satisfaction in new[] { 0d, 0.4d, 0.75d, 0.93d, 0.99d, 1d })
+            {
+                foreach (double weight in new[] { 1d, 6d })
+                {
+                    foreach (double from in new[] { -0.5d, 0d, 0.5d })
+                    {
+                        double move = (satisfaction - Core.Balance.GameBalance.NeutralSatisfaction)
+                                      * Core.Balance.GameBalance.StandingStep * weight;
+
+                        double after = Core.Util.MathUtil.Clamp(from + move, -1d, 1d);
+                        double bias = after * Core.Balance.GameBalance.StandingBiasRange;
+
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"sat\":").Append(D(satisfaction))
+                            .Append(",\"w\":").Append(D(weight))
+                            .Append(",\"from\":").Append(D(from))
+                            .Append(",\"after\":").Append(D(Math.Round(after, 6)))
+                            .Append(",\"bias\":").Append(D(Math.Round(bias, 6)))
                             .Append('}');
                     }
                 }

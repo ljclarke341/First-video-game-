@@ -109,6 +109,7 @@ namespace GarageTycoon.Core.Save
             // --- statistics ---
             GameStats stats = simulation.Stats;
             JsonValue statsJson = JsonValue.Object();
+            statsJson.Add("standing", stats.Standing);
             statsJson.Add("carsCompleted", stats.CarsCompleted);
             statsJson.Add("carsLost", stats.CarsLost);
             statsJson.Add("jobsCompleted", stats.JobsCompleted);
@@ -310,6 +311,9 @@ namespace GarageTycoon.Core.Save
 
             // --- statistics ---
             JsonValue stats = root["stats"];
+            // Absent in a save from before standing, and 0 is right for those: a garage nobody
+            // had an opinion about yet.
+            simulation.Stats.Standing = Util.MathUtil.Clamp(stats["standing"].AsDouble(0d), -1d, 1d);
             simulation.Stats.CarsCompleted = stats["carsCompleted"].AsInt(0);
             simulation.Stats.CarsLost = stats["carsLost"].AsInt(0);
             simulation.Stats.JobsCompleted = stats["jobsCompleted"].AsInt(0);

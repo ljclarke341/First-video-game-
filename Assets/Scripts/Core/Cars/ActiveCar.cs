@@ -81,6 +81,16 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>
+        /// How heavily this customer's opinion counts towards the garage's standing.
+        ///
+        /// One for almost everybody. A collector tells people.
+        /// </summary>
+        public double ReputationWeight
+        {
+            get { return Special == null ? 1d : Special.ReputationWeight; }
+        }
+
+        /// <summary>
         /// The grade of part this customer turned up expecting.
         ///
         /// Null for everybody ordinary - they have no opinion, so nothing they are fitted counts

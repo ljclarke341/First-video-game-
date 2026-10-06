@@ -15,6 +15,21 @@ namespace GarageTycoon.Core.Simulation
         public double BestCarPayout;
         public float PlayTimeSeconds;
 
+        /// <summary>
+        /// How the garage is spoken of, -1 to +1, starting at 0 for a garage nobody has heard of.
+        ///
+        /// This is not a new score so much as the missing half of one that was already there. The
+        /// spawner has always rolled rarity against what its own comment calls "the player's
+        /// reputation bias", and until now that bias could only be BOUGHT, from the Reputation
+        /// upgrades. Standing is the part you earn: serve people well and better cars start
+        /// turning up, serve them badly and they stop.
+        ///
+        /// Every finished customer moves it by how far their satisfaction landed either side of an
+        /// ordinary job, so competent ordinary work drifts nowhere. A collector moves it several
+        /// times as hard, in whichever direction they are pointing.
+        /// </summary>
+        public double Standing;
+
         /// <summary>Longest work streak ever landed.</summary>
         public int BestStreak;
 
@@ -45,6 +60,7 @@ namespace GarageTycoon.Core.Simulation
             BestCarPayout = 0d;
             PlayTimeSeconds = 0f;
             BestStreak = 0;
+            Standing = 0d;
         }
     }
 

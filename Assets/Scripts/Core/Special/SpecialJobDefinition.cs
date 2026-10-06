@@ -87,6 +87,17 @@ namespace GarageTycoon.Core.Special
         /// <summary>The most repairs this job may turn up with, or 0 for no cap.</summary>
         public int MaximumJobs { get; private set; }
 
+        /// <summary>
+        /// How heavily this customer's opinion counts towards the garage's standing, 1 for the
+        /// usual.
+        ///
+        /// This is what a VIP is. An ordinary customer who leaves unhappy is one unhappy customer;
+        /// a collector who leaves unhappy tells everybody. The satisfaction figure itself is the
+        /// existing one, computed exactly as it always was - all this decides is how far it moves
+        /// the needle.
+        /// </summary>
+        public double ReputationWeight { get; private set; }
+
         /// <summary>The grade this customer expects. Fitting below it disappoints them.</summary>
 /// <summary>
         /// The grade of part this customer turned up expecting, or null if they do not care.
@@ -113,7 +124,7 @@ namespace GarageTycoon.Core.Special
             string colorHex, double patienceMultiplier, double payoutMultiplier,
             double speedTipMultiplier, double qualityWeight, int extraJobs,
             PartGrade? expectedGrade, float spawnWeight, int minRankLevel,
-            double workMultiplier = 1d, int minimumJobs = 0, int fleetSize = 0, int maximumJobs = 0)
+            double workMultiplier = 1d, int minimumJobs = 0, int fleetSize = 0, int maximumJobs = 0, double reputationWeight = 1d)
         {
             Type = type;
             DisplayName = displayName;
@@ -128,6 +139,7 @@ namespace GarageTycoon.Core.Special
             MinimumJobs = minimumJobs;
             FleetSize = fleetSize;
             MaximumJobs = maximumJobs;
+            ReputationWeight = reputationWeight <= 0d ? 1d : reputationWeight;
             ExpectedGrade = expectedGrade;
             SpawnWeight = spawnWeight;
             MinRankLevel = minRankLevel;

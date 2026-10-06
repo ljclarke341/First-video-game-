@@ -114,7 +114,8 @@ namespace GarageTycoon.HeadlessTests
                 Tests.DiagnosisGateTests.Build(),
                 Tests.PerformanceJobTests.Build(),
                 Tests.RestorationJobTests.Build(),
-                Tests.FleetJobTests.Build()
+                Tests.FleetJobTests.Build(),
+                Tests.CollectorJobTests.Build()
             };
 
             int passed = 0;

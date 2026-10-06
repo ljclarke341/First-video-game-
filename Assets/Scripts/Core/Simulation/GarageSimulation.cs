@@ -386,7 +386,11 @@ namespace GarageTycoon.Core.Simulation
             SpawnParametersBundle bundle = Effects.ToSpawnValues();
 
             SpawnParameters parameters = SpawnParameters.Default;
-            parameters.RarityBias = bundle.RarityBias;
+            // Standing rides on top of what the Reputation upgrades bought. Positive standing
+            // brings better cars in, negative keeps them away - the same dial, now earned as well
+            // as bought. Clamped by the spawner, so this can never drive it out of range.
+            parameters.RarityBias = bundle.RarityBias
+                + (float)(Stats.Standing * GameBalance.StandingBiasRange);
             parameters.PatienceMultiplier = bundle.PatienceMultiplier;
             parameters.PayoutMultiplier = bundle.PayoutMultiplier * modifiers.PayoutMultiplier;
             parameters.ExtraJobChance = modifiers.ExtraJobChance;
@@ -703,6 +707,43 @@ namespace GarageTycoon.Core.Simulation
             session.RestartDelay = session.IsMechanic ? 0.3f : 0.4f;
         }
 
+        /// <summary>
+        /// Moves the garage's standing by how this customer felt about the work.
+        ///
+        /// The satisfaction figure is the existing one, computed exactly as it always was and
+        /// adjusted for what they were quoted. All that is new is that it now DOES something: it
+        /// nudges the bias the spawner has always rolled rarity against. Serve people well and
+        /// better cars start turning up.
+        ///
+        /// Measured either side of NeutralSatisfaction, so a garage doing competent ordinary work
+        /// drifts nowhere in particular. A customer whose opinion carries weight - a collector -
+        /// moves it several times as far, in whichever direction they are pointing.
+        ///
+        /// A car nobody did any work on cannot have an opinion worth recording, so a declined or
+        /// instantly-finished one is skipped. Without that, turning work away would quietly be a
+        /// reputation decision as well as a capacity one.
+        /// </summary>
+        private void RecordStanding(ActiveCar car)
+        {
+            if (car == null) return;
+            if (car.QuotedAs == Cars.QuoteOption.Declined) return;
+
+            int roundsPlayed = 0;
+            for (int i = 0; i < car.Jobs.Count; i++) roundsPlayed += car.Jobs[i].RoundsPlayed;
+            if (roundsPlayed <= 0) return;
+
+            QualityReport quality = RepairQuality.ForCar(car);
+
+            double satisfaction = car.Quoted
+                ? Cars.Quote.AdjustSatisfaction(quality.Satisfaction, car.Mood, car.QuotedAs)
+                : quality.Satisfaction;
+
+            double move = (satisfaction - GameBalance.NeutralSatisfaction)
+                          * GameBalance.StandingStep * car.ReputationWeight;
+
+            Stats.Standing = MathUtil.Clamp(Stats.Standing + move, -1d, 1d);
+        }
+
         /// <summary>Pays the finishing tips, frees the bay and tells the UI the customer drove off happy.</summary>
         private void CompleteCar(ActiveCar car)
         {
@@ -714,6 +755,8 @@ namespace GarageTycoon.Core.Simulation
             {
                 CancelFleet();
             }
+
+            RecordStanding(car);
 
             // Finishing early earns a tip proportional to the car's value, which is what makes
             // speed worth chasing without letting the tip eclipse the repair itself.

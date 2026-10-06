@@ -149,7 +149,44 @@ namespace GarageTycoon.Core.Special
                 expectedGrade: null,
                 spawnWeight: 1f,
                 minRankLevel: 4,
-                fleetSize: 8, maximumJobs: 2)
+                fleetSize: 8, maximumJobs: 2),
+
+            // COLLECTOR: the one where your name is on the line.
+            //
+            // Called Collector rather than VIP because CustomerMood already has a VIP, and two
+            // badges both reading VIP would be a riddle rather than a warning.
+            //
+            // The car is ordinary. Ordinary faults, ordinary length, ordinary patience, ordinary
+            // parts, no grade expectation - deliberately, because Performance already owns "buy
+            // the better part" and Restoration already owns "this will take all afternoon". What
+            // makes this one different is who is watching.
+            //
+            // Their opinion counts SIX TIMES as heavily towards the garage's standing as anybody
+            // else's, and standing is what decides the calibre of car that turns up next (see
+            // GameStats.Standing - it rides on the same rarity bias the Reputation upgrades buy).
+            // So the risk is not this car. The risk is the next twenty.
+            //
+            // Quality weighs 1.3 here rather than Performance's 1.8: enough that doing it properly
+            // pays, not so much that it becomes a parts decision wearing a different hat. The real
+            // consequence is not in this cheque at all.
+            //
+            // The decision: back yourself, or take the safer work. A player who lands their rounds
+            // should want these. A player who is struggling should think twice, because a botched
+            // collector drags the whole forecourt down for a good while afterwards.
+            new SpecialJobDefinition(
+                SpecialJobType.Vip,
+                "Collector",
+                "Knows everyone. However this goes, people will hear about it.",
+                "#B06BD9",
+                patienceMultiplier: 1d,
+                payoutMultiplier: 1.45d,
+                speedTipMultiplier: 1d,
+                qualityWeight: 1.3d,
+                extraJobs: 0,
+                expectedGrade: null,
+                spawnWeight: 1f,
+                minRankLevel: 4,
+                reputationWeight: 6d)
         };
 
         /// <summary>The definitions as shipped, so a measurement run can always put them back.</summary>

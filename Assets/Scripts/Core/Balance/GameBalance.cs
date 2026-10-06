@@ -160,6 +160,28 @@ namespace GarageTycoon.Core.Balance
         /// </summary>
         public const double GradeShortfallPenalty = 0.13d;
 
+        /// <summary>
+        /// The satisfaction a customer leaves with when the garage did an ordinary job.
+        ///
+        /// Standing moves by how far a customer's satisfaction landed either side of this, so
+        /// setting it at what ordinary work actually scores is what keeps ordinary play neutral:
+        /// a garage serving ordinary customers competently drifts nowhere in particular, which is
+        /// exactly right. Measured across real sessions rather than guessed.
+        /// </summary>
+        public const double NeutralSatisfaction = 0.93d;
+
+        /// <summary>How far one ordinary customer moves the garage's standing.</summary>
+        public const double StandingStep = 0.04d;
+
+        /// <summary>
+        /// How much of the rarity bias standing can account for.
+        ///
+        /// Small on purpose. Standing is a nudge on top of what the Reputation upgrades buy, not a
+        /// replacement for them - a garage that never buys signage should not be able to out-earn
+        /// one that did by being tidy.
+        /// </summary>
+        public const float StandingBiasRange = 0.25f;
+
         /// <summary>Progress (0..1) granted by a perfectly executed mini-game step.</summary>
         public const double PerfectProgress = 0.45d;
 

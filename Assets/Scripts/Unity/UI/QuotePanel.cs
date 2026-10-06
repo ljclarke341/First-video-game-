@@ -267,6 +267,17 @@ namespace GarageTycoon.Unity.UI
         /// </summary>
         private void RefreshExpectation()
         {
+            // A collector's stake comes first of all: a grade expectation is about this car, a
+            // fleet is about the next eight, and this is about every car after that.
+            if (_car.ReputationWeight > 1d)
+            {
+                _expectation.gameObject.SetActive(true);
+                _expectation.text = "Collector - high expectations. "
+                    + "How this one turns out will be talked about";
+                _expectation.color = Theme.Hex("#B06BD9");
+                return;
+            }
+
             // The fleet decision takes priority on this line, because it is the bigger one: a
             // grade expectation is about this car, a fleet is about the next eight.
             if (_car.FleetBatchId != 0)

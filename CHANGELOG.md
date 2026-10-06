@@ -6,6 +6,96 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase B.2h — Special jobs: COLLECTOR (VIP), and the reputation that was already there
+
+The last of the five, and the first whose answer depends on the PLAYER rather than the garage.
+
+### What I found before writing anything
+
+Two things, and they decided the design:
+
+1. **`QualityReport.Satisfaction` was computed and never used.** Only tests and probes read it -
+   the same shape as the Phase A "quality is scored but not paid on" hole.
+2. **The reputation system already existed.** It is `RarityBias`, which the spawner's own comment
+   calls *"the player's reputation bias"*, and which the Reputation upgrade branch feeds. Until now
+   you could only **buy** it.
+
+So the collector's job was to connect the two: let reputation be **earned**.
+
+### Exact Core rules added
+
+- **`GameStats.Standing`**, -1 to +1, starting at 0. Every finished customer moves it by how far
+  their satisfaction landed either side of `NeutralSatisfaction`, times `StandingStep`, times that
+  customer's weight. Clamped. Saved.
+- **`SpecialJobDefinition.ReputationWeight`** - how heavily this customer's opinion counts. 1 for
+  everybody; **6** for a collector.
+- Standing feeds the existing `RarityBias` through `StandingBiasRange` (0.25). No second score, no
+  new currency, no new dial - the one the game already rolled rarity against.
+- A car nobody worked on has no opinion, so declining is still free.
+
+Collector: payout **1.45x**, quality weight **1.3** (deliberately below Performance's 1.8), everything
+else ordinary. Rank 4. Named Collector because `CustomerMood` already has a VIP.
+
+### The neutral point, measured
+
+`NeutralSatisfaction` is set at what an ordinary job actually scores, so ordinary play drifts
+nowhere and the ordinary economy is untouched:
+
+| skill | satisfaction | standing after 15 min | rarity bias moved by |
+|---|---|---|---|
+| 0.50 | 0.815 | -0.057 | **-0.014** |
+| 0.70 | 0.908 | -0.022 | **-0.006** |
+| 0.85 | 0.983 | +0.080 | **+0.020** |
+| 0.95 | 0.998 | +0.121 | **+0.030** |
+
+### The decision depends on the player
+
+Taking every collector against turning every one away, same garage, same rank:
+
+| player | take | decline | gap |
+|---|---|---|---|
+| 0.40 poor | $165/min | $171/min | **-3.0%** |
+| 0.55 weak | $274/min | $277/min | **-1.0%** |
+| 0.70 average | $451/min | $443/min | **+2.0%** |
+| 0.85 good | $808/min | $804/min | +0.4% |
+| 0.95 expert | $1,131/min | $1,113/min | **+1.6%** |
+
+And what one collector does to the garage's name:
+
+| player | collector quality | satisfaction | standing per collector |
+|---|---|---|---|
+| poor | 0.434 | 0.783 | **-0.0352** |
+| average | 0.682 | 0.909 | -0.0051 |
+| expert | 0.940 | 0.994 | **+0.0154** |
+
+The downside is about **eight times** the upside, because satisfaction is capped at 1.0 and has no
+floor. Botching a collector costs you the next twenty cars; nailing one is a modest nudge. That
+asymmetry is the risk.
+
+### It is not a parts decision
+
+Deliberately checked, because Performance already owns that one:
+
+| policy on a collector | income/min | collector $/car | collector quality |
+|---|---|---|---|
+| Budget | $450 | $321 | 0.611 |
+| Standard | $451 | $325 | 0.682 |
+| Performance | $437 | $316 | 0.725 |
+
+Flat. Better parts raise the quality score but do not pay for themselves here, which is exactly
+right - a test pins that parts move a collector less than they move a Performance job.
+
+### Verified
+
+- **375 tests pass** (20 new).
+- **585 cross-build parity cases, all identical** (up from 548), with a new `standing` section.
+- Compile check clean, 20-minute soak clean, saves round-trip, pre-standing saves load neutral,
+  repeated offline catch-ups cannot run the name away.
+- Browser: violet COLLECTOR badge, the ramp warning, the stakes on the quote, and standing moving
+  +0.017 on great work against -0.137 on botched work.
+
+---
+
 ## Phase B.2g — Special jobs: FLEET
 
 The fourth of the five, and the first that is not about the car in front of you.
@@ -1542,6 +1632,12 @@ I would want a second opinion on.
    *damage* — a dent, exhaust smoke, a paint patch, an electrics spark — that fades as each job is
    finished. Unity does not, because those are drawn shapes per job type and it is a chunk of
    work for something the bolts already communicate. Say the word if you want parity.
+28. **Satisfaction now does something, for the first time.** It was computed from Phase A onwards
+   and read by nobody. It now drives the garage's standing, which drives the rarity bias. That is a
+   real change to how the game behaves over a long session - good play brings better cars - and it
+   is worth you deciding whether you want it that way round. The alternative is to let only
+   collectors move standing, which keeps ordinary play bit-identical but is less coherent.
+
 27. **The garage is permanently arrival-saturated, and that limits what any job can do.** The
    queue sits at 4.3-5.4 of 6 in every configuration I measured, from one bay to four bays with
    four mechanics. Arrivals outrun throughput at every stage of the game, which is why Fleet's
