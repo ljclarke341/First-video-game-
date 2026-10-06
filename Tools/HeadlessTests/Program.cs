@@ -27,6 +27,17 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            if (args != null && args.Length > 1 && args[0] == "prog")
+            {
+                string seeds = args.Length > 2 ? args[2] : null;
+                if (args[1] == "crew") { ProgressionProbe.Crew(seeds); return 0; }
+                if (args[1] == "capacity") { ProgressionProbe.Capacity(seeds); return 0; }
+                if (args[1] == "toolwall") { ProgressionProbe.ToolWall(seeds); return 0; }
+                if (args[1] == "rounds") { ProgressionProbe.ToolWallRounds(); return 0; }
+                if (args[1] == "prestige") { ProgressionProbe.Prestige(seeds); return 0; }
+                if (args[1] == "reset") { ProgressionProbe.PrestigeReset(); return 0; }
+            }
+
             if (args != null && args.Length > 1 && args[0] == "quality" && args[1] == "dist")
             {
                 int seeds = 60;

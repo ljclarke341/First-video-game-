@@ -6,6 +6,126 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.4 — Audit: the fourth mechanic, capacity, the tool wall, prestige
+
+An audit. **No shipped value changed** - `Assets/` is untouched. Four issues investigated, and two
+of them turned out to be one problem. Two unrelated parity bugs fell out of the prestige inspection.
+
+### 1 + 2. The fourth mechanic and "late-game over-capacity" are the SAME bug
+
+The player permanently occupies one bay, and a mechanic can only work a car that is already in a bay
+and that nobody else holds. So **only (bays - 1) mechanics can ever work.** The Nth mechanic is worth
+nothing whenever N equals the bay count - this is a general law, not a quirk of the fourth:
+
+| garage | last mechanic's busy% | income |
+|---|---|---|
+| 1 bay, 1 crew | **0.1%** | $813 - *below* the $822 with no crew at all |
+| 2 bays, 1 crew | 98.2% | $1,250 |
+| 2 bays, 2 crew | **0.0%** | $1,270 |
+| 3 bays, 2 crew | 93.6% | $1,731 |
+| 3 bays, 3 crew | **0.0%** | $1,750 |
+| 4 bays, 3 crew | 69.3% | $1,975 |
+| 4 bays, 4 crew | **0.0%** | $1,994 |
+
+**"Hire Mechanic" does nothing at all until you own a second bay**, and costs $650 for the privilege.
+That is an early-game trap the game never mentions.
+
+Attribution, each cause isolated:
+
+- **(a) bay capacity** - binding. Crew beyond bays-1 is dead weight.
+- **(b) the player holding a bay** - the direct cause. Hands-off at 4 bays, mechanic #4 goes from
+  **0.0% busy to 82.3%** and from +$19/min to **+$316/min**, at the same arrival rate.
+- **(c) mechanic throughput** - not the limiter; mechanics 1-3 run at 69-98% busy.
+- **(d) queue demand** - ruled out, see below.
+- **(e) training** - matters enormously for mechanics 1-3 (untrained +$148/+$89/+$103 against trained
+  +$489/+$429/+$217) and not at all for #4 (+$2 against +$19).
+- **(f) arrival rate** - ruled out. At 6.5s and 4.5s between cars, with the forecourt full 24% and
+  54% of the time and 3.9-5.2 cars queued, **#4 is still 0.0% busy**.
+
+So late-game "over-capacity" is not a demand problem: it is this same mis-allocation. Crew
+utilisation of 59% at 4 bays/4 crew is entirely #4's zero. The 4th *bay* is still clearly worth
+buying (+$244/min, 94 cars to 109). The throughput ceiling is ~126 cars against ~110 arriving, so
+there is about 13% unused headroom - and it is headroom the player cannot reach.
+
+**Correction to C.2:** the fourth mechanic is **not** worth -$17/min. At 300 seeds it is **+$19/min
+with car throughput literally unchanged** (109.4 against 109.4). Both figures are noise around zero;
+the honest statement is that it does nothing, for $8,986.
+
+### 3. The Labelled Tool Wall is genuinely harmful
+
+Root cause, measured rather than inferred. Core builds both memory games as
+`TimeLimit = PreviewSeconds + a FIXED answer window`, and the upgrade is added to `PreviewSeconds`:
+
+| levels | ToolMatch round | answer window | RapidSequence round | answer window |
+|---|---|---|---|---|
+| 0 | 6.80s | 4.20s | 5.31s | 3.00s |
+| 6 | 7.88s (+16%) | **4.20s** | 6.39s (+20%) | **3.00s** |
+
+Every level makes the round longer in real time and gives the player no more room to answer, while
+the customer's patience burns on the clock regardless.
+
+It loses money for **everyone**, monotonically, at every level:
+
+| garage / player | 6 levels vs none | cars | quality |
+|---|---|---|---|
+| skill 0.45, 3 bays 2 crew | **-19.0%** | 65.0 to 56.3 | 0.754 to 0.766 |
+| skill 0.65, 3 bays 2 crew | **-17.0%** | 81.4 to 64.9 | 0.760 to 0.774 |
+| skill 0.85, 3 bays 2 crew | **-20.4%** | 94.3 to 76.2 | 0.808 to 0.817 |
+| skill 0.85, 1 bay no crew | **-19.6%** | 35.8 to 28.2 | 0.884 to 0.898 |
+| hands off, 4 bays 4 crew | **-11.4%** | 105.8 to 91.2 | 0.771 to 0.787 |
+
+My prior guess that weak players would benefit was wrong: at skill 0.45 it is still -19%. The recall
+gain is capped (`PreviewComfort` tops out at 1.18x) while the time cost is linear. Quality does rise
+- by about +0.012 - which is worth far less than a fifth of the throughput. Verdict: **(a) genuinely
+harmful**, and the only upgrade in the game that is reliably negative.
+
+### 4. Prestige works and takes two to three hours
+
+Not impossible, not bugged. **100% of runs reach it**, 30 seeds each, capped at four hours:
+
+| profile | reached | median | p25 | p75 | fastest | slowest | tokens |
+|---|---|---|---|---|---|---|---|
+| early, buys nothing | 100% | 3.27h | 3.19h | 3.39h | 2.97h | 3.76h | 1.0 |
+| normal play (shops) | 100% | 3.28h | 3.21h | 3.37h | 3.02h | 3.60h | **9.7** |
+| trained mid, shops | 100% | 2.10h | 2.06h | 2.14h | 1.95h | 2.41h | 14.3 |
+| trained late, shops | 100% | 1.78h | 1.75h | 1.84h | 1.58h | 1.98h | 15.0 |
+| trained late, hoards | 100% | 1.54h | 1.49h | 1.59h | 1.30h | 1.66h | 3.0 |
+
+The C.3 note that "0% of runs reached prestige within the hour" was true and misleading: it takes
+1.5-3.3 hours, which for a tycoon game's reset loop is reasonable. Better still, the incentive is
+well shaped - buying upgrades reaches prestige at the *same* time as hoarding (3.28h against 3.27h)
+but banks **ten times the tokens**. Verdict: **(d) reasonable but poorly communicated.** The
+requirement is cash ON HAND, so the progress bar slides backwards every time the player buys
+anything, and nothing tells them the horizon is hours rather than minutes.
+
+### Two parity bugs found while inspecting the reset
+
+Core's `TryPrestige()` and the web's `doPrestige()` disagree, and the web's comments state the
+intent ("nobody has heard of the new one", "selling the garage ends any account in progress"), so
+Core is the one that is wrong. Verified by measurement, not by reading:
+
+```
+before:  standing -0.062   fleet vans left 5   bays 4
+after:   standing -0.062   fleet vans left 5   bays 1
+  standing cleared in Core?  NO - DIVERGES
+  fleet cancelled in Core?   NO - DIVERGES
+  fleet vans arriving at the NEW garage (rank 0, fleet unlocks at rank 4): 5
+```
+
+1. **A ruined reputation follows the player into the new garage** in Unity, and does not in the web.
+2. **A fleet run in progress survives the sell-up**, and all five remaining vans then arrive at a
+   brand-new rank-0 garage - where fleets are not unlocked until rank 4 ($350,000 lifetime).
+
+The parity suite never caught these because it compares shared *formulas* and prestige is a state
+transition with no dump section.
+
+### Verified
+
+392 tests pass, 1,161 parity cases identical, Unity compile check clean, web soak clean with no page
+errors, browser save round-trip and offline catch-up unchanged. `Assets/` is byte-for-byte untouched.
+
+---
+
 ## Phase C.3 — The quality curve had no middle
 
 Repair quality was bimodal: `perfect%` and `top-band%` were **the same number for every actor
