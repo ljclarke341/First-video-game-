@@ -30,6 +30,44 @@ namespace GarageTycoon.Core.Cars
         Declined = 3
     }
 
+    /// <summary>
+    /// Whether a car can be quoted for, and if not, why not.
+    ///
+    /// These are FOUR different states that were previously collapsed into one question -
+    /// "has anything been revealed?" - and that conflation was a bug. A diagnosis check reveals a
+    /// SYSTEM, and a revealed system need not carry any outstanding work: it can be perfectly
+    /// healthy, or its job can already be finished. So a successful check could leave the garage
+    /// with something revealed and nothing to quote for.
+    ///
+    /// The web build then treated that empty quote as "this car is already done" and silently
+    /// accepted EVERY job on the car, hidden ones included, and started repairing. The player
+    /// pressed a button marked "Quote what I found", never saw a quote or a price, and was
+    /// committed to the most expensive option on work they had never been shown.
+    ///
+    /// Core owns the distinction now so the two builds cannot answer it differently.
+    /// </summary>
+    public enum QuoteReadiness
+    {
+        /// <summary>Nobody has looked at anything yet. There is nothing to write a quote from.</summary>
+        NothingInspected = 0,
+
+        /// <summary>
+        /// Something has been revealed, but none of it is work that still needs doing - and the car
+        /// DOES still have jobs nobody has found. Quoting here would be quoting for an empty bill,
+        /// and must not be mistaken for the car being finished.
+        /// </summary>
+        NothingRepairableFound = 1,
+
+        /// <summary>There is revealed, outstanding work. A quote can be written for it.</summary>
+        ReadyToQuote = 2,
+
+        /// <summary>
+        /// The car genuinely has no outstanding work left, revealed or hidden. This is the real
+        /// "already done" case, and the only one in which an empty quote may be completed outright.
+        /// </summary>
+        NoWorkRemaining = 3
+    }
+
     /// <summary>One line on the quote: a repair, what it is for, and what it costs.</summary>
     public struct QuoteLine
     {
@@ -145,6 +183,51 @@ namespace GarageTycoon.Core.Cars
             }
 
             return quote;
+        }
+
+        /// <summary>
+        /// Which of the four quote states this car is in. The single rule both UIs ask.
+        ///
+        /// "Outstanding" means a job that is not finished. A job the customer declined is still
+        /// outstanding work as far as this question goes - declining is an answer to a quote, and
+        /// the car leaves on the next tick, so it never reaches here.
+        /// </summary>
+        public static QuoteReadiness ReadinessFor(ActiveCar car)
+        {
+            if (car == null) return QuoteReadiness.NothingInspected;
+
+            int revealedOutstanding = 0;
+            int hiddenOutstanding = 0;
+
+            for (int i = 0; i < car.Jobs.Count; i++)
+            {
+                RepairJob job = car.Jobs[i];
+                if (job.IsComplete) continue;
+
+                if (car.Diagnosis.IsRevealed(CarCondition.SystemFor(job.Type))) revealedOutstanding++;
+                else hiddenOutstanding++;
+            }
+
+            // Nothing left to do at all: the genuine completion case.
+            if (revealedOutstanding == 0 && hiddenOutstanding == 0) return QuoteReadiness.NoWorkRemaining;
+
+            // Something found that still needs doing: a quote can be written.
+            if (revealedOutstanding > 0) return QuoteReadiness.ReadyToQuote;
+
+            // Work remains, but none of it has been found. Either nobody has looked, or what was
+            // looked at turned out to be fine - two different things to tell the player.
+            return car.Diagnosis.RevealedCount > 0
+                ? QuoteReadiness.NothingRepairableFound
+                : QuoteReadiness.NothingInspected;
+        }
+
+        /// <summary>
+        /// True only when an empty quote means the car is finished, rather than meaning the garage
+        /// has not found the work yet. The web build's empty-quote shortcut must be gated on this.
+        /// </summary>
+        public static bool CanCompleteWithoutQuoting(ActiveCar car)
+        {
+            return ReadinessFor(car) == QuoteReadiness.NoWorkRemaining;
         }
 
         /// <summary>

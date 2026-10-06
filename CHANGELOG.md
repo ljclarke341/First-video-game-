@@ -6,6 +6,82 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Quote bypass fix — the button that accepted work nobody quoted
+
+A QA pass found the quote button acting on a car with **nothing repairable revealed**: it opened an
+empty quote and the empty-quote shortcut then accepted *every* job on the car, hidden faults included,
+and started a repair session. Reproduced 6 times in 10 with real browser clicks before the fix.
+
+### Root cause — two different questions, asked inconsistently
+
+The gate on the button asked **"has anything been revealed?"** (`Diagnosis.RevealedCount > 0`), but
+the quote is built from **revealed work that is still outstanding** (`Quote.For` skips completed jobs
+and unrevealed systems). Inspect a system that turns out to be *healthy* and those two answers part
+company: something is revealed, nothing is quotable. The button enabled, the quote came back with zero
+lines, and `renderQuote`'s shortcut read an empty bill as "this car is already finished" and called
+`acceptQuote(car, quote, 'all')` — which accepts work the customer was never shown.
+
+Three states were being collapsed into one. They are now distinct:
+
+| State | Meaning | Quote button |
+|---|---|---|
+| `NothingInspected` | nothing revealed yet | disabled, "Nothing found yet" |
+| `NothingRepairableFound` | revealed, but all of it healthy | disabled, "Nothing to fix found yet" |
+| `ReadyToQuote` | revealed outstanding work exists | enabled |
+| `NoWorkRemaining` | no outstanding jobs at all, hidden or revealed | disabled, "Nothing left to do" |
+
+Only the fourth state may complete a car without a quote, and it is the only one that can, because it
+is the only one where there is genuinely nothing left to bill for.
+
+### The rule lives in Core
+
+`Quote.ReadinessFor(car)` and `Quote.CanCompleteWithoutQuoting(car)` in
+`Assets/Scripts/Core/Cars/RepairQuote.cs`. Both UIs now ask Core the question instead of each deciding
+for itself, so Unity and the web cannot drift apart on it — and a new `quoteReadiness` parity section
+drives all 45 combinations of (revealed outstanding, hidden outstanding, revealed count) through both
+builds and compares the answers.
+
+Hidden work stays hidden throughout: readiness counts hidden jobs to tell "nothing left" from
+"nothing found", but never reveals one, never quotes one, and never accepts one.
+
+### Changed
+
+- `Assets/Scripts/Core/Cars/RepairQuote.cs` — new `QuoteReadiness` enum, `Quote.ReadinessFor`,
+  `Quote.CanCompleteWithoutQuoting`.
+- `Assets/Scripts/Unity/UI/InspectPanel.cs` — button gated on `ReadyToQuote`, four distinct labels.
+- `Assets/Scripts/Unity/Minigames/MinigamePanel.cs` — `OpenQuote` refuses a car that is not
+  `ReadyToQuote` and returns the player to the ramp instead of opening an empty quote.
+- `garage-tycoon.html` (web) — the same four states, the same gate, the same labels, and the
+  empty-quote shortcut now requires `canCompleteWithoutQuoting(car)`.
+- `Tools/HeadlessTests/Tests/QuoteReadinessTests.cs` — 10 new tests.
+- `Tools/HeadlessTests/ParityDump.cs`, `vparity.js`, `diffparity.py` — the new parity section.
+
+### Verified
+
+- **417 tests pass** (was 407) — 10 new.
+- **1,249 parity cases identical** (was 1,228) — 21 new.
+- Unity compile check: 0 errors.
+- **Real trusted browser clicks, 10 runs each.** Revealed outstanding work: quote opened 10/10, rows
+  shown == lines 10/10, decline button present 10/10, no auto-accept 10/10, no session started 10/10,
+  hidden work preserved 10/10. Revealed-but-healthy (the path that used to fail): button disabled
+  10/10, the click refused 10/10, no quote set at all 10/10, no auto-accept 10/10, no session started
+  10/10, hidden work preserved 10/10, still on the ramp 10/10. No console errors.
+- **Fleet decline, which this bug was blocking** — 14/14 checks: decline button present, decline
+  recorded, nothing accepted, no session started, the whole account cancelled
+  (`fleetLeft`/`fleetId`/`fleetOf` all 0), the van left the bay, no cash taken, no parts consumed,
+  nothing earned, and no fleet van arrived again in eight further minutes of trade.
+- Fresh first launch: button starts disabled at "Nothing found yet", enables only once real
+  outstanding work is found, quote opens, repairs pay out, no errors.
+
+### Noticed, not changed (no behaviour change was in scope here)
+
+Declining a fleet only stops vans that have **not yet arrived**. Vans already on the forecourt are
+still served. Core's `CancelFleet` and the web's are identical on this, so the builds agree and it is
+existing design rather than drift — but if the intent is that turning the account down clears the
+whole run off the forecourt, that is a separate change.
+
+---
+
 ## Phase C.4 (follow-up) — Verification, and the 150k
 
 A review of a downloaded HTML file reported the mechanic cap, the prestige readout and the sell-up

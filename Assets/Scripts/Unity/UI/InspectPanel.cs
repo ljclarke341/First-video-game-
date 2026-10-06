@@ -269,16 +269,37 @@ namespace GarageTycoon.Unity.UI
             }
 
             bool found = _car.Diagnosis.FoundEverything(_car.Condition);
-            // With nothing found there is nothing to quote for, so the button says so rather than
-            // opening an empty bill. "Just get stuck in" is still right there, so the player is
-            // never stuck - they just cannot write a quote for work nobody has looked at.
-            bool anythingFound = _car.Diagnosis.RevealedCount > 0;
 
-            _quoteButton.interactable = anythingFound;
-            _quoteLabel.text = !anythingFound ? "NOTHING FOUND YET"
-                : found ? "WRITE THE QUOTE" : "QUOTE WHAT I FOUND";
-            _quoteLabel.color = anythingFound ? Theme.TextOnAccent : Theme.TextMuted;
-            _quoteButton.GetComponent<Image>().color = anythingFound ? Theme.Info : Theme.PanelSunken;
+            // Asked of Core, so this build and the web one cannot answer it differently.
+            //
+            // This used to be `RevealedCount > 0`, which is a different question: a check reveals a
+            // SYSTEM, and a revealed system need not carry any work - it can simply be healthy. So
+            // the button could offer to quote for a bill with nothing on it. "Nothing found yet"
+            // and "nothing that needs doing found yet" are separate states and now read as such.
+            QuoteReadiness readiness = Quote.ReadinessFor(_car);
+            bool canQuote = readiness == QuoteReadiness.ReadyToQuote;
+
+            string label;
+            switch (readiness)
+            {
+                case QuoteReadiness.ReadyToQuote:
+                    label = found ? "WRITE THE QUOTE" : "QUOTE WHAT I FOUND";
+                    break;
+                case QuoteReadiness.NothingRepairableFound:
+                    label = "NOTHING TO FIX FOUND YET";
+                    break;
+                case QuoteReadiness.NoWorkRemaining:
+                    label = "NOTHING LEFT TO DO";
+                    break;
+                default:
+                    label = "NOTHING FOUND YET";
+                    break;
+            }
+
+            _quoteButton.interactable = canQuote;
+            _quoteLabel.text = label;
+            _quoteLabel.color = canQuote ? Theme.TextOnAccent : Theme.TextMuted;
+            _quoteButton.GetComponent<Image>().color = canQuote ? Theme.Info : Theme.PanelSunken;
         }
 
         /// <summary>Red is a real fault, amber is worn, green is fine - the timer bar's language.</summary>

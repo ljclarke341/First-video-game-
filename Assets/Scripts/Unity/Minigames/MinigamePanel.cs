@@ -167,6 +167,17 @@ namespace GarageTycoon.Unity.Minigames
 
         private void OpenQuote(ActiveCar car)
         {
+            // Belt and braces behind InspectPanel's gate: never open a bill with nothing on it.
+            // An empty quote has no decision in it, and the one thing it must NEVER do is stand in
+            // for "this car is finished" - that would commit the player to work they cannot see.
+            // The player stays on the ramp and keeps control of the car.
+            if (Quote.ReadinessFor(car) != QuoteReadiness.ReadyToQuote)
+            {
+                _inspecting = car;
+                Refresh();
+                return;
+            }
+
             _inspecting = null;
             _simulation.CancelDiagnosis();
 

@@ -219,6 +219,43 @@ namespace GarageTycoon.HeadlessTests
             }
             json.Append("\n],\n");
 
+
+            // --- quote readiness: the state that decides whether a quote may be opened ---
+            //
+            // Driven over every combination of revealed/hidden and outstanding/finished work, as
+            // counts rather than live cars, because that is exactly what the rule reads. If either
+            // build ever answers one of these differently, the quote bypass is back.
+            json.Append("\"quoteReadiness\":[\n");
+            first = true;
+            foreach (int revealedOutstanding in new[] { 0, 1, 3 })
+            {
+                foreach (int hiddenOutstanding in new[] { 0, 1, 2 })
+                {
+                    foreach (int revealedCount in new[] { 0, 1, 4 })
+                    {
+                        // A system cannot be revealed-and-outstanding without something revealed.
+                        if (revealedOutstanding > 0 && revealedCount == 0) continue;
+
+                        int state;
+                        if (revealedOutstanding == 0 && hiddenOutstanding == 0) state = 3;        // NoWorkRemaining
+                        else if (revealedOutstanding > 0) state = 2;                              // ReadyToQuote
+                        else state = revealedCount > 0 ? 1 : 0;                                  // NothingRepairable / NothingInspected
+
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"revOut\":").Append(revealedOutstanding)
+                            .Append(",\"hidOut\":").Append(hiddenOutstanding)
+                            .Append(",\"revCount\":").Append(revealedCount)
+                            .Append(",\"state\":").Append(state)
+                            .Append(",\"canComplete\":").Append(state == 3 ? 1 : 0)
+                            .Append(",\"canQuote\":").Append(state == 2 ? 1 : 0)
+                            .Append('}');
+                    }
+                }
+            }
+            json.Append("\n],\n");
+
             // --- the diagnosis bonus, over accuracy ---
             json.Append("\"diagBonus\":[\n");
             first = true;
