@@ -27,6 +27,18 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            if (args != null && args.Length > 1 && args[0] == "sweep" && args[1] == "handsoff")
+            {
+                SpawnSweepProbe.HandsOff();
+                return 0;
+            }
+
+            if (args != null && args.Length > 0 && args[0] == "sweep")
+            {
+                SpawnSweepProbe.Run();
+                return 0;
+            }
+
             if (args != null && args.Length > 0 && args[0] == "audit")
             {
                 AuditProbe.Run(args.Length > 1 ? args[1] : null);

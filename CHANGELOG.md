@@ -6,6 +6,73 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.1 — The spawn rate is not the bottleneck
+
+Measured, and **no shipped value was changed**. `Assets/` is untouched; the only edits are to the
+measuring rigs.
+
+### What was asked, and what the numbers said
+
+The hypothesis was that the garage is arrival-saturated, and that easing arrivals would let
+mechanics take work off the player. Swept five arrival rates plus two extremes, 120 seeds each:
+
+| interval | queue | forecourt full | player idle | player rounds | crew used | income/min |
+|---|---|---|---|---|---|---|
+| **9s** (current) | 4.62 | 40% | **0%** | 372 | 73% | $1,166 |
+| 10.6s (0.85x) | 4.02 | 26% | 0% | 372 | 71% | $1,155 |
+| 12s (0.75x) | 3.02 | 13% | 0% | 371 | 69% | $1,139 |
+| 13.9s (0.65x) | 1.75 | 3% | 1% | 372 | 63% | $1,158 |
+| 16.4s (0.55x) | 0.73 | 0% | 2% | 369 | 49% | $1,041 |
+| 25s | 0.12 | 0% | 14% | 331 | 18% | $795 |
+| 40s | 0.04 | 0% | 38% | 239 | **6%** | $529 |
+
+**Player workload is flat across a 45% cut in arrivals** (372 to 369 rounds). Idle time reaches 2%.
+To idle the player even 38% you have to starve the garage to 1.5 cars a minute, where the crew is 6%
+utilised and income has halved.
+
+The cause: **the player claims a bay the instant one frees, so mechanics only ever get what is left
+over.** Easing arrivals idles the MECHANICS, not the player - crew utilisation falls from 73% to 6%
+while the player stays busy throughout.
+
+### The measurement that actually answers it
+
+Same garages, played working-every-second against never touching a car:
+
+| garage | working | hands off | kept | customers lost | crew used |
+|---|---|---|---|---|---|
+| 1 bay, 0 crew | $525 | $0 | 0% | 100% | - |
+| 3 bays, 1 crew | $911 | $80 | 9% | 84.7% | 100% |
+| 3 bays, 2 crew | $993 | $175 | 18% | 71.7% | 99% |
+| 4 bays, 4 crew | $1,161 | $390 | **34%** | **54.9%** | **98%** |
+
+Four mechanics, flat out at 98% utilisation, hold a third of the business. **Automation cannot run
+the garage**, and no arrival rate changes that: the constraint is how much a mechanic gets through
+(`MechanicBaseSpeed` 0.55, skill capped 0.72), not how many cars arrive.
+
+So the spawn rate was not changed. It would have cost income and idled the crew without moving the
+thing it was meant to move.
+
+### Three Phase C findings corrected
+
+The upgrade probe measured mechanic upgrades in a garage with **no mechanics**. That was my error,
+and it made three upgrades look dead that are not:
+
+| upgrade | reported | actually |
+|---|---|---|
+| Mechanic Training x5 | 0.0% | **+24.4%**, 1.5h payback |
+| Air Tools x5 | 0.0% | **+11.2%**, 4.4h payback |
+| Slow-Wind Rig x5 | -2.8% | +2.1%, 5.5h payback |
+
+The real traps are two, not five: **Labelled Tool Wall (-16.0%)** and Local Radio Ads (-1.3%).
+Extra Bay improves to +4.3% (10h). And **Hire Mechanic itself is now the weak one** - +0.6% for
+$14,940, a 46-hour payback, because crew past the second adds little.
+
+### Verified
+
+375 tests pass, 585 parity cases identical, and `Assets/` is byte-for-byte unchanged.
+
+---
+
 ## Phase C — Full-game audit, and two fixes
 
 An investigation pass over the whole game. Two changes implemented, both repairs rather than

@@ -82,7 +82,8 @@ namespace GarageTycoon.HeadlessTests.Tests
             Func<GarageSimulation, int> bayPicker = null,
             Func<ActiveCar, int> checksWanted = null,
             Func<ActiveCar, DiagnosisAction?> nextCheck = null,
-            Action<ActiveCar> onInspectionDone = null)
+            Action<ActiveCar> onInspectionDone = null,
+            Action<GarageSimulation> onTick = null)
         {
             double startCash = simulation.Wallet.Cash;
             double startEarnings = simulation.Wallet.LifetimeEarnings;
@@ -139,6 +140,11 @@ namespace GarageTycoon.HeadlessTests.Tests
                 {
                     autoPlayer.Tick(step);
                 }
+
+                // Sampled every tick, which is the only way to see idle time at all: a hook on
+                // round-started can never observe it, because if a round is starting somebody is
+                // by definition working.
+                if (onTick != null) onTick(simulation);
 
                 if (buyUpgrades)
                 {

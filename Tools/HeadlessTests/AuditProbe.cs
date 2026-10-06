@@ -324,6 +324,16 @@ namespace GarageTycoon.HeadlessTests
             {
                 GarageSimulation simulation = new GarageSimulation(94000 + seed);
                 GameplayHarness.GrantUpgrade(simulation, "workshop_rates", 3);
+
+                // A crew and the bays to put them in, in BOTH columns.
+                //
+                // The first version of this measured from a garage with neither, which made
+                // Mechanic Training and Air Tools read as 0.0% - of course they did, there was
+                // nobody to train and nobody to hand the tools to. That was a flaw in the
+                // measurement rather than a pair of dead upgrades, and it is the reason these two
+                // are now bought up front.
+                GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 2);
+                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
                 simulation.Wallet.Earn(120000d);
 
                 if (upgradeId != null) GameplayHarness.GrantUpgrade(simulation, upgradeId, levels);
