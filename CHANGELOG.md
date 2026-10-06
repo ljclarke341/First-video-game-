@@ -6,6 +6,103 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.2 — Mechanic automation already works; the measurement was wrong
+
+**No shipped value changed.** `Assets/` is untouched. The whole phase is one correction plus the
+measurements that establish it.
+
+### The correction
+
+Phase C.1 concluded that mechanics are too slow, from a hands-off test that kept 34% of income at
+four mechanics. That test granted `auto_mechanic` and **nothing else**. Mechanic Training and Air
+Tools are six-level upgrades; bought out they reach exactly 0.72 skill and 0.91 pace, the two
+numbers the design comment in `UpgradeState` quotes. So the test measured untrained apprentices at
+0.42/0.55 and reported them as the ceiling.
+
+Measured properly, at 4 bays and 4 mechanics with the player never touching a car:
+
+| crew | income kept | cars | customers lost | quality | standing |
+|---|---|---|---|---|---|
+| untrained (0.42 / 0.55) | 33% | 26.8 | 55.2% | 0.484 | -0.178 |
+| **trained (0.72 / 0.91)** | **84%** | **104.0** | **1.9%** | **0.703** | **+0.004** |
+
+84% is above the 60-75% this phase was asked to reach. At 3 bays and 2 mechanics it is 56%, inside
+the 40-60% target. The automation was never broken.
+
+### Why no constant moved
+
+- **`MechanicMaxSkill` is a no-op.** Swept 0.72 / 0.78 / 0.82 / 0.86 / 0.90: every digit of every
+  row identical. Trained skill is 0.42 + 6x0.05 = 0.72 exactly, so the clamp never binds. Raising it
+  cannot do anything without also changing an upgrade, which is out of scope. It does bind for a
+  prestiged player with Old Crew - which means **Old Crew is worth nothing to a fully trained crew**,
+  since its +0.10 clamps straight back to 0.72.
+- **Raising `MechanicBaseSpeed` breaks the design rule.** Swept to 1.00: trained hands-off income
+  rises 84% -> 91%, so putting the phone down becomes as good as playing. It also wrecks the
+  untrained crew's reputation (standing -0.187 -> -0.447, quality 0.612 -> 0.550) by letting bad
+  mechanics ruin cars faster.
+- **Raising `MechanicBaseSkill` only helps untrained crews** (33% -> 47% at 0.58) and leaves every
+  trained row byte-identical. It would mostly devalue Mechanic Training, the second-best upgrade in
+  the game, so it is left alone.
+
+### The player's role does change
+
+"Player rounds" cannot show it, because the virtual player works every second it can and the
+forecourt never empties. What shows it is giving the player a job description:
+
+| how the player plays | income/min | kept | player rounds | cars |
+|---|---|---|---|---|
+| works every car | $2,009 | 100% | 366 | 109.6 |
+| **only special jobs** | **$1,832** | **91%** | **169** | 107.8 |
+| never touches a car | $1,682 | 84% | 0 | 104.0 |
+
+A manager who only steps in for special jobs does **54% fewer rounds for 91% of the income**. The
+intended late-game role exists and pays.
+
+### Training is a smooth ramp, not a cliff
+
+Hands-off retention by training level (both upgrades together): 33%, 42%, 46%, 57%, 65%, 77%, 83%.
+The target band is reached at level 4-5, for $22,667-$46,388. One wrinkle: standing gets *worse* at
+levels 1-2 (-0.179 -> -0.222) before recovering, because faster mechanics ruin cars faster than
+better ones fix them.
+
+### Hiring economics, corrected
+
+Phase C reported Hire Mechanic at +0.6% and a 46-hour payback. That compared an untrained crew, and
+also let Premium Labour Rates vary with crew size. With rates held fixed and the crew trained:
+
+| crew | income/min | gain | hire cost | payback |
+|---|---|---|---|---|
+| 1st | $1,467 | +$531 | $650 | 0.0 h (3.0 h with full training) |
+| 2nd | $1,905 | +$438 | $1,560 | 0.1 h |
+| 3rd | $2,026 | +$121 | $3,744 | 0.5 h |
+| **4th** | $2,009 | **-$17** | $8,986 | **never** |
+
+### Three problems found, none fixable in this phase's scope
+
+1. **The fourth mechanic is worthless** while the player works at all: 4 bays cannot hold 4 mechanics
+   plus a player, so it costs $8,986 for -$17/min. It only earns its keep hands-off (75% -> 84%).
+   Fixing it means bay count or mechanic cap - both out of scope.
+2. **A trained late garage is over capacity.** It completes 110 cars against ~100 arrivals and loses
+   0.6% of customers, so the late game has no pressure left. That is the spawn rate, ruled out in
+   C.1 and out of scope here.
+3. **Quality is bimodal.** Perfect% and top-band% are the same number in every garage measured -
+   there is nothing at all between 0.9 and 1.0. p75 and p90 are both 1.000 while p50 sits at 0.588
+   to 0.817. Training moves perfect% from 26.0% to 36.5%.
+
+Also noted: a random event grants `MechanicSkillBonus` 0.15 clamped only to 1.0, so during it
+mechanics reach 0.87 - above the cap the prestige perk respects. Inconsistent, and out of scope.
+
+### Verified
+
+375 tests pass, 585 parity cases identical, Unity compile check clean, web soak clean with no page
+errors. In the real browser: a trained hands-off crew does 64 cars with **0 lost** against the
+untrained crew's 16 cars with 18 lost; payouts exactly equal completions (no double or missing pay);
+no two mechanics ever share a car; offline credits exactly what it reports and pays $0 with no crew;
+a trained crew survives a save round-trip and resumes work, and a save stripped of its training keys
+loads as an untrained crew rather than inventing skill.
+
+---
+
 ## Phase C.1 — The spawn rate is not the bottleneck
 
 Measured, and **no shipped value was changed**. `Assets/` is untouched; the only edits are to the

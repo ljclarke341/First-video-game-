@@ -27,6 +27,42 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "training")
+            {
+                MechanicProbe.Training(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "roles")
+            {
+                MechanicProbe.Roles(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "payback")
+            {
+                MechanicProbe.Payback(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "quality")
+            {
+                MechanicProbe.Quality(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "special")
+            {
+                MechanicProbe.Specials(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
+            if (args != null && args.Length > 0 && args[0] == "mech")
+            {
+                MechanicProbe.Run(args.Length > 1 ? args[1] : null);
+                return 0;
+            }
+
             if (args != null && args.Length > 1 && args[0] == "sweep" && args[1] == "handsoff")
             {
                 SpawnSweepProbe.HandsOff();
