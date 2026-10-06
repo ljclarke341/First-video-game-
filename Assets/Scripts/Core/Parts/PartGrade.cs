@@ -1,0 +1,92 @@
+namespace GarageTycoon.Core.Parts
+{
+    /// <summary>What you decided to fit. Three tiers is enough to be a decision and few enough to read.</summary>
+    public enum PartGrade
+    {
+        Budget = 0,
+        Standard = 1,
+        Performance = 2
+    }
+
+    public static class PartGrades
+    {
+        public const int Count = 3;
+
+        public static string DisplayName(this PartGrade grade)
+        {
+            switch (grade)
+            {
+                case PartGrade.Budget: return "Budget";
+                case PartGrade.Performance: return "Performance";
+                default: return "Standard";
+            }
+        }
+
+        /// <summary>One line on why you would fit this rather than the others.</summary>
+        public static string Description(this PartGrade grade)
+        {
+            switch (grade)
+            {
+                case PartGrade.Budget: return "Cheap, and it shows. Costs less, finishes worse.";
+                case PartGrade.Performance: return "The good stuff. Costs more, finishes better.";
+                default: return "What the job is priced for. No surprises either way.";
+            }
+        }
+
+        /// <summary>
+        /// What a part of this grade costs, as a multiple of the STANDARD price.
+        ///
+        /// Standard is 1.0 and that is the load-bearing number: the whole economy is calibrated so
+        /// that a garage fitting standard parts earns exactly what it earned before parts existed.
+        /// Budget and Performance are the deviations from that baseline, in both directions.
+        ///
+        /// These were 0.55 and 1.9, and measured, that spread made the choice no choice at all:
+        /// the grade moved COST about three times as hard as it moved QUALITY, so Budget won by
+        /// 32% per car and nothing else was worth fitting. Narrowing them to 0.8 and 1.3 halves
+        /// the cost swing, which brings it level with what quality is worth and closes the gap to
+        /// 8% - with no single grade ahead on both common and rare cars.
+        /// </summary>
+        public static double CostMultiplier(this PartGrade grade)
+        {
+            switch (grade)
+            {
+                case PartGrade.Budget: return 0.8d;
+                case PartGrade.Performance: return 1.3d;
+                default: return 1d;
+            }
+        }
+
+        /// <summary>
+        /// What fitting this grade does to the finished job's quality score.
+        ///
+        /// Modest on purpose. A good part should not rescue sloppy work and a cheap one should not
+        /// ruin careful work - the mini-game is still what decides the repair.
+        /// </summary>
+        /// <remarks>
+        /// DOUBLE, like the cost multiplier and for the same reason: -0.1f widened to double is
+        /// -0.10000000149011612, which shifted the finished score just far enough to show a
+        /// different whole percentage, and on a flawless Budget job a different payout, from the
+        /// web build. The values are unchanged; only their precision.
+        /// </remarks>
+        public static double QualityModifier(this PartGrade grade)
+        {
+            switch (grade)
+            {
+                case PartGrade.Budget: return -0.1d;
+                case PartGrade.Performance: return 0.08d;
+                default: return 0d;
+            }
+        }
+
+        /// <summary>Stars out of 5, for the shop listing.</summary>
+        public static int QualityStars(this PartGrade grade)
+        {
+            switch (grade)
+            {
+                case PartGrade.Budget: return 2;
+                case PartGrade.Performance: return 5;
+                default: return 4;
+            }
+        }
+    }
+}

@@ -1,0 +1,243 @@
+using GarageTycoon.Core.Util;
+
+namespace GarageTycoon.Core.Minigames
+{
+    /// <summary>
+    /// A virtual mechanic that can play any of the four mini-games at a given skill level (0 = hopeless,
+    /// 1 = machine-perfect).
+    ///
+    /// This one class does double duty:
+    ///  1. The AUTOMATED TESTS use it to play thousands of rounds and check the economy behaves.
+    ///  2. The AUTO-REPAIR upgrade branch uses it in-game, so hired mechanics literally play the same
+    ///     mini-games the player does - no separate, divergent "idle" code path to keep in sync.
+    /// </summary>
+    public sealed class MinigameAutoPlayer
+    {
+        private readonly MinigameBase _game;
+        private readonly float _skill;
+        private readonly IRandomSource _random;
+
+        // Where this mechanic intends to tap / release, worked out once so behaviour stays consistent
+        // across the round rather than re-rolling every frame.
+        private readonly float _aimPoint;
+        private readonly float _reactionDelay;
+        private readonly float _stepInterval;
+
+        private bool _hasPressed;
+        private float _nextInputAt;
+
+        public MinigameAutoPlayer(MinigameBase game, float skill, IRandomSource random)
+        {
+            _game = game;
+            _skill = MathUtil.Clamp01(skill);
+            _random = random;
+
+            // A person's aiming error is a TIMING error, measured in seconds - they press a
+            // fraction too early or too late. It only becomes a positional error once you
+            // multiply it by how fast the thing is moving.
+            //
+            // This used to be modelled as a flat positional error, which meant a slower marker
+            // gave the simulated player no advantage at all. The balance tests therefore scored
+            // the "Slow-Wind Rig" upgrade - whose entire purpose is slowing things down - at 29%
+            // WORSE than not buying it, because all it did in simulation was lengthen the round.
+            float jitterSeconds = (float)System.Math.Pow(1f - _skill, 1.2d) * 0.5f;
+            float signedJitter = (_random.NextFloat() * 2f - 1f) * jitterSeconds;
+
+            TimingBarMinigame timing = game as TimingBarMinigame;
+            HoldReleaseMinigame hold = game as HoldReleaseMinigame;
+
+            if (timing != null)
+            {
+                // Seconds of error become bar-widths of error at the marker's speed.
+                _aimPoint = MathUtil.Clamp(timing.SweetSpotCenter + signedJitter * timing.Speed, 0f, 1f);
+            }
+            else if (hold != null)
+            {
+                // Same again, converted through how fast the gauge is winding up. No upper clamp
+                // at the redline: a clumsy mechanic really can blow the part.
+                _aimPoint = MathUtil.Clamp(hold.TargetCenter + signedJitter * hold.FillRate, 0f, 1.5f);
+            }
+            else
+            {
+                _aimPoint = 0f;
+            }
+
+            _reactionDelay = 0.12f + (1f - _skill) * 0.8f;
+            _stepInterval = 0.10f + (1f - _skill) * 0.35f;
+            _nextInputAt = 0f;
+        }
+
+        /// <summary>
+        /// Feeds inputs into the mini-game for this frame. Call it immediately AFTER the mini-game's own
+        /// Tick so it reacts to the state the player would actually be looking at.
+        /// </summary>
+        public void Tick(float deltaTime)
+        {
+            if (_game.IsFinished) return;
+
+            switch (_game.Type)
+            {
+                case MinigameType.TimingBar:
+                    TickTimingBar(deltaTime);
+                    break;
+                case MinigameType.HoldRelease:
+                    TickHoldRelease();
+                    break;
+                case MinigameType.ToolMatch:
+                    TickToolMatch();
+                    break;
+                case MinigameType.RapidSequence:
+                    TickRapidSequence();
+                    break;
+            }
+        }
+
+        private void TickTimingBar(float deltaTime)
+        {
+            TimingBarMinigame game = (TimingBarMinigame)_game;
+
+            // Tap when the marker is within one frame's travel of where we meant to hit.
+            float travelThisFrame = game.Speed * deltaTime;
+            float tolerance = travelThisFrame * 0.6f + 0.001f;
+
+            if (MathUtil.Abs(game.MarkerPosition - _aimPoint) <= tolerance)
+            {
+                game.Press();
+            }
+        }
+
+        private void TickHoldRelease()
+        {
+            HoldReleaseMinigame game = (HoldReleaseMinigame)_game;
+
+            if (!_hasPressed)
+            {
+                if (_game.Elapsed < _reactionDelay * 0.5f) return;
+                game.Press();
+                _hasPressed = true;
+                return;
+            }
+
+            if (game.Pressure >= _aimPoint)
+            {
+                game.Release();
+            }
+        }
+
+        private void TickToolMatch()
+        {
+            ToolMatchMinigame game = (ToolMatchMinigame)_game;
+
+            if (game.IsPreviewing) return;
+
+            // Wait a beat after the labels hide, the way a person would.
+            if (_game.Elapsed < game.PreviewSeconds + _reactionDelay) return;
+
+            // Skill AND reading time decide whether the mechanic remembered which button it was.
+            // Modelling the reading time matters: without it a longer preview is pure cost in
+            // simulation, and the balance tests conclude that the upgrade whose entire purpose is
+            // buying reading time makes you poorer - which is true of a robot and false of a person.
+            //
+            // Read off the LABEL HOLD, not the answer gate: since Phase C.4 the Tool Wall lengthens
+            // how long the labels stay readable rather than how long the round takes, and that hold
+            // is the thing that actually helps somebody remember the tool.
+            double recall = System.Math.Pow(_skill, 0.7d) * PreviewComfort(game.LabelHoldSeconds, 2.2f);
+            bool remembers = _random.NextFloat() < recall;
+
+            if (remembers)
+            {
+                game.SelectOption(game.CorrectIndex);
+            }
+            else
+            {
+                int guess = _random.NextInt(0, game.Options.Count);
+                game.SelectOption(guess);
+            }
+        }
+
+        private void TickRapidSequence()
+        {
+            RapidSequenceMinigame game = (RapidSequenceMinigame)_game;
+
+            if (game.IsPreviewing) return;
+
+            if (_nextInputAt <= 0f)
+            {
+                _nextInputAt = game.PreviewSeconds + _reactionDelay;
+            }
+
+            if (_game.Elapsed < _nextInputAt) return;
+
+            int index = game.ProgressIndex;
+            if (index >= game.Sequence.Count) return;
+
+            // Reading time here is the per-step pace plus however long the pattern lingers - but the
+            // lingering is shared across the whole pattern, so it is divided by the number of steps
+            // before being compared against a PER-STEP comfort figure.
+            //
+            // Adding the whole 1.08s to a 0.55s per-step baseline instead pushed recall past 1.0,
+            // which means "never forgets a step", and measured the upgrade at +40% income. The
+            // brief for this fix was a modest improvement, not the best upgrade in the game.
+            float lingerPerStep = game.Sequence.Count <= 0
+                ? 0f
+                : (game.PatternHoldSeconds - game.PreviewSeconds) / game.Sequence.Count;
+
+            double recall = System.Math.Pow(_skill, 0.5d)
+                * PreviewComfort(game.StepSeconds + lingerPerStep, 0.55f);
+            bool remembers = _random.NextFloat() < recall;
+            int correct = (int)game.Sequence[index];
+
+            if (remembers)
+            {
+                game.SelectOption(correct);
+            }
+            else
+            {
+                // Deliberately press a neighbouring direction - the classic panicked mistake.
+                int wrong = (correct + 1 + _random.NextInt(0, 3)) % 4;
+                game.SelectOption(wrong);
+            }
+
+            _nextInputAt = _game.Elapsed + _stepInterval;
+        }
+
+        /// <summary>
+        /// How well a player could take the information in, given how long it was on screen.
+        /// Below the comfortable duration recall falls away quickly; above it there are gentle
+        /// returns, because past a point more staring does not help.
+        /// </summary>
+        private static double PreviewComfort(float actualSeconds, float comfortableSeconds)
+        {
+            if (comfortableSeconds <= 0f) return 1d;
+            float ratio = actualSeconds / comfortableSeconds;
+            if (ratio >= 1f) return MathUtil.Clamp(1f + (ratio - 1f) * 0.12f, 1f, 1.18f);
+            return MathUtil.Clamp(0.45f + ratio * 0.55f, 0.35f, 1f);
+        }
+
+        /// <summary>
+        /// Runs a whole round to completion in a tight loop and returns the verdict.
+        /// Used by tests and by offline/idle income, where there is no real frame loop to piggyback on.
+        /// </summary>
+        public static MinigameResult PlayToCompletion(MinigameBase game, float skill, IRandomSource random, float step = 1f / 60f)
+        {
+            MinigameAutoPlayer player = new MinigameAutoPlayer(game, skill, random);
+
+            // Hard iteration cap so a logic bug can never hang the game in an infinite loop.
+            int maxIterations = (int)((game.TimeLimit + 2f) / step) + 60;
+
+            for (int i = 0; i < maxIterations && !game.IsFinished; i++)
+            {
+                game.Tick(step);
+                player.Tick(step);
+            }
+
+            if (!game.IsFinished)
+            {
+                // Should be unreachable: the base class times every round out. Belt and braces.
+                return MinigameResult.FromOutcome(MinigameOutcome.Miss, "Gave up");
+            }
+
+            return game.Result;
+        }
+    }
+}

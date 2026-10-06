@@ -1,0 +1,316 @@
+using System.Collections.Generic;
+using GarageTycoon.Core.Balance;
+using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Economy;
+using GarageTycoon.Core.Minigames;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace GarageTycoon.Unity.UI
+{
+    /// <summary>
+    /// The "how to play" screen.
+    ///
+    /// It opens by itself the first time someone plays and is always one tap away afterwards.
+    /// Each mini-game is introduced with its own colour-coded heading rather than a wall of text,
+    /// because the thing a new player needs first is "which of these four am I looking at".
+    /// </summary>
+    public sealed class HelpScreen
+    {
+        private RectTransform _root;
+        private RectTransform _content;
+
+        /// <summary>True while the help screen is on screen.</summary>
+        public bool IsVisible { get { return _root != null && _root.gameObject.activeSelf; } }
+
+        public void Build(RectTransform parent)
+        {
+            // Solid rather than translucent: this screen is read, not glanced at, and the garage
+            // showing through behind the text makes it hard work.
+            Image backdrop = UIFactory.CreateImage("HelpScreen", parent, Theme.Hex("#0C1117"));
+            _root = backdrop.rectTransform;
+            UIFactory.Stretch(_root);
+            backdrop.raycastTarget = true;
+
+            Text title = UIFactory.CreateText("Title", _root, "HOW TO PLAY", Theme.FontTitle,
+                Theme.TextPrimary, TextAnchor.MiddleLeft, FontStyle.Bold);
+            UIFactory.AnchorTop(title.rectTransform, 60f, 40f, Theme.ScreenPadding);
+
+            // ---- scrollable body ----
+            RectTransform viewport = UIFactory.CreateRect("Viewport", _root);
+            UIFactory.AnchorMiddle(viewport, 118f, 150f, Theme.ScreenPadding);
+
+            Image viewportImage = viewport.gameObject.AddComponent<Image>();
+            viewportImage.color = new Color(0f, 0f, 0f, 0.001f);
+            viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+
+            _content = UIFactory.CreateRect("Content", viewport);
+            _content.anchorMin = new Vector2(0f, 1f);
+            _content.anchorMax = new Vector2(1f, 1f);
+            _content.pivot = new Vector2(0.5f, 1f);
+            _content.offsetMin = Vector2.zero;
+            _content.offsetMax = Vector2.zero;
+
+            UIFactory.AddVerticalLayout(_content.gameObject, 10f);
+            ContentSizeFitter fitter = _content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.content = _content;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.scrollSensitivity = 45f;
+
+            BuildContent();
+
+            Button close = UIFactory.CreateButton("Close", _root, "GOT IT", Theme.Success,
+                Theme.TextOnAccent, Theme.FontBody, Hide);
+            UIFactory.AnchorBottom(close.GetComponent<RectTransform>(), Theme.TouchTargetHeight, 40f, Theme.ScreenPadding);
+
+            _root.gameObject.SetActive(false);
+        }
+
+        private void BuildContent()
+        {
+            Paragraph("You run a car garage. Cars roll in needing repairs, and every repair job is a "
+                      + "small mini-game. Finish a car before the owner loses patience and you get paid.");
+
+            Heading("THE LOOP");
+            Step(1, "A car arrives and the owner tells you what's wrong - in their words, not yours. "
+                    + "Its card just says the jobs have not been looked at. The bar underneath is their "
+                    + "patience, and it is already running.");
+            Step(2, "Tap the car to put it on the ramp. Run checks to find out what it actually needs - "
+                    + "each one is a short mini-game. A check you play well tells you something; a "
+                    + "botched one tells you nothing.");
+            Step(3, "Then write the quote. Do everything and earn more but stay in the bay longer, or do "
+                    + "the essentials and get them out quickly for less. Red NEEDED jobs are the ones "
+                    + "the car really should not leave without.");
+            Step(4, "Now do the work. Each job is one of the four mini-games below, played over and over "
+                    + "until its bar is full. Every job is scored out of five stars.");
+            Step(5, "Finish the quoted work and they pay up. Let the timer run out and they leave "
+                    + "annoyed - you keep what the finished jobs earned and lose the rest.");
+
+            Heading("YOU NEVER HAVE TO INSPECT");
+            Bullet(Theme.Info,
+                "In a hurry? JUST GET STUCK IN on the ramp shows you everything at once and starts the "
+                + "work. It costs nothing - you only miss the small bonus for a thorough inspection.");
+            Bullet(Theme.Warning,
+                "The condition sheet is the reason for the work. \"Brakes at 34%\" is why the brake "
+                + "service is on the quote. Anything still showing -- is something you have not looked at.");
+            Bullet(Theme.Prestige,
+                "Different customers want different quotes. A VIP wants the job done properly; someone "
+                + "in a hurry wants the bill small. The one they were hoping for is highlighted.");
+
+            Heading("THE FOUR JOBS");
+            Minigame(MinigameType.TimingBar, Theme.Info,
+                "A marker sweeps across the bar. Tap when it is in the GREEN. The gold centre is a "
+                + "perfect hit and pays a bonus.");
+            Minigame(MinigameType.ToolMatch, Theme.Warning,
+                "The job stays on screen and the tools flash up briefly. Once they hide, tap the one "
+                + "that was right. The WRONG TOOL DAMAGES THE PART - you lose progress, not just time.");
+            Minigame(MinigameType.HoldRelease, Theme.Success,
+                "HOLD the button to wind the gauge up and let go in the green. Let go early and the "
+                + "bolt is loose. Hold past the red line and you strip the thread.");
+            Minigame(MinigameType.RapidSequence, Theme.Prestige,
+                "A short pattern of directions lights up one at a time, then hides. Repeat it on the "
+                + "pad. One wrong tap ends the round, so take the moment to read it.");
+
+            Heading("KEEP A STREAK GOING");
+            Paragraph("Land rounds back to back and the streak bar climbs. Every job you finish while "
+                      + "it is running pays more, and the meter shows what it is currently worth on the "
+                      + "job in hand. It takes a couple of minutes of clean work to reach the top.");
+            Paragraph("A miss or a breakage drops it to zero, and so does letting your own customer walk "
+                      + "out. A scrappy round holds it but does not build it. And it SLIPS AWAY if you "
+                      + "stop working: put the tools down for a few seconds and it starts draining.");
+
+            Heading("RANK UP AND THE GAME CHANGES");
+            Paragraph("The bar under your cash is your standing in the trade, earned by everything "
+                      + "you have ever made - so unlike cash and upgrades, it survives selling the garage.");
+            Paragraph("Each rank unlocks a TWIST that starts turning up at random on one of the "
+                      + "mini-games: two narrow zones instead of one wide one, a torque gauge that "
+                      + "starts part-wound, tools that move after they hide, a pattern you repeat "
+                      + "backwards. Landing a twisted round is worth extra progress, so they are "
+                      + "something to want rather than a tax for playing well.");
+
+            Heading("KNOW YOUR CUSTOMER");
+            Bullet(Theme.Hex(CustomerMood.Impatient.ColorHex()),
+                "In a hurry - will not wait long, but tips well if you are quick.");
+            Bullet(Theme.Hex(CustomerMood.BigTipper.ColorHex()),
+                "Big tipper - ordinary patience, very generous at the end.");
+            Bullet(Theme.Hex(CustomerMood.Vip.ColorHex()),
+                "VIP - pays well over the odds. The best car on the forecourt.");
+            Bullet(Theme.Hex(CustomerMood.Relaxed.ColorHex()),
+                "No rush - happy to wait while you deal with someone else.");
+            Paragraph("The COFFEE button on a car buys back some of the patience that customer has "
+                      + "lost. It is free, but there is a wait before you can use it again, so it is a "
+                      + "decision about WHICH car to save.");
+
+            Heading("PARTS");
+            Bullet(Theme.Success,
+                "Every repair but a diagnostic scan fits a part. What the garage fits is one "
+                + "setting on the PARTS screen - Budget, Standard or Performance.");
+            Bullet(Theme.Cash,
+                "Cheaper parts leave more in the till and finish worse; better ones cost you and "
+                + "finish better. Standard is what the job is priced for, either way.");
+            Bullet(Theme.Danger,
+                "Stock turns up on its own and costs nothing. Running out never blocks a repair - "
+                + "the part comes off the van instead, with a surcharge on top. The quote tells you "
+                + "before you commit.");
+
+            Heading("GETTING PAID");
+            Bullet(Theme.Cash, "Perfect rounds pay a bonus. Finish a whole job without dropping a "
+                               + "single round and it pays 25% more.");
+            Bullet(Theme.Success, "Finish quickly for a tip worth up to a quarter of the car, based on "
+                                  + "how fast the repair went once you started it.");
+            Bullet(Theme.Danger, "Damage - the wrong tool, or over-torquing - costs you progress you "
+                                 + "already earned, and patience on top.");
+            Bullet(Theme.Info, "Rarer cars pay far more but are harder and take longer.");
+
+            Heading("GROWING THE GARAGE");
+            for (int i = 0; i < 4; i++)
+            {
+                UpgradeBranch branch = (UpgradeBranch)i;
+                Bullet(Theme.Hex(branch.ColorHex()), branch.DisplayName() + " - " + branch.Description());
+            }
+            Paragraph("One upgrade has NO LIMIT: Master Tooling multiplies every payout and can be "
+                      + "bought forever. It is expensive, it compounds, and it means there is always "
+                      + "something worth saving for however long you play.");
+            Paragraph("Once you bank $" + CashFormat.Short(GameBalance.PrestigeCashCap)
+                      + " you can sell the garage. You lose your cash and your upgrades, and you keep "
+                      + "Reputation Tokens.");
+            Paragraph("Tokens are spent under REP on perks that last forever: higher rates on every "
+                      + "job, an extra bay you start the next garage with, a crew that arrives already "
+                      + "trained. They are a currency, not a score - nothing happens until you choose "
+                      + "what to buy, and that choice is what makes each run different from the last.");
+
+            Heading("IF IT FEELS TOO FAST");
+            Paragraph("Open STATS and turn on RELAXED PACE. It gives you longer to read the tools and "
+                      + "patterns, and slows the markers down. It pays exactly the same - nothing is "
+                      + "lost by using it.");
+        }
+
+        // ------------------------------------------------------------------
+        // Small builders. Each returns a row already sized for the layout group.
+        // ------------------------------------------------------------------
+
+        private void Heading(string text)
+        {
+            Text label = UIFactory.CreateText("Heading", _content, text, Theme.FontSmall,
+                Theme.Cash, TextAnchor.LowerLeft, FontStyle.Bold);
+            UIFactory.SetPreferredHeight(label.gameObject, 52f);
+        }
+
+        private void Paragraph(string text)
+        {
+            Text label = UIFactory.CreateText("Paragraph", _content, text, Theme.FontTiny,
+                Theme.TextSecondary, TextAnchor.UpperLeft);
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            UIFactory.SetPreferredHeight(label.gameObject, EstimateHeight(text, 30f));
+        }
+
+        private void Step(int number, string text)
+        {
+            Image row = UIFactory.CreateImage("Step", _content, new Color(0f, 0f, 0f, 0f));
+            UIFactory.SetPreferredHeight(row.gameObject, EstimateHeight(text, 42f));
+
+            Image bubble = UIFactory.CreatePanel("Number", row.transform, Theme.Cash, 24);
+            RectTransform bubbleRect = bubble.rectTransform;
+            bubbleRect.anchorMin = new Vector2(0f, 1f);
+            bubbleRect.anchorMax = new Vector2(0f, 1f);
+            bubbleRect.pivot = new Vector2(0f, 1f);
+            bubbleRect.sizeDelta = new Vector2(40f, 40f);
+            bubbleRect.anchoredPosition = Vector2.zero;
+
+            Text numberLabel = UIFactory.CreateText("N", bubble.transform, number.ToString(),
+                Theme.FontSmall, Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Stretch(numberLabel.rectTransform);
+
+            Text body = UIFactory.CreateText("Body", row.transform, text, Theme.FontTiny,
+                Theme.TextSecondary, TextAnchor.UpperLeft);
+            body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            RectTransform bodyRect = body.rectTransform;
+            bodyRect.anchorMin = Vector2.zero;
+            bodyRect.anchorMax = Vector2.one;
+            bodyRect.offsetMin = new Vector2(54f, 0f);
+            bodyRect.offsetMax = Vector2.zero;
+        }
+
+        private void Minigame(MinigameType type, Color accent, string text)
+        {
+            Image card = UIFactory.CreatePanel("Minigame", _content, Theme.Panel);
+            UIFactory.SetPreferredHeight(card.gameObject, EstimateHeight(text, 78f));
+
+            Image tag = UIFactory.CreatePanel("Tag", card.transform, accent, 8);
+            RectTransform tagRect = tag.rectTransform;
+            tagRect.anchorMin = new Vector2(0f, 1f);
+            tagRect.anchorMax = new Vector2(0f, 1f);
+            tagRect.pivot = new Vector2(0f, 1f);
+            tagRect.sizeDelta = new Vector2(190f, 34f);
+            tagRect.anchoredPosition = new Vector2(Theme.PanelPadding, -Theme.PanelPadding * 0.6f);
+
+            Text tagLabel = UIFactory.CreateText("TagLabel", tag.transform, type.DisplayName().ToUpperInvariant(),
+                Theme.FontTiny, Theme.TextOnAccent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIFactory.Stretch(tagLabel.rectTransform);
+
+            Text body = UIFactory.CreateText("Body", card.transform, text, Theme.FontTiny,
+                Theme.TextSecondary, TextAnchor.UpperLeft);
+            body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            RectTransform bodyRect = body.rectTransform;
+            bodyRect.anchorMin = Vector2.zero;
+            bodyRect.anchorMax = Vector2.one;
+            bodyRect.offsetMin = new Vector2(Theme.PanelPadding, Theme.PanelPadding * 0.6f);
+            bodyRect.offsetMax = new Vector2(-Theme.PanelPadding, -52f);
+        }
+
+        private void Bullet(Color dotColor, string text)
+        {
+            Image row = UIFactory.CreateImage("Bullet", _content, new Color(0f, 0f, 0f, 0f));
+            UIFactory.SetPreferredHeight(row.gameObject, EstimateHeight(text, 34f));
+
+            Image dot = UIFactory.CreateImage("Dot", row.transform, dotColor, UISprites.Circle(32));
+            RectTransform dotRect = dot.rectTransform;
+            dotRect.anchorMin = new Vector2(0f, 1f);
+            dotRect.anchorMax = new Vector2(0f, 1f);
+            dotRect.pivot = new Vector2(0f, 1f);
+            dotRect.sizeDelta = new Vector2(16f, 16f);
+            dotRect.anchoredPosition = new Vector2(2f, -8f);
+
+            Text body = UIFactory.CreateText("Body", row.transform, text, Theme.FontTiny,
+                Theme.TextSecondary, TextAnchor.UpperLeft);
+            body.horizontalOverflow = HorizontalWrapMode.Wrap;
+            RectTransform bodyRect = body.rectTransform;
+            bodyRect.anchorMin = Vector2.zero;
+            bodyRect.anchorMax = Vector2.one;
+            bodyRect.offsetMin = new Vector2(34f, 0f);
+            bodyRect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>
+        /// Rough height for a wrapped block of text. Unity's layout system cannot size a wrapped
+        /// Text inside a vertical group without a ContentSizeFitter per row, which is heavier than
+        /// this screen needs - so estimate from the character count and err generous.
+        /// </summary>
+        private static float EstimateHeight(string text, float extra)
+        {
+            const float CharactersPerLine = 46f;
+            const float LineHeight = 34f;
+
+            int lines = Mathf.Max(1, Mathf.CeilToInt(text.Length / CharactersPerLine));
+            return lines * LineHeight + extra;
+        }
+
+        public void Show()
+        {
+            _root.gameObject.SetActive(true);
+            _root.SetAsLastSibling();
+            _content.anchoredPosition = Vector2.zero;
+        }
+
+        public void Hide()
+        {
+            if (_root != null) _root.gameObject.SetActive(false);
+        }
+    }
+}

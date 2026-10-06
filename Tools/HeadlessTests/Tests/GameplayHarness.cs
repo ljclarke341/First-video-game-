@@ -1,0 +1,365 @@
+using System;
+using System.Collections.Generic;
+using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Diagnosis;
+using GarageTycoon.Core.Economy;
+using GarageTycoon.Core.Minigames;
+using GarageTycoon.Core.Parts;
+using GarageTycoon.Core.Simulation;
+using GarageTycoon.Core.Util;
+
+namespace GarageTycoon.HeadlessTests.Tests
+{
+    /// <summary>What happened during a simulated play session.</summary>
+    public struct SessionReport
+    {
+        /// <summary>Money in, before anything goes out again.</summary>
+        public double CashEarned;
+
+        /// <summary>
+        /// CASH that left the wallet on parts: counter surcharges and expedite fees.
+        ///
+        /// Not the parts' value - that never passes through the wallet at all, because the job
+        /// simply keeps the labour. Subtracting it here as well would count the same money twice.
+        ///
+        /// Before parts existed, gross income and money kept were the same number, so the probe
+        /// only ever reported gross. They are not the same now: payouts carry the part, so a
+        /// gross figure would read 28% higher without the garage being a penny better off.
+        /// </summary>
+        public double PartsSpend;
+
+        public double FinalCash;
+        public int CarsCompleted;
+        public int CarsLost;
+        public int RoundsPlayed;
+        public float SecondsPlayed;
+        public int UpgradesBought;
+
+        /// <summary>Average income per minute, the number the balance tests care about most.</summary>
+        public double CashPerMinute
+        {
+            get { return SecondsPlayed <= 0f ? 0d : CashEarned / (SecondsPlayed / 60d); }
+        }
+
+        /// <summary>
+        /// What the garage actually kept, per minute. THIS is the figure to compare against the
+        /// numbers from before parts existed - it is the same quantity those measured.
+        /// </summary>
+        public double NetPerMinute
+        {
+            get { return SecondsPlayed <= 0f ? 0d : (CashEarned - PartsSpend) / (SecondsPlayed / 60d); }
+        }
+    }
+
+    /// <summary>
+    /// Plays the game the way a human would, using the same auto-player the hired mechanics use.
+    ///
+    /// This is what replaces manual playtesting: instead of tapping through the game in the editor,
+    /// the tests run a virtual player of a chosen skill level through minutes or hours of gameplay
+    /// and then assert that the economy, timers and upgrades all behaved.
+    /// </summary>
+    public static class GameplayHarness
+    {
+        /// <summary>
+        /// Plays for the given number of simulated seconds.
+        /// </summary>
+        /// <param name="skill">0 = hopeless, 1 = perfect.</param>
+        /// <param name="buyUpgrades">When true, the virtual player spends spare cash the way a real one would.</param>
+        /// <param name="bayPicker">
+        /// Which bay the virtual player works next, or null for the default "most money at risk"
+        /// strategy. A probe passes this to model a DIFFERENT player: the whole claim behind a
+        /// special job is that noticing it changes what you do, and that claim can only be measured
+        /// by comparing a player who notices against one who does not.
+        /// </param>
+        /// <param name="checksWanted">
+        /// How many inspection checks the virtual player runs on a car before picking up a spanner,
+        /// or null for none. Inspecting costs real seconds off the customer's patience and pays a
+        /// bonus for an accurate diagnosis, so it is the clearest decision in the game that has a
+        /// cost on both sides - and a probe cannot see it at all unless the harness can inspect.
+        /// </param>
+        public static SessionReport Play(GarageSimulation simulation, float seconds, float skill,
+            bool buyUpgrades = false, float step = 1f / 60f,
+            Func<GarageSimulation, int> bayPicker = null,
+            Func<ActiveCar, int> checksWanted = null,
+            Func<ActiveCar, DiagnosisAction?> nextCheck = null,
+            Action<ActiveCar> onInspectionDone = null,
+            Action<GarageSimulation> onTick = null)
+        {
+            double startCash = simulation.Wallet.Cash;
+            double startEarnings = simulation.Wallet.LifetimeEarnings;
+            double startParts = simulation.Inventory.TotalSpent;
+            int startCompleted = simulation.Stats.CarsCompleted;
+            int startLost = simulation.Stats.CarsLost;
+            int startRounds = simulation.Stats.RoundsPlayed;
+
+            MinigameBase trackedGame = null;
+            MinigameAutoPlayer autoPlayer = null;
+            int upgradesBought = 0;
+
+            int steps = (int)(seconds / step);
+            float shopTimer = 0f;
+
+            for (int i = 0; i < steps; i++)
+            {
+                // Pick a car to work on whenever we are idle. An inspection counts as busy: it
+                // takes the place of repair work, exactly as it does for a real player.
+                if (simulation.PlayerSession == null && simulation.DiagnosisSession == null)
+                {
+                    int chosen = bayPicker == null ? BestBay(simulation) : bayPicker(simulation);
+
+                    if (chosen >= 0)
+                    {
+                        if (!TryInspect(simulation, chosen, checksWanted, nextCheck))
+                        {
+                            // Inspection is over for this car. This is the moment a real player
+                            // writes the quote: they have decided they know enough.
+                            if (onInspectionDone != null && simulation.Bays[chosen] != null)
+                            {
+                                onInspectionDone(simulation.Bays[chosen]);
+                            }
+
+                            simulation.SelectBay(chosen);
+                        }
+                    }
+                }
+
+                simulation.Tick(step);
+
+                // Feed inputs to whatever round is currently on screen. LiveMinigame rather than
+                // the work session's, so an inspection round is played too instead of sitting
+                // untouched until it times out.
+                MinigameBase game = simulation.LiveMinigame;
+
+                if (game != trackedGame)
+                {
+                    trackedGame = game;
+                    autoPlayer = game == null ? null : new MinigameAutoPlayer(game, skill, simulation.Random);
+                }
+
+                if (autoPlayer != null && game != null && !game.IsFinished)
+                {
+                    autoPlayer.Tick(step);
+                }
+
+                // Sampled every tick, which is the only way to see idle time at all: a hook on
+                // round-started can never observe it, because if a round is starting somebody is
+                // by definition working.
+                if (onTick != null) onTick(simulation);
+
+                if (buyUpgrades)
+                {
+                    shopTimer += step;
+                    if (shopTimer >= 1f)
+                    {
+                        shopTimer = 0f;
+                        upgradesBought += SpendSpareCash(simulation);
+                    }
+                }
+            }
+
+            SessionReport report = new SessionReport();
+            report.CashEarned = simulation.Wallet.LifetimeEarnings - startEarnings;
+            report.PartsSpend = simulation.Inventory.TotalSpent - startParts;
+            report.FinalCash = simulation.Wallet.Cash;
+            report.CarsCompleted = simulation.Stats.CarsCompleted - startCompleted;
+            report.CarsLost = simulation.Stats.CarsLost - startLost;
+            report.RoundsPlayed = simulation.Stats.RoundsPlayed - startRounds;
+            report.SecondsPlayed = steps * step;
+            report.UpgradesBought = upgradesBought;
+
+            // Guard rail: cash should never dip below zero no matter what the player did.
+            Check.IsTrue(simulation.Wallet.Cash >= 0d, "Cash went negative during play");
+
+            return report;
+        }
+
+        /// <summary>
+        /// Puts the player into the bay with the most MONEY AT RISK - the unfinished payout
+        /// weighed against how soon that customer will walk.
+        ///
+        /// This started out as "work on whoever is closest to leaving", which turned out to model
+        /// a bad player: cheap cars have the shortest patience, so pure urgency quietly prioritises
+        /// rusty utes over supercars. That made extra bays measure as a 30% INCOME LOSS, which said
+        /// more about the strategy than about the upgrade.
+        /// </summary>
+        /// <summary>
+        /// Runs the next outstanding check on this bay's car, if the player wants to inspect it.
+        /// Returns false when there is nothing left to look at, so the caller picks up a spanner.
+        /// </summary>
+        private static bool TryInspect(GarageSimulation simulation, int bayIndex,
+            Func<ActiveCar, int> checksWanted, Func<ActiveCar, DiagnosisAction?> nextCheck)
+        {
+            if (bayIndex < 0 || bayIndex >= simulation.Bays.Count) return false;
+
+            ActiveCar car = simulation.Bays[bayIndex];
+            if (car == null) return false;
+
+            // A strategy that picks WHICH check to run beats one that only picks how many: reading
+            // the complaint and testing the thing it points at is a real player's first move, and
+            // "run them in enum order" cannot express it.
+            if (nextCheck != null)
+            {
+                DiagnosisAction? wantedCheck = nextCheck(car);
+                if (wantedCheck == null) return false;
+
+                return simulation.StartDiagnosis(bayIndex, wantedCheck.Value);
+            }
+
+            if (checksWanted == null) return false;
+
+            int wanted = checksWanted(car);
+            if (wanted <= 0 || car.Diagnosis.ActionsRun.Count >= wanted) return false;
+
+            for (int i = 0; i < DiagnosisActions.Count; i++)
+            {
+                if (simulation.StartDiagnosis(bayIndex, (DiagnosisAction)i)) return true;
+            }
+
+            return false;
+        }
+
+        private static void ClaimAnyBay(GarageSimulation simulation)
+        {
+            int best = BestBay(simulation);
+            if (best >= 0) simulation.SelectBay(best);
+        }
+
+        /// <summary>The bay with the most money at risk per second of patience left.</summary>
+        public static int BestBay(GarageSimulation simulation)
+        {
+            int bestBay = -1;
+            double bestScore = double.MinValue;
+
+            for (int i = 0; i < simulation.Bays.Count; i++)
+            {
+                ActiveCar car = simulation.Bays[i];
+                if (car == null || car.AllJobsComplete) continue;
+
+                double atRisk = 0d;
+                for (int j = 0; j < car.Jobs.Count; j++)
+                {
+                    if (!car.Jobs[j].IsComplete) atRisk += car.Jobs[j].Payout;
+                }
+
+                // Value per second of remaining patience: high-value or nearly-out-of-time wins.
+                double score = atRisk / (car.TimeRemaining < 1f ? 1f : car.TimeRemaining);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestBay = i;
+                }
+            }
+
+            return bestBay;
+        }
+
+        /// <summary>
+        /// Models how a COMPETENT player shops, which matters: a naive "always buy the cheapest thing"
+        /// strategy buys Local Radio Ads with one bay, drowns in cars it cannot serve, and then reports
+        /// the game as badly balanced. A real player buys capacity before volume.
+        ///
+        /// The rules, in order:
+        ///  1. An Extra Bay is always worth it the moment it is affordable - capacity is king.
+        ///  2. Never buy "more cars arrive" upgrades while cars are already queuing up unserved.
+        ///  3. Otherwise buy the cheapest thing available.
+        /// </summary>
+        public static int SpendSpareCash(GarageSimulation simulation)
+        {
+            int bought = 0;
+
+            for (int guard = 0; guard < 10; guard++)
+            {
+                // Rule 1: capacity first.
+                UpgradeDefinition bays = UpgradeCatalog.FindById("workshop_bays");
+                if (bays != null && !simulation.Upgrades.IsMaxed(bays)
+                    && simulation.Wallet.Cash >= simulation.GetUpgradeCost(bays))
+                {
+                    if (simulation.TryBuyUpgrade(bays.Id)) { bought++; continue; }
+                }
+
+                // Rule 2: only drum up more business when there is slack to absorb it.
+                bool forecourtIsBusy = simulation.WaitingCars.Count >= 2;
+
+                // Rule 3: once the sell-up is genuinely in reach, stop feeding the endless sink
+                // and start banking. An upgrade with no ceiling will otherwise absorb every
+                // pound forever, and a real player switches to saving when the goal is close.
+                bool savingForPrestige =
+                    simulation.Wallet.Cash > simulation.Prestige.CashRequirement * 0.55d;
+
+                UpgradeDefinition cheapest = null;
+                double cheapestCost = double.PositiveInfinity;
+
+                for (int i = 0; i < UpgradeCatalog.All.Count; i++)
+                {
+                    UpgradeDefinition definition = UpgradeCatalog.All[i];
+                    if (simulation.Upgrades.IsMaxed(definition)) continue;
+                    if (forecourtIsBusy && definition.Id == "rep_marketing") continue;
+                    if (savingForPrestige && definition.IsUnlimited) continue;
+
+                    double cost = simulation.GetUpgradeCost(definition);
+                    if (cost < cheapestCost)
+                    {
+                        cheapestCost = cost;
+                        cheapest = definition;
+                    }
+                }
+
+                if (cheapest == null) break;
+                if (simulation.Wallet.Cash < cheapestCost) break;
+
+                if (!simulation.TryBuyUpgrade(cheapest.Id)) break;
+                bought++;
+            }
+
+            return bought;
+        }
+
+        /// <summary>Counts how many cars are anywhere in the garage right now.</summary>
+        public static int CarsOnSite(GarageSimulation simulation)
+        {
+            int count = simulation.WaitingCars.Count;
+            for (int i = 0; i < simulation.Bays.Count; i++)
+            {
+                if (simulation.Bays[i] != null) count++;
+            }
+            return count;
+        }
+
+        /// <summary>Buys a specific upgrade a number of times, granting the cash needed to do it.</summary>
+        /// <summary>
+        /// Hires mechanics AND opens the bays they need to be legal.
+        ///
+        /// A garage can only keep (bays - 1) mechanics busy, because the player holds a bay
+        /// themselves, and the purchase is blocked past that. Tests that want "a garage with two
+        /// mechanics" mean a garage where two mechanics actually work, so they say so through
+        /// this rather than granting a crew the garage will clamp straight back to zero.
+        /// Tests that are ABOUT the cap call TryBuyUpgrade directly instead.
+        /// </summary>
+        public static void GrantMechanics(GarageSimulation simulation, int mechanics)
+        {
+            if (mechanics <= 0) return;
+
+            int baysNeeded = mechanics + 1;
+            if (baysNeeded > simulation.BayCount)
+            {
+                GrantUpgrade(simulation, "workshop_bays", baysNeeded - simulation.BayCount);
+            }
+
+            GrantUpgrade(simulation, "auto_mechanic", mechanics);
+        }
+
+        public static void GrantUpgrade(GarageSimulation simulation, string upgradeId, int levels)
+        {
+            for (int i = 0; i < levels; i++)
+            {
+                UpgradeDefinition definition = UpgradeCatalog.FindById(upgradeId);
+                if (definition == null || simulation.Upgrades.IsMaxed(definition)) return;
+
+                double cost = simulation.GetUpgradeCost(definition);
+                simulation.Wallet.Earn(cost);
+                simulation.TryBuyUpgrade(upgradeId);
+            }
+        }
+    }
+}

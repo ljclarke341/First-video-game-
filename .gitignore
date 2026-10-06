@@ -104,3 +104,7 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Headless test harness build output (Tools/ sits outside Assets/ so Unity never sees it)
+/Tools/**/bin/
+/Tools/**/obj/

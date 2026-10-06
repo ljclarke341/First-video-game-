@@ -1,0 +1,218 @@
+using System.Collections.Generic;
+using GarageTycoon.Core.Cars;
+using GarageTycoon.Core.Util;
+
+namespace GarageTycoon.Core.Minigames
+{
+    /// <summary>
+    /// MINI-GAME 2 - TOOL MATCHING.
+    /// The job is announced ("Torque the head bolts") and a row of tools flashes up for a moment.
+    /// Once the labels hide, the player has to remember WHICH BUTTON held the right tool and tap it.
+    /// Grabbing the wrong tool damages the part: lost progress plus a time penalty.
+    /// </summary>
+    public sealed class ToolMatchMinigame : MinigameBase
+    {
+        /// <summary>What the player is being asked to do.</summary>
+        public string TaskPrompt { get; private set; }
+
+        /// <summary>The tool names on the buttons, left to right.</summary>
+        public IReadOnlyList<string> Options { get { return _options; } }
+
+        /// <summary>Index of the button holding the correct tool.</summary>
+        public int CorrectIndex { get; private set; }
+
+        /// <summary>Seconds the tool labels stay visible before they hide.</summary>
+        public float PreviewSeconds { get; private set; }
+
+        /// <summary>
+        /// True until answering opens. Taps before this are ignored, so it also sets the floor on
+        /// how long the round can possibly take.
+        /// </summary>
+        public bool IsPreviewing { get { return Elapsed < PreviewSeconds; } }
+
+        /// <summary>
+        /// How long the tool labels stay readable - the base preview plus whatever the Tool Wall
+        /// has bought. This runs PAST the point where answering opens, which is the whole trick:
+        /// the player gets more reading time without the round getting longer.
+        ///
+        /// On a SHUFFLE round the labels never survive the swap, or the twist would be defeated by
+        /// simply reading the answer off the button after it moved.
+        /// </summary>
+        public float LabelHoldSeconds
+        {
+            get
+            {
+                float hold = PreviewSeconds + Tuning.PreviewBonusSeconds;
+                if (Modifier == MinigameModifier.Shuffle && hold > ShuffleAt) hold = ShuffleAt;
+                return hold;
+            }
+        }
+
+        /// <summary>True while the tool labels can still be read. The UI greys them out after this.</summary>
+        public bool LabelsVisible { get { return Elapsed < LabelHoldSeconds; } }
+
+        /// <summary>Seconds left of the preview, for the countdown pip.</summary>
+        public float PreviewRemaining { get { return MathUtil.Clamp(PreviewSeconds - Elapsed, 0f, PreviewSeconds); } }
+
+        private readonly List<string> _options = new List<string>();
+
+        public override MinigameType Type { get { return MinigameType.ToolMatch; } }
+
+        /// <summary>
+        /// The job being done. This stays on screen for the WHOLE round: the player is being
+        /// tested on which tool they grabbed, not on whether they managed to read the question
+        /// before it vanished. Only the tool labels hide.
+        /// </summary>
+        public override string Prompt { get { return TaskPrompt; } }
+
+        public ToolMatchMinigame(JobType jobType, float difficulty, MinigameTuning tuning, IRandomSource random)
+            : base(difficulty, tuning, random)
+        {
+            ToolTask task = ToolLibrary.RandomTaskFor(jobType, random);
+            TaskPrompt = task.Prompt;
+
+            // Rarer cars put more tools on the bench: 3 at easy difficulty, up to 5 at legendary.
+            int optionCount = MathUtil.ClampInt(3 + (int)((Difficulty - 1f) * 2.2f), 3, 5);
+
+            BuildOptions(task.CorrectTool, optionCount);
+
+            // PLAYTEST FIX: this used to be 1.5f / Difficulty, which gave a rare car about a
+            // second to read a job prompt AND scan up to five tool names. Testers could not read
+            // it at all, so the round was pure guesswork rather than recall.
+            //
+            // It now scales by the SQUARE ROOT of difficulty and has a much higher floor, so a
+            // legendary car is still tighter than a ute without ever becoming unreadable.
+            // NOTE the Tool Wall bonus is deliberately NOT in here.
+            //
+            // It used to be, and because answering is ignored until the preview is over, that made
+            // PreviewSeconds a hard floor on how long the round took. Six levels of the upgrade
+            // stretched this round from 6.80s to 7.88s while leaving the answer window at 4.20s,
+            // which cost about a fifth of the garage's throughput and made the upgrade the only
+            // reliably negative purchase in the game (measured at -11% to -20% for every player
+            // at every skill level).
+            //
+            // What the upgrade buys now is LabelHoldSeconds below: the labels linger past the
+            // moment answering opens, so the player reads for longer without the round, the answer
+            // window or the customer's clock growing at all.
+            PreviewSeconds = MathUtil.Clamp(
+                2.6f / (float)System.Math.Sqrt(Difficulty), 1.5f, 6f);
+
+            TimeLimit = PreviewSeconds + 4.2f;
+        }
+
+        /// <summary>Fills the button row with the correct tool plus unique decoys, then shuffles it.</summary>
+        private void BuildOptions(string correctTool, int optionCount)
+        {
+            _options.Add(correctTool);
+
+            // Pull distinct decoys from the tool wall.
+            int guard = 0;
+            while (_options.Count < optionCount && guard < 200)
+            {
+                guard++;
+                string candidate = ToolLibrary.AllTools[Random.NextInt(0, ToolLibrary.AllTools.Length)];
+                if (!_options.Contains(candidate)) _options.Add(candidate);
+            }
+
+            // Fisher-Yates shuffle so the answer is not always in slot 0.
+            for (int i = _options.Count - 1; i > 0; i--)
+            {
+                int j = Random.NextInt(0, i + 1);
+                string swap = _options[i];
+                _options[i] = _options[j];
+                _options[j] = swap;
+            }
+
+            CorrectIndex = _options.IndexOf(correctTool);
+        }
+
+        /// <summary>The patience clock is eased off while the player is still reading.</summary>
+        /// <summary>
+        /// The patience clock is eased off while the player is still reading.
+        ///
+        /// Tied to the ANSWER GATE, not to how long the labels linger. Easing it over the lingering
+        /// seconds too was measured at +43% income, because it quietly handed the car about a
+        /// second of near-free clock on every round of its repair - a far bigger gift than the
+        /// reading time the upgrade is meant to sell.
+        /// </summary>
+        public override bool IsShowingPreview { get { return IsPreviewing; } }
+
+        /// <summary>True once a SHUFFLE round has actually swapped the buttons round.</summary>
+        public bool HasShuffled { get; private set; }
+
+        /// <summary>Seconds after the preview at which a SHUFFLE round rearranges the buttons.</summary>
+        public float ShuffleAt { get { return PreviewSeconds + 0.55f; } }
+
+        protected override void OnTick(float deltaTime)
+        {
+            // SHUFFLE twist: a moment after the labels hide, the tools swap places. Remembering
+            // "it was the third one" stops working; you have to have read the tool itself.
+            if (Modifier == MinigameModifier.Shuffle && !HasShuffled && Elapsed >= ShuffleAt)
+            {
+                ShuffleOptions();
+                HasShuffled = true;
+            }
+        }
+
+        /// <summary>Rearranges the buttons, keeping track of where the right tool ended up.</summary>
+        private void ShuffleOptions()
+        {
+            string correctTool = _options[CorrectIndex];
+
+            for (int i = _options.Count - 1; i > 0; i--)
+            {
+                int j = Random.NextInt(0, i + 1);
+                string swap = _options[i];
+                _options[i] = _options[j];
+                _options[j] = swap;
+            }
+
+            CorrectIndex = _options.IndexOf(correctTool);
+        }
+
+        /// <summary>The player tapped one of the tool buttons.</summary>
+        public override void SelectOption(int optionIndex)
+        {
+            if (IsFinished) return;
+
+            // Tapping during the preview is ignored rather than punished - it would be a cheap gotcha
+            // on a touch screen where a stray finger is easy.
+            if (IsPreviewing) return;
+
+            if (optionIndex < 0 || optionIndex >= _options.Count)
+            {
+                Finish(MinigameResult.FromOutcome(MinigameOutcome.Miss, "Fumbled it!"));
+                return;
+            }
+
+            if (optionIndex == CorrectIndex)
+            {
+                // Answering quickly after the labels hide shows real recall: that is a PERFECT.
+                float answerDelay = Elapsed - PreviewSeconds;
+                if (answerDelay <= 1.4f)
+                {
+                    Finish(MinigameResult.FromOutcome(MinigameOutcome.Perfect, "PERFECT!"));
+                }
+                else
+                {
+                    Finish(MinigameResult.FromOutcome(MinigameOutcome.Good, "Right tool!"));
+                }
+            }
+            else
+            {
+                Finish(MinigameResult.FromOutcome(MinigameOutcome.Damage, "Wrong tool!"));
+            }
+        }
+
+        /// <summary>Tapping the main area is treated as a fumble so a mis-tap is never free.</summary>
+        public override void Press()
+        {
+            // Deliberately does nothing: the tool game only accepts option buttons.
+        }
+
+        protected override void OnTimeout()
+        {
+            Finish(MinigameResult.FromOutcome(MinigameOutcome.Miss, "Too slow!"));
+        }
+    }
+}
