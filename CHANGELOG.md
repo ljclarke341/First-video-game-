@@ -16,23 +16,27 @@ measuring rigs.
 The hypothesis was that the garage is arrival-saturated, and that easing arrivals would let
 mechanics take work off the player. Swept five arrival rates plus two extremes, 120 seeds each:
 
-| interval | queue | forecourt full | player idle | player rounds | crew used | income/min |
-|---|---|---|---|---|---|---|
-| **9s** (current) | 4.62 | 40% | **0%** | 372 | 73% | $1,166 |
-| 10.6s (0.85x) | 4.02 | 26% | 0% | 372 | 71% | $1,155 |
-| 12s (0.75x) | 3.02 | 13% | 0% | 371 | 69% | $1,139 |
-| 13.9s (0.65x) | 1.75 | 3% | 1% | 372 | 63% | $1,158 |
-| 16.4s (0.55x) | 0.73 | 0% | 2% | 369 | 49% | $1,041 |
-| 25s | 0.12 | 0% | 14% | 331 | 18% | $795 |
-| 40s | 0.04 | 0% | 38% | 239 | **6%** | $529 |
+| interval | queue | forecourt full | player idle | player rounds | rounds/car | crew used | income/min |
+|---|---|---|---|---|---|---|---|
+| **9s** (current) | 4.62 | 40% | **0%** | 372 | 6.22 | 73% | $1,166 |
+| 10.6s (0.85x) | 4.02 | 26% | 0% | 372 | 6.10 | 71% | $1,155 |
+| 12s (0.75x) | 3.02 | 13% | 0% | 371 | 6.15 | 69% | $1,139 |
+| 13.8s (0.65x) | 1.75 | 4% | 1% | 370 | 6.36 | 63% | $1,138 |
+| 16.4s (0.55x) | 0.76 | 0% | 2% | 369 | 6.57 | 49% | $1,052 |
+| 25s | 0.12 | 0% | 14% | 331 | 8.27 | 18% | $795 |
+| 40s | 0.04 | 0% | 38% | 239 | 9.18 | **6%** | $529 |
 
-**Player workload is flat across a 45% cut in arrivals** (372 to 369 rounds). Idle time reaches 2%.
+Late garage (4 bays, 4 mechanics), 120 seeds of 15 minutes each.
+
+**Player workload is flat across a 45% cut in arrivals** (372 to 369 rounds), and rounds per car *rises* from 6.22 to 6.57 - each car costs the player MORE
+hands-on work, not less. Idle time reaches 2%.
 To idle the player even 38% you have to starve the garage to 1.5 cars a minute, where the crew is 6%
-utilised and income has halved.
+utilised and income has more than halved.
 
 The cause: **the player claims a bay the instant one frees, so mechanics only ever get what is left
-over.** Easing arrivals idles the MECHANICS, not the player - crew utilisation falls from 73% to 6%
-while the player stays busy throughout.
+over.** Easing arrivals idles the MECHANICS, not the player - crew utilisation falls from 73% to 6% while
+the player stays busy throughout. In the mid garage it is starker still: 97% to 63% across the
+five swept rates, while the player's rounds per car climb 6.70 to 7.34.
 
 ### The measurement that actually answers it
 
