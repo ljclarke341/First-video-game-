@@ -310,7 +310,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             for (int seed = 0; seed < Seeds; seed++)
             {
                 GarageSimulation idle = new GarageSimulation(7900 + seed * 37);
-                GameplayHarness.GrantUpgrade(idle, "auto_mechanic", 1);
+                GameplayHarness.GrantMechanics(idle, 1);
                 GameplayHarness.GrantUpgrade(idle, "auto_skill", 6);
                 GameplayHarness.GrantUpgrade(idle, "auto_speed", 6);
                 idle.Wallet.Restore(GameBalance.StartingCash, 0d, 0d);

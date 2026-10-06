@@ -117,7 +117,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             GarageSimulation simulation = new GarageSimulation(3002);
 
             GameplayHarness.GrantUpgrade(simulation, "precision_window", 3);
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
+            GameplayHarness.GrantMechanics(simulation, 2);
             GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 1);
             simulation.Wallet.Earn(12345d);
             simulation.Prestige.Restore(4, 2, null);

@@ -191,10 +191,25 @@ namespace GarageTycoon.Core.Simulation
 
             effects.PatienceMultiplier += Prestige.PatienceBonus;
 
+            // The crew is capped by the bays, and THIS is the only place the bay count is final -
+            // Inherited Lease has just been added to it. A mechanic can only work a car already in
+            // a bay that nobody else holds, and the player permanently occupies one bay, so the
+            // last mechanic hired measured 0.0% busy whenever the crew matched the bay count.
+            //
+            // Clamped rather than refunded: the stored level is untouched, so a save carrying an
+            // impossible crew keeps it and that mechanic starts working the moment a bay opens.
+            effects.MechanicCount = MathUtil.ClampInt(
+                effects.MechanicCount, 0, UpgradeState.MaxMechanicsFor(effects.BayCount));
+
             if (effects.MechanicCount > 0)
             {
                 effects.MechanicSkill = MathUtil.Clamp(
                     effects.MechanicSkill + Prestige.MechanicSkillBonus, 0f, UpgradeState.MechanicMaxSkill);
+            }
+            else
+            {
+                // No crew that can actually work means no crew skill to report.
+                effects.MechanicSkill = 0f;
             }
 
             return effects;
@@ -1153,11 +1168,38 @@ namespace GarageTycoon.Core.Simulation
         }
 
         /// <summary>Buys one level of an upgrade if affordable, and re-applies the effects immediately.</summary>
+        /// <summary>
+        /// Why this upgrade cannot be bought right now, or null when it can.
+        ///
+        /// Exposed so the shop can say so BEFORE the player spends anything, rather than the
+        /// purchase failing silently. Cost is deliberately not checked here: a price the player
+        /// cannot afford yet is already shown on the button.
+        /// </summary>
+        public string BlockedReason(UpgradeDefinition definition)
+        {
+            if (definition == null) return "Unknown upgrade";
+            if (Upgrades.IsMaxed(definition)) return "Fully upgraded";
+
+            if (definition.Id == "auto_mechanic")
+            {
+                int hired = Upgrades.GetLevel("auto_mechanic");
+                if (hired >= UpgradeState.MaxMechanicsFor(BayCount))
+                {
+                    // The player holds a bay themselves, so there is physically nowhere for this
+                    // mechanic to work. Measured at 0.0% busy, so selling it would be a con.
+                    return "Need another bay first";
+                }
+            }
+
+            return null;
+        }
+
         public bool TryBuyUpgrade(string upgradeId)
         {
             UpgradeDefinition definition = UpgradeCatalog.FindById(upgradeId);
             if (definition == null) return false;
             if (Upgrades.IsMaxed(definition)) return false;
+            if (BlockedReason(definition) != null) return false;
 
             double cost = GetUpgradeCost(definition);
             if (double.IsInfinity(cost)) return false;
@@ -1241,6 +1283,17 @@ namespace GarageTycoon.Core.Simulation
             Wallet.ResetForPrestige(GameBalance.StartingCash + Prestige.StartingCashBonus);
             Events.ClearActive();
             CalmCooldownRemaining = 0f;
+
+            // Selling up ends any fleet account in progress. Without this the new garage keeps
+            // the old run's counter, and TickFleet forces the remaining vans onto a rank-0
+            // forecourt where fleets are not unlocked for another three ranks.
+            CancelFleet();
+
+            // And nobody has heard of the new garage. Standing is the one stat that describes
+            // THIS garage rather than the player's career, so carrying a ruined name across a
+            // sell-up would make prestige a punishment for having had a bad run.
+            // Tokens, prestige count, perks and all-time earnings are career-long and stay.
+            Stats.Standing = 0d;
 
             RefreshEffects();
 

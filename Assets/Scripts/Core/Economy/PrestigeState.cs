@@ -147,6 +147,66 @@ namespace GarageTycoon.Core.Economy
             return MathUtil.Clamp01((float)(currentCash / CashRequirement));
         }
 
+        /// <summary>
+        /// Everything the sell-up readout needs, worked out in one place so Unity and the web say
+        /// exactly the same thing.
+        ///
+        /// The requirement is cash ON HAND, which is why a bare progress bar was misleading: it
+        /// slides backwards every time the player buys an upgrade, with no explanation. The readout
+        /// therefore carries the requirement, what is still missing, what the sell-up would pay,
+        /// and - only when it can be trusted - how long the current pace would take.
+        /// </summary>
+        public PrestigeReadout BuildReadout(double currentCash, double lifetimeEarnings,
+            double playTimeSeconds, double startingCash)
+        {
+            PrestigeReadout readout = new PrestigeReadout();
+            readout.Requirement = CashRequirement;
+            readout.CurrentCash = currentCash < 0d ? 0d : currentCash;
+            readout.Remaining = CashRequirement - readout.CurrentCash;
+            if (readout.Remaining < 0d) readout.Remaining = 0d;
+            readout.Fraction = ProgressTowardsPrestige(currentCash);
+            readout.TokensIfSoldNow = TokensForReset(lifetimeEarnings);
+            readout.Ready = CanPrestige(currentCash, lifetimeEarnings);
+
+            // A token is also owed on lifetime earnings, and it is perfectly possible to be sitting
+            // on the cash without having earned enough yet. Saying "ready" then would be a lie.
+            readout.NeedsMoreEarnings = readout.CurrentCash >= CashRequirement
+                && readout.TokensIfSoldNow < 1;
+
+            // The pace estimate. Net accumulation since the run began, which is the honest rate:
+            // it already accounts for everything the player has spent. Withheld rather than
+            // guessed when there is not enough to go on, or when the player is spending as fast as
+            // they earn and the answer would be "never".
+            readout.HasEstimate = false;
+            readout.EstimateSeconds = 0d;
+
+            if (!readout.Ready && playTimeSeconds >= MinimumSecondsForEstimate)
+            {
+                double banked = readout.CurrentCash - startingCash;
+                double ratePerSecond = banked / playTimeSeconds;
+
+                if (ratePerSecond > 0d)
+                {
+                    double seconds = readout.Remaining / ratePerSecond;
+
+                    // Past a day it stops being information and starts being discouraging noise.
+                    if (seconds > 0d && seconds <= MaximumEstimateSeconds)
+                    {
+                        readout.HasEstimate = true;
+                        readout.EstimateSeconds = seconds;
+                    }
+                }
+            }
+
+            return readout;
+        }
+
+        /// <summary>Below this much play there is not enough history to estimate a pace from.</summary>
+        public const double MinimumSecondsForEstimate = 120d;
+
+        /// <summary>Beyond this the estimate is withheld rather than shown.</summary>
+        public const double MaximumEstimateSeconds = 24d * 3600d;
+
         // ------------------------------------------------------------------
         // Saving
         // ------------------------------------------------------------------

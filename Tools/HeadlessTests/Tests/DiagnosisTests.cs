@@ -165,7 +165,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Otherwise the player would watch a car being repaired whose card still said
                 // nobody knew what was wrong with it.
                 GarageSimulation simulation = new GarageSimulation(400);
-                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+                GameplayHarness.GrantMechanics(simulation, 1);
                 Advance(simulation, 30f);
 
                 ActiveCar car = simulation.Bays[0];
@@ -300,7 +300,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Nobody is holding the phone during the catch-up, so an open inspection would
                 // simply time out and record a failed check the player never got to play.
                 GarageSimulation simulation = new GarageSimulation(900);
-                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+                GameplayHarness.GrantMechanics(simulation, 1);
                 Advance(simulation, 20f);
 
                 Check.IsTrue(simulation.StartDiagnosis(0, DiagnosisAction.BrakeInspection),
@@ -322,7 +322,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Offline runs the real tick, so the self-diagnosis that lets a mechanic pick up an
                 // uninspected car has to work there too - otherwise idle income quietly stops.
                 GarageSimulation simulation = new GarageSimulation(901);
-                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
+                GameplayHarness.GrantMechanics(simulation, 2);
                 Advance(simulation, 30f);
 
                 OfflineReport report = simulation.ApplyOfflineProgress(3600d);

@@ -336,7 +336,7 @@ namespace GarageTycoon.HeadlessTests
         {
             Console.WriteLine("=== WHY THE TOOL WALL COSTS MONEY: ROUND LENGTH ===");
             Console.WriteLine();
-            Console.WriteLine("levels  preview+   ToolMatch: preview  limit  answer window | RapidSequence: preview  limit  answer window");
+            Console.WriteLine("levels  bonus    ToolMatch: gate  labels  limit  window | RapidSequence: gate  pattern  limit  window");
 
             UpgradeDefinition definition = UpgradeCatalog.FindById("precision_preview");
 
@@ -355,17 +355,19 @@ namespace GarageTycoon.HeadlessTests
                 Console.WriteLine(
                     levels.ToString().PadLeft(6)
                     + ((definition == null ? 0f : levels * definition.EffectPerLevel).ToString("0.00") + "s").PadLeft(10)
-                    + tool.PreviewSeconds.ToString("0.00").PadLeft(20)
+                    + tool.PreviewSeconds.ToString("0.00").PadLeft(17)
+                    + tool.LabelHoldSeconds.ToString("0.00").PadLeft(8)
                     + tool.TimeLimit.ToString("0.00").PadLeft(7)
-                    + (tool.TimeLimit - tool.PreviewSeconds).ToString("0.00").PadLeft(15)
+                    + (tool.TimeLimit - tool.PreviewSeconds).ToString("0.00").PadLeft(8)
                     + " |"
-                    + rapid.PreviewSeconds.ToString("0.00").PadLeft(24)
+                    + rapid.PreviewSeconds.ToString("0.00").PadLeft(21)
+                    + rapid.PatternHoldSeconds.ToString("0.00").PadLeft(9)
                     + rapid.TimeLimit.ToString("0.00").PadLeft(7)
-                    + (rapid.TimeLimit - rapid.PreviewSeconds).ToString("0.00").PadLeft(15));
+                    + (rapid.TimeLimit - rapid.PreviewSeconds).ToString("0.00").PadLeft(8));
             }
 
             Console.WriteLine();
-            Console.WriteLine("The answer window never moves. Only the round gets longer.");
+            Console.WriteLine("The round and the answer window never move. Only how long the labels linger does.");
             Console.WriteLine();
         }
 

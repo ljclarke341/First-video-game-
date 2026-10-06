@@ -6,6 +6,112 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.4 (implementation) — The four confirmed fixes
+
+### 1. Selling up now actually ends the old garage
+
+`TryPrestige` cleared neither the garage's name nor an in-progress fleet account; the web build
+cleared both and its comments stated the intent, so Core was the one that was wrong.
+
+```
+before:  standing -0.35   fleet vans left 5   bays 4
+after:   standing  0.00   fleet vans left 0   bays 1
+```
+
+Tokens, prestige count, perks and all-time earnings still carry over, and the $120,000 cash
+requirement is untouched. Five tests pin it, including one proving a stale counter can no longer
+force vans into a garage that has not unlocked fleets.
+
+### 2. Mechanics are capped at bays - 1, and the shop says so
+
+The player permanently occupies a bay, so a crew matching the bay count always left its last hire at
+**0.0% busy**. Now `MaxMechanicsFor(bays) = bays - 1`, clamped in `ApplyPerks` - the one place the bay
+count is final, since Inherited Lease adds bays after `BuildEffects` and clamping earlier would have
+permanently cost a prestiged player a mechanic.
+
+| garage | before | after |
+|---|---|---|
+| 1 bay, hire 1 | $813, **below** the $822 with no crew | purchase refused: "Need another bay first" |
+| 2 bays, hire 2 | $1,270, 2nd mechanic 0.0% busy | capped at 1; $1,250 |
+| 3 bays, hire 3 | $1,750, 3rd mechanic 0.0% busy | capped at 2; $1,731 |
+| 4 bays, hire 4 | $1,994, 4th 0.0% busy, cost $8,986 | capped at 3; $1,975 |
+
+Crew utilisation at 4 bays now reads an honest **79%** rather than a 59% diluted by a mechanic who
+never worked. Saves are clamped, never rewritten: a garage holding an impossible crew keeps it, and
+those mechanics start working the moment another bay opens.
+
+**Flagged, because it is a real consequence of the rule as specified:** a one-bay garage can now have
+no mechanics at all, so it earns **nothing** offline until a second bay is bought. The 0.0%-busy
+measurement was taken with the player working; hands-off, a single mechanic in a single bay did work
+fine. If idle income from the very first garage matters, the rule wants to be "bays - 1, minimum 1",
+and that is a one-line change to `MaxMechanicsFor`.
+
+### 3. The Tool Wall buys reading time, not a longer round
+
+Root cause: taps are ignored until the preview ends, so `PreviewSeconds` was a hard floor on round
+length, and the upgrade was being added to it. The two jobs that number was doing are now separate -
+`PreviewSeconds` gates answering and sets the round length, `LabelHoldSeconds` / `PatternHoldSeconds`
+say how long the information stays readable, and only the latter grows:
+
+| levels | tool round | labels | answer window | sequence round | pattern |
+|---|---|---|---|---|---|
+| 0 | 6.80s | 2.60s | 4.20s | 5.31s | 2.31s |
+| 6 | **6.80s** | **3.68s** | **4.20s** | **5.31s** | **3.39s** |
+
+| garage / player | before | after |
+|---|---|---|
+| skill 0.45, 3 bays 2 crew | **-19.0%** | **+15.2%** |
+| skill 0.65, 3 bays 2 crew | **-17.0%** | **+18.8%** |
+| skill 0.85, 3 bays 2 crew | **-20.4%** | **+18.9%** |
+| skill 0.85, 1 bay solo | **-19.6%** | **+22.9%** |
+| hands-off, 4 bays 4 crew | **-11.4%** | **+20.3%** |
+
+That lands it mid-table next to Air Tools (+11%) and well under Street Signage (+38%) and Premium
+Rates (+29%), which is the "modest useful improvement" this was asked for. Two over-shoots were
+caught and backed out on the way: extending the patience easing over the lingering labels measured
+**+43%** (about a second of near-free clock per round), and adding the whole 1.08s bonus to a 0.55s
+PER-STEP recall baseline measured **+40%** by pushing recall past "never forgets a step". The twists
+keep their teeth - labels never survive a SHUFFLE swap, and the pattern never lingers on a BACKWARDS
+round.
+
+### 4. The sell-up explains itself
+
+The target is unchanged at $120,000. A new shared `PrestigeState.BuildReadout` feeds both builds, so
+they cannot drift, and the bar is no longer left to speak for itself:
+
+```
+$74.3K / $120K
+Sell up at $120K cash on hand · $45.8K to go · ~18m 29s at this pace · +12 tokens
+```
+
+The estimate is net accumulation since the run began, so it already accounts for everything spent -
+and it is **withheld** rather than guessed when there is under two minutes of play, when the garage
+is banking nothing, or when the answer would exceed a day. Holding the cash without enough trading
+history now says so ("the garage needs a longer trading history first") instead of just greying the
+button. A test asserts that spending still drives progress backwards, so nobody later "fixes" it by
+latching the highest value reached.
+
+### Verified
+
+**407 tests** pass (15 new). **1,228 parity cases identical**, up from 1,161: new `crewCap` and
+`prestigeReadout` sections. Unity compile check clean, web soak clean, no page errors. In the real
+browser: the cap holds at every bay count with the right refusal copy and no money taken; an
+impossible save loads, keeps its crew and restores it when bays return; the sell-up clears standing
+and the fleet while keeping tokens and all-time earnings; round length is identical at every Tool
+Wall level while the labels linger; offline pays with a legal crew and pays nothing without a bay.
+
+Economy held: early $543 and mid $1,631 unchanged to the dollar, late $2,023 to $2,003 (-1.0%) -
+exactly the share the dead fourth mechanic was contributing, which the player no longer pays $8,986
+for.
+
+### Also corrected
+
+The C.4 audit claimed the surviving fleet vans arrived "at a rank-0 garage where fleets are not
+unlocked". Rank comes from all-time earnings and deliberately survives a sell-up, so that framing was
+wrong; my own new test caught it. The bug was the stale counter, not premature unlocks.
+
+---
+
 ## Phase C.4 — Audit: the fourth mechanic, capacity, the tool wall, prestige
 
 An audit. **No shipped value changed** - `Assets/` is untouched. Four issues investigated, and two
@@ -113,8 +219,14 @@ after:   standing -0.062   fleet vans left 5   bays 1
 ```
 
 1. **A ruined reputation follows the player into the new garage** in Unity, and does not in the web.
-2. **A fleet run in progress survives the sell-up**, and all five remaining vans then arrive at a
-   brand-new rank-0 garage - where fleets are not unlocked until rank 4 ($350,000 lifetime).
+2. **A fleet run in progress survives the sell-up**, and the old run's counter then forces its five
+   remaining vans into the new garage, bypassing the ordinary 12% roll entirely.
+
+**Correction to the above, found while implementing the fix:** this audit said those vans arrive "at
+a brand-new rank-0 garage where fleets are not unlocked". That part was wrong. `RankLevel` is derived
+from ALL-TIME earnings, which deliberately survive a sell-up, so a wealthy player keeps their
+unlocks and the new garage is not rank 0. The bug is narrower than reported - a stale counter forcing
+vans, rather than vans appearing before they are unlocked - and still real.
 
 The parity suite never caught these because it compares shared *formulas* and prestige is a state
 transition with no dump section.

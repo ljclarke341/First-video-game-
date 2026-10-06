@@ -121,7 +121,7 @@ namespace GarageTycoon.HeadlessTests.Tests
         {
             GarageSimulation simulation = new GarageSimulation(2006);
 
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+            GameplayHarness.GrantMechanics(simulation, 1);
             GameplayHarness.GrantUpgrade(simulation, "auto_skill", 4);
 
             double before = simulation.Wallet.Cash;
@@ -149,7 +149,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             // Bays first, so the extra mechanics have somewhere to work.
             GameplayHarness.GrantUpgrade(simulation, "workshop_bays", mechanics - 1);
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", mechanics);
+            GameplayHarness.GrantMechanics(simulation, mechanics);
             GameplayHarness.GrantUpgrade(simulation, "auto_skill", 4);
 
             double before = simulation.Wallet.Cash;
@@ -181,7 +181,7 @@ namespace GarageTycoon.HeadlessTests.Tests
             GarageSimulation simulation = new GarageSimulation(2009);
 
             GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 2);
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 3);
+            GameplayHarness.GrantMechanics(simulation, 3);
             GameplayHarness.GrantUpgrade(simulation, "auto_skill", 3);
 
             for (int i = 0; i < 60 * 120; i++)
@@ -234,7 +234,7 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             // With mechanics: real income.
             GarageSimulation staffed = new GarageSimulation(2011);
-            GameplayHarness.GrantUpgrade(staffed, "auto_mechanic", 2);
+            GameplayHarness.GrantMechanics(staffed, 2);
             GameplayHarness.GrantUpgrade(staffed, "auto_skill", 5);
             GameplayHarness.GrantUpgrade(staffed, "workshop_bays", 1);
 
@@ -250,7 +250,7 @@ namespace GarageTycoon.HeadlessTests.Tests
         private static void OfflineIsCapped()
         {
             GarageSimulation simulation = new GarageSimulation(2012);
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+            GameplayHarness.GrantMechanics(simulation, 1);
             GameplayHarness.GrantUpgrade(simulation, "auto_skill", 4);
 
             // A whole week away.

@@ -31,8 +31,28 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>How long each step is highlighted for. The view uses this to pace the lights.</summary>
         public float StepSeconds { get; private set; }
 
-        /// <summary>True while the pattern is still on screen.</summary>
+        /// <summary>True until inputs are accepted. Also the floor on how long the round can take.</summary>
         public bool IsPreviewing { get { return Elapsed < PreviewSeconds; } }
+
+        /// <summary>
+        /// How long the pattern stays on screen - the base preview plus whatever the Tool Wall has
+        /// bought. It lingers into the input phase, so the player has longer to read it without the
+        /// round growing.
+        ///
+        /// On a BACKWARDS round it never lingers: being able to read the pattern while entering it
+        /// in reverse would remove the twist entirely.
+        /// </summary>
+        public float PatternHoldSeconds
+        {
+            get
+            {
+                if (Modifier == MinigameModifier.Reversed) return PreviewSeconds;
+                return PreviewSeconds + Tuning.PreviewBonusSeconds;
+            }
+        }
+
+        /// <summary>True while the pattern can still be read.</summary>
+        public bool PatternVisible { get { return Elapsed < PatternHoldSeconds; } }
 
         /// <summary>Seconds left of the preview.</summary>
         public float PreviewRemaining { get { return MathUtil.Clamp(PreviewSeconds - Elapsed, 0f, PreviewSeconds); } }
@@ -45,7 +65,9 @@ namespace GarageTycoon.Core.Minigames
         {
             get
             {
-                if (!IsPreviewing || _sequence.Count == 0) return -1;
+                // Gated on how long the pattern stays READABLE rather than on when inputs open,
+                // so the seconds the Tool Wall buys are seconds the player can actually see.
+                if (!PatternVisible || _sequence.Count == 0) return -1;
                 // Paced by StepSeconds rather than by dividing the whole preview, so the trailing
                 // "take it in" beat holds on the last step instead of racing past it.
                 int step = StepSeconds <= 0f ? 0 : (int)(Elapsed / StepSeconds);
@@ -110,7 +132,10 @@ namespace GarageTycoon.Core.Minigames
             // lingers for a beat after the last step before it hides.
             float perStep = MathUtil.Clamp(0.62f / (float)System.Math.Sqrt(Difficulty), 0.34f, 0.9f);
             StepSeconds = perStep;
-            PreviewSeconds = perStep * length + Tuning.PreviewBonusSeconds + 0.45f;
+            // The Tool Wall bonus is deliberately NOT in here - see PatternHoldSeconds. Adding it
+            // to PreviewSeconds lengthened the round (inputs are ignored until the preview ends)
+            // without widening the input window, which is what made the upgrade lose money.
+            PreviewSeconds = perStep * length + 0.45f;
 
             float inputWindow = MathUtil.Clamp(length * 1.0f, 3f, 8f);
             TimeLimit = PreviewSeconds + inputWindow;
@@ -118,7 +143,10 @@ namespace GarageTycoon.Core.Minigames
             ProgressIndex = 0;
         }
 
-        /// <summary>The patience clock is eased off while the player is still reading.</summary>
+        /// <summary>
+        /// The patience clock is eased off while the player is still reading. Tied to the input
+        /// gate rather than to how long the pattern lingers, for the reason given on the tool game.
+        /// </summary>
         public override bool IsShowingPreview { get { return IsPreviewing; } }
 
         protected override void OnTick(float deltaTime)

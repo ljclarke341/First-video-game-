@@ -167,6 +167,58 @@ namespace GarageTycoon.HeadlessTests
             }
             json.Append("\n],\n");
 
+
+            // --- the crew cap and the sell-up readout, Phase C.4 ---
+            //
+            // Both are shared rules that the two builds compute independently, so both get pinned.
+            // The readout especially: it decides what the player is told about a goal hours away.
+            json.Append("\"crewCap\":[\n");
+            first = true;
+            for (int bays = 1; bays <= Core.Balance.GameBalance.MaxBayCount; bays++)
+            {
+                if (!first) json.Append(",\n");
+                first = false;
+                json.Append("  {\"bays\":").Append(bays)
+                    .Append(",\"max\":").Append(Core.Economy.UpgradeState.MaxMechanicsFor(bays))
+                    .Append('}');
+            }
+            json.Append("\n],\n");
+
+            json.Append("\"prestigeReadout\":[\n");
+            first = true;
+            {
+                Core.Economy.PrestigeState prestige = new Core.Economy.PrestigeState();
+
+                foreach (double cash in new[] { 0d, 500d, 30000d, 74250d, 119999d, 120000d, 150000d })
+                {
+                    foreach (double lifetime in new[] { 900d, 100000d, 1250000d })
+                    {
+                        foreach (double played in new[] { 30d, 1800d, 7200d })
+                        {
+                            Core.Economy.PrestigeReadout readout = prestige.BuildReadout(
+                                cash, lifetime, played, Core.Balance.GameBalance.StartingCash);
+
+                            if (!first) json.Append(",\n");
+                            first = false;
+
+                            json.Append("  {\"cash\":").Append(D(cash))
+                                .Append(",\"life\":").Append(D(lifetime))
+                                .Append(",\"played\":").Append(D(played))
+                                .Append(",\"need\":").Append(D(readout.Requirement))
+                                .Append(",\"left\":").Append(D(readout.Remaining))
+                                .Append(",\"frac\":").Append(D(Math.Round(readout.Fraction, 6)))
+                                .Append(",\"tokens\":").Append(readout.TokensIfSoldNow)
+                                .Append(",\"ready\":").Append(readout.Ready ? 1 : 0)
+                                .Append(",\"needsMore\":").Append(readout.NeedsMoreEarnings ? 1 : 0)
+                                .Append(",\"hasEta\":").Append(readout.HasEstimate ? 1 : 0)
+                                .Append(",\"eta\":").Append(D9(readout.HasEstimate ? Math.Round(readout.EstimateSeconds, 3) : 0d))
+                                .Append('}');
+                        }
+                    }
+                }
+            }
+            json.Append("\n],\n");
+
             // --- the diagnosis bonus, over accuracy ---
             json.Append("\"diagBonus\":[\n");
             first = true;

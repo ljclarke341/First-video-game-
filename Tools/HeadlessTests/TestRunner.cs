@@ -111,6 +111,7 @@ namespace GarageTycoon.HeadlessTests
                 Tests.PartsTests.Build(),
                 Tests.QualityPayTests.Build(),
                 Tests.QualityCurveTests.Build(),
+                Tests.ProgressionFixTests.Build(),
                 Tests.SpecialJobTests.Build(),
                 Tests.DiagnosisGateTests.Build(),
                 Tests.PerformanceJobTests.Build(),

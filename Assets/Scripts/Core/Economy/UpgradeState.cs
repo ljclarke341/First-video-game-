@@ -111,13 +111,32 @@ namespace GarageTycoon.Core.Economy
             effects.PreviewBonusSeconds = GetLevel("precision_preview") * Effect("precision_preview");
             effects.SpeedReduction = GetLevel("precision_speed") * Effect("precision_speed");
 
+            // --- Workshop capacity ---
+            // Worked out BEFORE the crew, because how many mechanics can actually hold a spanner
+            // depends on it.
+            effects.BayCount = MathUtil.ClampInt(
+                GameBalance.StartingBayCount + GetLevel("workshop_bays"), 1, GameBalance.MaxBayCount);
+
             // --- Automation ---
             // DESIGN RULE: idle income must always be worth LESS than playing by hand, otherwise the
             // best strategy is to put the phone down. Mechanics are therefore capped below an expert
             // player on BOTH skill and speed: fully trained they reach 0.72 skill at 0.91x pace, where
             // a good player is 0.85+ at full pace and can also pick the most urgent car to work on.
             // Measured by the balance tests, that puts idle income at roughly two thirds of playing.
+            //
+            // AND capped by the bays. A mechanic can only work a car that is already in a bay and
+            // that nobody else has, and the player permanently occupies one bay, so the last
+            // mechanic hired was measured at 0.0% busy whenever the crew matched the bay count -
+            // worthless at 4 bays, and actively negative at 1, where hiring anybody at all cost
+            // money for nothing. Clamped here rather than by editing the stored level, so a save
+            // carrying an impossible crew keeps it and the mechanic simply starts working again
+            // the moment another bay is opened.
+            // Left UNCLAMPED here on purpose. The bay count is not final until the prestige perks
+            // have been folded in, and clamping against a bay count that is about to grow would
+            // permanently cost a prestiged player a mechanic. GarageSimulation.ApplyPerks does the
+            // clamp once, against the finished bay count.
             effects.MechanicCount = GetLevel("auto_mechanic");
+
             effects.MechanicSkill = effects.MechanicCount > 0
                 ? MathUtil.Clamp(MechanicBaseSkill + GetLevel("auto_skill") * Effect("auto_skill"), 0f, MechanicMaxSkill)
                 : 0f;
@@ -129,8 +148,7 @@ namespace GarageTycoon.Core.Economy
             effects.SpawnIntervalMultiplier = MathUtil.Clamp(1f - GetLevel("rep_marketing") * Effect("rep_marketing"), 0.35f, 1f);
 
             // --- Workshop ---
-            effects.BayCount = MathUtil.ClampInt(
-                GameBalance.StartingBayCount + GetLevel("workshop_bays"), 1, GameBalance.MaxBayCount);
+            // BayCount is set at the top of this method, before the crew that depends on it.
             // Premium Rates adds; Master Tooling multiplies. The compounding one is what keeps
             // the income curve climbing once every capped upgrade has been bought out.
             double rates = 1d + GetLevel("workshop_rates") * Effect("workshop_rates");
@@ -138,6 +156,19 @@ namespace GarageTycoon.Core.Economy
             effects.PayoutMultiplier = rates * master * prestigeMultiplier;
 
             return effects;
+        }
+
+        /// <summary>
+        /// How many mechanics a garage of this many bays can actually keep busy.
+        ///
+        /// The player permanently occupies one bay and a mechanic can only work a car already in a
+        /// bay, so the honest ceiling is one below the bay count. One bay therefore supports no
+        /// mechanics at all, which is why hiring one there used to cost $650 and lose money.
+        /// </summary>
+        public static int MaxMechanicsFor(int bayCount)
+        {
+            int allowed = bayCount - 1;
+            return allowed < 0 ? 0 : allowed;
         }
 
         /// <summary>Skill of a freshly hired, untrained apprentice.</summary>

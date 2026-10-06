@@ -94,13 +94,16 @@ namespace GarageTycoon.Unity.Minigames
             ToolMatchMinigame game = Minigame as ToolMatchMinigame;
             if (game == null) return;
 
-            bool previewing = game.IsPreviewing;
+            // Driven by how long the labels stay READABLE, not by when answering opens. The two
+            // are no longer the same thing: the Tool Wall buys lingering labels rather than a
+            // longer round, so they can still be on screen while the player is already able to tap.
+            bool previewing = game.LabelsVisible;
 
-            _instruction.text = previewing ? "Memorise the tools" : "Which one was it?";
-            _instruction.color = previewing ? Theme.Info : Theme.Warning;
+            _instruction.text = game.IsPreviewing ? "Memorise the tools" : "Which one was it?";
+            _instruction.color = game.IsPreviewing ? Theme.Info : Theme.Warning;
 
             _previewBar.Fraction = game.PreviewSeconds <= 0f ? 0f : game.PreviewRemaining / game.PreviewSeconds;
-            _previewBar.Rect.gameObject.SetActive(previewing);
+            _previewBar.Rect.gameObject.SetActive(game.IsPreviewing);
 
             for (int i = 0; i < _buttons.Count; i++)
             {

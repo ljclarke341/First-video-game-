@@ -405,7 +405,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 // Mechanics diagnose for themselves. Without this a car handed to the crew would
                 // sit there with its faults hidden and nobody able to reveal them.
                 GarageSimulation simulation = new GarageSimulation(8200);
-                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 2);
+                GameplayHarness.GrantMechanics(simulation, 2);
 
                 Advance(simulation, 240f);
 

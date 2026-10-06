@@ -96,10 +96,12 @@ namespace GarageTycoon.Unity.Minigames
             RapidSequenceMinigame game = Minigame as RapidSequenceMinigame;
             if (game == null) return;
 
-            bool previewing = game.IsPreviewing;
+            // The pattern stays drawn while it is readable, which can run past the point where
+            // inputs are accepted - that lingering is what the Tool Wall buys.
+            bool previewing = game.PatternVisible;
 
             _prompt.text = game.Prompt;
-            _prompt.color = previewing ? Theme.Info : Theme.Warning;
+            _prompt.color = game.IsPreviewing ? Theme.Info : Theme.Warning;
 
             int highlighted = game.HighlightedStep;
 

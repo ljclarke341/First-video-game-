@@ -327,6 +327,28 @@ namespace GarageTycoon.HeadlessTests.Tests
         }
 
         /// <summary>Buys a specific upgrade a number of times, granting the cash needed to do it.</summary>
+        /// <summary>
+        /// Hires mechanics AND opens the bays they need to be legal.
+        ///
+        /// A garage can only keep (bays - 1) mechanics busy, because the player holds a bay
+        /// themselves, and the purchase is blocked past that. Tests that want "a garage with two
+        /// mechanics" mean a garage where two mechanics actually work, so they say so through
+        /// this rather than granting a crew the garage will clamp straight back to zero.
+        /// Tests that are ABOUT the cap call TryBuyUpgrade directly instead.
+        /// </summary>
+        public static void GrantMechanics(GarageSimulation simulation, int mechanics)
+        {
+            if (mechanics <= 0) return;
+
+            int baysNeeded = mechanics + 1;
+            if (baysNeeded > simulation.BayCount)
+            {
+                GrantUpgrade(simulation, "workshop_bays", baysNeeded - simulation.BayCount);
+            }
+
+            GrantUpgrade(simulation, "auto_mechanic", mechanics);
+        }
+
         public static void GrantUpgrade(GarageSimulation simulation, string upgradeId, int levels)
         {
             for (int i = 0; i < levels; i++)

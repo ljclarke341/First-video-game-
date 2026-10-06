@@ -137,7 +137,11 @@ namespace GarageTycoon.Core.Minigames
             // Modelling the reading time matters: without it a longer preview is pure cost in
             // simulation, and the balance tests conclude that the upgrade whose entire purpose is
             // buying reading time makes you poorer - which is true of a robot and false of a person.
-            double recall = System.Math.Pow(_skill, 0.7d) * PreviewComfort(game.PreviewSeconds, 2.2f);
+            //
+            // Read off the LABEL HOLD, not the answer gate: since Phase C.4 the Tool Wall lengthens
+            // how long the labels stay readable rather than how long the round takes, and that hold
+            // is the thing that actually helps somebody remember the tool.
+            double recall = System.Math.Pow(_skill, 0.7d) * PreviewComfort(game.LabelHoldSeconds, 2.2f);
             bool remembers = _random.NextFloat() < recall;
 
             if (remembers)
@@ -167,7 +171,19 @@ namespace GarageTycoon.Core.Minigames
             int index = game.ProgressIndex;
             if (index >= game.Sequence.Count) return;
 
-            double recall = System.Math.Pow(_skill, 0.5d) * PreviewComfort(game.StepSeconds, 0.55f);
+            // Reading time here is the per-step pace plus however long the pattern lingers - but the
+            // lingering is shared across the whole pattern, so it is divided by the number of steps
+            // before being compared against a PER-STEP comfort figure.
+            //
+            // Adding the whole 1.08s to a 0.55s per-step baseline instead pushed recall past 1.0,
+            // which means "never forgets a step", and measured the upgrade at +40% income. The
+            // brief for this fix was a modest improvement, not the best upgrade in the game.
+            float lingerPerStep = game.Sequence.Count <= 0
+                ? 0f
+                : (game.PatternHoldSeconds - game.PreviewSeconds) / game.Sequence.Count;
+
+            double recall = System.Math.Pow(_skill, 0.5d)
+                * PreviewComfort(game.StepSeconds + lingerPerStep, 0.55f);
             bool remembers = _random.NextFloat() < recall;
             int correct = (int)game.Sequence[index];
 

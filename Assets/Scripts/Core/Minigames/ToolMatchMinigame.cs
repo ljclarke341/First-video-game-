@@ -24,8 +24,32 @@ namespace GarageTycoon.Core.Minigames
         /// <summary>Seconds the tool labels stay visible before they hide.</summary>
         public float PreviewSeconds { get; private set; }
 
-        /// <summary>True while the labels are still readable. The UI greys them out once this flips.</summary>
+        /// <summary>
+        /// True until answering opens. Taps before this are ignored, so it also sets the floor on
+        /// how long the round can possibly take.
+        /// </summary>
         public bool IsPreviewing { get { return Elapsed < PreviewSeconds; } }
+
+        /// <summary>
+        /// How long the tool labels stay readable - the base preview plus whatever the Tool Wall
+        /// has bought. This runs PAST the point where answering opens, which is the whole trick:
+        /// the player gets more reading time without the round getting longer.
+        ///
+        /// On a SHUFFLE round the labels never survive the swap, or the twist would be defeated by
+        /// simply reading the answer off the button after it moved.
+        /// </summary>
+        public float LabelHoldSeconds
+        {
+            get
+            {
+                float hold = PreviewSeconds + Tuning.PreviewBonusSeconds;
+                if (Modifier == MinigameModifier.Shuffle && hold > ShuffleAt) hold = ShuffleAt;
+                return hold;
+            }
+        }
+
+        /// <summary>True while the tool labels can still be read. The UI greys them out after this.</summary>
+        public bool LabelsVisible { get { return Elapsed < LabelHoldSeconds; } }
 
         /// <summary>Seconds left of the preview, for the countdown pip.</summary>
         public float PreviewRemaining { get { return MathUtil.Clamp(PreviewSeconds - Elapsed, 0f, PreviewSeconds); } }
@@ -58,8 +82,20 @@ namespace GarageTycoon.Core.Minigames
             //
             // It now scales by the SQUARE ROOT of difficulty and has a much higher floor, so a
             // legendary car is still tighter than a ute without ever becoming unreadable.
+            // NOTE the Tool Wall bonus is deliberately NOT in here.
+            //
+            // It used to be, and because answering is ignored until the preview is over, that made
+            // PreviewSeconds a hard floor on how long the round took. Six levels of the upgrade
+            // stretched this round from 6.80s to 7.88s while leaving the answer window at 4.20s,
+            // which cost about a fifth of the garage's throughput and made the upgrade the only
+            // reliably negative purchase in the game (measured at -11% to -20% for every player
+            // at every skill level).
+            //
+            // What the upgrade buys now is LabelHoldSeconds below: the labels linger past the
+            // moment answering opens, so the player reads for longer without the round, the answer
+            // window or the customer's clock growing at all.
             PreviewSeconds = MathUtil.Clamp(
-                2.6f / (float)System.Math.Sqrt(Difficulty) + Tuning.PreviewBonusSeconds, 1.5f, 6f);
+                2.6f / (float)System.Math.Sqrt(Difficulty), 1.5f, 6f);
 
             TimeLimit = PreviewSeconds + 4.2f;
         }
@@ -91,6 +127,14 @@ namespace GarageTycoon.Core.Minigames
         }
 
         /// <summary>The patience clock is eased off while the player is still reading.</summary>
+        /// <summary>
+        /// The patience clock is eased off while the player is still reading.
+        ///
+        /// Tied to the ANSWER GATE, not to how long the labels linger. Easing it over the lingering
+        /// seconds too was measured at +43% income, because it quietly handed the car about a
+        /// second of near-free clock on every round of its repair - a far bigger gift than the
+        /// reading time the upgrade is meant to sell.
+        /// </summary>
         public override bool IsShowingPreview { get { return IsPreviewing; } }
 
         /// <summary>True once a SHUFFLE round has actually swapped the buttons round.</summary>

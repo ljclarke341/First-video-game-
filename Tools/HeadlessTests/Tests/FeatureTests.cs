@@ -148,7 +148,7 @@ namespace GarageTycoon.HeadlessTests.Tests
         private static void MechanicsDoNotCombo()
         {
             GarageSimulation simulation = new GarageSimulation(9004);
-            GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+            GameplayHarness.GrantMechanics(simulation, 1);
             GameplayHarness.GrantUpgrade(simulation, "auto_skill", 6);
 
             // Nobody plays by hand; only the mechanic works.
@@ -319,7 +319,7 @@ namespace GarageTycoon.HeadlessTests.Tests
                 PrestigePerk perk = PerkCatalog.All[i];
 
                 GarageSimulation simulation = new GarageSimulation(9100 + i);
-                GameplayHarness.GrantUpgrade(simulation, "auto_mechanic", 1);
+                GameplayHarness.GrantMechanics(simulation, 1);
 
                 UpgradeEffects before = simulation.Effects;
                 int capBefore = simulation.Combo.Cap;

@@ -28,6 +28,7 @@ namespace GarageTycoon.Unity.UI
         private Text _rateLabel;
         private Text _tokenLabel;
         private ProgressBar _prestigeBar;
+        private Text _prestigeLabel;
 
         private Image _eventBanner;
         private Text _eventText;
@@ -128,13 +129,29 @@ namespace GarageTycoon.Unity.UI
             barRect.anchorMin = new Vector2(0.5f, 0f);
             barRect.anchorMax = new Vector2(1f, 0f);
             barRect.pivot = new Vector2(0.5f, 0f);
-            barRect.offsetMin = new Vector2(0f, 20f);
-            barRect.offsetMax = new Vector2(-Theme.PanelPadding, 30f);
+            barRect.offsetMin = new Vector2(0f, 28f);
+            barRect.offsetMax = new Vector2(-Theme.PanelPadding, 38f);
+
+            // The sell-up spelled out under the bar, because the bar alone is actively misleading:
+            // it wants cash ON HAND, so buying anything drives it backwards and a bar cannot say
+            // why. Full width of the HUD and wrapped, because the honest sentence does not fit on
+            // one line at this size - and it stays INSIDE the HUD panel so it cannot collide with
+            // the rank row beneath it.
+            _prestigeLabel = UIFactory.CreateText("PrestigeLabel", hud.transform, string.Empty,
+                Theme.FontTiny, Theme.TextMuted, TextAnchor.LowerRight);
+            RectTransform labelRect = _prestigeLabel.rectTransform;
+            labelRect.anchorMin = new Vector2(0f, 0f);
+            labelRect.anchorMax = new Vector2(1f, 0f);
+            labelRect.pivot = new Vector2(0.5f, 0f);
+            labelRect.offsetMin = new Vector2(Theme.PanelPadding, 4f);
+            labelRect.offsetMax = new Vector2(-Theme.PanelPadding, 26f);
+            _prestigeLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _prestigeLabel.verticalOverflow = VerticalWrapMode.Overflow;
         }
 
         /// <summary>
         /// The garage's standing. It sits above the streak because it is the slowest-moving thing
-        /// on the screen and the only one that survives selling up.
+        /// on the screen. It does NOT survive selling up - the new garage starts unknown.
         /// </summary>
         private void BuildRankMeter()
         {
@@ -411,12 +428,53 @@ namespace GarageTycoon.Unity.UI
                                  : earned + " token" + (earned == 1 ? "" : "s") + " spent")
                 : string.Empty;
 
-            _prestigeBar.Fraction = _simulation.Prestige.ProgressTowardsPrestige(_simulation.Wallet.Cash);
+            PrestigeReadout readout = _simulation.Prestige.BuildReadout(
+                _simulation.Wallet.Cash, _simulation.Wallet.LifetimeEarnings,
+                _simulation.Stats.PlayTimeSeconds, GameBalance.StartingCash);
+
+            _prestigeBar.Fraction = readout.Fraction;
+            _prestigeLabel.text = DescribePrestige(readout);
 
             bool canPrestige = _simulation.CanPrestige();
             _prestigeButton.interactable = canPrestige;
             _prestigeButton.GetComponent<Image>().color = canPrestige ? Theme.Prestige : Theme.PanelSunken;
             _prestigeButton.GetComponentInChildren<Text>().color = canPrestige ? Theme.TextOnAccent : Theme.TextMuted;
+        }
+
+        /// <summary>
+        /// The sell-up, explained: what is still needed, what it would pay, and - only when the
+        /// readout says it can be trusted - how long at this pace.
+        ///
+        /// The web build splits this across two slots because its HUD has a narrow one; here it is
+        /// one wrapped line. Both are built from the same shared readout, which is what the parity
+        /// suite pins.
+        /// </summary>
+        private static string DescribePrestige(PrestigeReadout readout)
+        {
+            if (readout.Ready)
+            {
+                return "Sell up for +" + readout.TokensIfSoldNow + " reputation token"
+                    + (readout.TokensIfSoldNow == 1 ? "" : "s");
+            }
+
+            if (readout.NeedsMoreEarnings)
+            {
+                return "Cash is there - the garage needs a longer trading history first";
+            }
+
+            string line = "Sell up at $" + CashFormat.Short(readout.Requirement)
+                + " cash on hand · $" + CashFormat.Short(readout.Remaining) + " to go";
+
+            if (readout.HasEstimate)
+            {
+                line += " · ~" + CashFormat.Duration(readout.EstimateSeconds) + " at this pace";
+            }
+
+            line += readout.TokensIfSoldNow > 0
+                ? " · +" + readout.TokensIfSoldNow + " token" + (readout.TokensIfSoldNow == 1 ? "" : "s")
+                : " · no tokens yet";
+
+            return line;
         }
 
         private void RefreshRank()
