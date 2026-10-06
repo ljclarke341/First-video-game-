@@ -1398,7 +1398,17 @@ namespace GarageTycoon.Core.Simulation
         public float SpawnTimer
         {
             get { return _spawnTimer; }
-            set { _spawnTimer = value < 0f ? 0f : value; }
+            set { _spawnTimer = RestoredSpawnTimer(value); }
+        }
+
+        /// <summary>
+        /// The countdown to the next arrival as read back from a save. A negative value is floored:
+        /// it would otherwise mean a car owed from before the game started. The rule both builds
+        /// share, so a reloaded forecourt keeps the same rhythm in each.
+        /// </summary>
+        public static float RestoredSpawnTimer(float savedSeconds)
+        {
+            return savedSeconds < 0f ? 0f : savedSeconds;
         }
 
         /// <summary>Adds a car straight into the waiting queue (used when loading a save).</summary>

@@ -151,6 +151,9 @@ namespace GarageTycoon.Core.Save
             json.Add("timeRemaining", car.TimeRemaining);
             json.Add("totalTime", car.TotalTime);
             json.Add("earned", car.EarnedSoFar);
+            // The patience reading from when work started: the finishing tip is paid on this, not
+            // on the car's full patience, so it has to survive a reload or the tip grows.
+            json.Add("workBegan", car.TimeRemainingWhenWorkBegan);
             json.Add("complaint", car.Complaint);
 
             // Condition is SAVED rather than re-derived: a car whose engine read 41% before you
@@ -354,6 +357,11 @@ namespace GarageTycoon.Core.Save
                     simulation.RestoreWaitingCar(car);
                     car.RestoreState(CarState.Waiting, carJson["timeRemaining"].AsFloat(car.TotalTime), -1, carJson["earned"].AsDouble(0d));
                 }
+
+                // Absent in a save from before this was written down, and -1 is exactly right for
+                // those: it is the sentinel meaning nobody has started work, which is how every
+                // reloaded car used to come back.
+                car.RestoreWorkBegan(carJson["workBegan"].AsFloat(-1f));
             }
 
             simulation.SyncRankBaseline();

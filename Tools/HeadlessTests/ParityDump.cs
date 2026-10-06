@@ -260,6 +260,28 @@ namespace GarageTycoon.HeadlessTests
             // --- restoring an event from a save ---
             // Driven through the shipped Core rule, not a copy of it: whatever
             // RandomEventSystem.RestoredRemaining decides is what the web must decide too.
+            // --- the plain timers a reload has to carry ---
+            // Driven through the shipped Core rules, so the web cannot clamp them differently.
+            json.Append("\"saveTimers\":[\n");
+            first = true;
+            foreach (double saved in new[] { -12d, -0.5d, 0d, 0.05d, 4.5d, 30d, 59.5d, 9999d })
+            {
+                foreach (double total in new[] { 30d, 45d })
+                {
+                    if (!first) json.Append(",\n");
+                    first = false;
+
+                    json.Append("  {\"saved\":").Append(D(saved))
+                        .Append(",\"total\":").Append(D(total))
+                        .Append(",\"spawn\":")
+                        .Append(D(Math.Round((double)GarageSimulation.RestoredSpawnTimer((float)saved), 4)))
+                        .Append(",\"workBegan\":")
+                        .Append(D(Math.Round((double)ActiveCar.RestoredWorkBegan((float)saved, (float)total), 4)))
+                        .Append('}');
+                }
+            }
+            json.Append("\n],\n");
+
             json.Append("\"eventRestore\":[\n");
             first = true;
             foreach (GameEventDefinition definition in GameEventCatalog.All)

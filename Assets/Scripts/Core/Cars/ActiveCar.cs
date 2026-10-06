@@ -437,6 +437,30 @@ namespace GarageTycoon.Core.Cars
             }
         }
 
+        /// <summary>
+        /// Puts back the patience reading from when work started, so a car reloaded mid-repair is
+        /// still judged on how fast the REPAIR went.
+        ///
+        /// Without this the save lost the baseline and the next round set a fresh one, which meant
+        /// reloading mid-repair quietly raised the finishing tip. -1 is the untouched sentinel, so
+        /// a save that does not carry the field behaves exactly as it did before.
+        /// </summary>
+        public void RestoreWorkBegan(float timeRemainingWhenWorkBegan)
+        {
+            TimeRemainingWhenWorkBegan = RestoredWorkBegan(timeRemainingWhenWorkBegan, TotalTime);
+        }
+
+        /// <summary>
+        /// The work-started patience reading as read back from a save. Anything negative is the
+        /// untouched sentinel, and a figure above the car's own patience is a stale or edited save,
+        /// so it is capped. The rule both builds share.
+        /// </summary>
+        public static float RestoredWorkBegan(float saved, float totalTime)
+        {
+            if (saved < 0f) return -1f;
+            return saved > totalTime ? totalTime : saved;
+        }
+
         public void MarkCompleted()
         {
             State = CarState.Completed;

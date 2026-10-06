@@ -6,6 +6,144 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Save/load parity audit — the whole save file, field by field
+
+Rather than wait for the next missing field to show up as a bug, every field Core's
+`GameStateSerializer` writes was compared against the web save. Three bugs, all now fixed, and
+the field lists were taken from the builds themselves rather than from a regex over the source.
+
+### The audit table
+
+Core is the reference. "Verified" means observed across a real browser page reload with that
+state live.
+
+| Field (Core / web) | Core W | Core R | Web W | Web R | Reload verified | Notes |
+|---|---|---|---|---|---|---|
+| version / v | Y | Y | Y | Y | yes | |
+| savedAt / at | Y | platform | Y | Y | yes | read for offline catch-up, not by the loader |
+| cash / cash | Y | Y | Y | Y | exact | |
+| lifetimeEarnings / lifetime | Y | Y | Y | Y | exact | |
+| allTimeEarnings / allTime | Y | Y | Y | Y | exact | |
+| prestigeTokens / tokensEarned | Y | Y | Y | Y | exact | |
+| prestigeCount / prestiges | Y | Y | Y | Y | exact | |
+| perks / perks | Y | Y | Y | Y | exact | |
+| upgrades / levels | Y | Y | Y | Y | exact | four bought through the shop UI survived |
+| relaxedPace / relaxed | Y | Y | Y | Y | exact | |
+| combo / combo | Y | Y | Y | Y | exact | |
+| comboBest / comboBest | Y | Y | Y | Y | exact | |
+| **calmCooldown / calmLeft** | Y | Y | **added** | **added** | yes | **BUG: a reload handed back a free calm** |
+| **spawnTimer / spawnTimer** | Y | Y | **added** | **added** | yes | **BUG: snapped to the fresh-game 2s** |
+| parts stock / inv.s | Y | Y | Y | Y | exact | |
+| parts policy / inv.p | Y | Y | Y | Y | exact | |
+| parts spent / inv.sp | Y | Y | Y | Y | exact | |
+| parts consumed / inv.cn | Y | Y | Y | Y | exact | |
+| parts delivery / inv.d | Y | Y | Y | Y | yes | advances with elapsed time |
+| fleetId / fleetLeft / fleetOf | Y | Y | Y | Y | exact | a 7-of-8 run survived intact |
+| events.activeId / ev | Y | Y | Y | Y | yes | fixed in the previous pass |
+| events.activeRemaining / evLeft | Y | Y | Y | Y | yes | fixed in the previous pass |
+| events.timeUntilNext / evNext | Y | Y | Y | Y | yes | fixed in the previous pass |
+| stats.standing / standing | Y | Y | Y | Y | exact | web keeps it at the top level |
+| stats (other 9) / stats | Y | Y | Y | Y | exact | 1:1 under different names |
+| randomState / — | Y | Y | n/a | n/a | n/a | **intentional**: the web spawner uses `Math.random` |
+| nextCarId / — | Y | Y | n/a | n/a | n/a | **intentional**: web ids are render-cache keys |
+| car: def, bay, mood, totalTime, earned, complaint | Y | Y | Y | Y | exact | |
+| car: timeRemaining / t | Y | Y | Y | Y | yes | patience advances with elapsed time |
+| **car: workBegan / wb** | **added** | **added** | Y | Y | yes | **BUG: Core reset the tip basis on reload** |
+| car: condition / cn | Y | Y | Y | Y | yes | whole percent in both; see below |
+| car: jobs (16 fields) | Y | Y | Y | Y | exact | progress, rounds, parts, accepted — all 16 |
+| car: diagnosis (mask/started/skipped/accuracy/actions) | Y | Y | Y | Y | exact | |
+| car: diagnosis rounds | — | — | Y | Y | n/a | web-only counter; Core uses `ActionsRun.Count` |
+| car: special, fleetId/Index/Size | Y | Y | Y | Y | exact | |
+| car: quoted + quotedAs / q | Y | Y | Y | Y | exact | web folds both into one nullable string |
+| current repair session | N | N | N | N | n/a | **intentional**: transient, both drop it |
+| inspection / quote screen | N | N | N | N | n/a | **intentional**: transient UI |
+| combo idle timer | N | N | N | N | n/a | **intentional**: both reset it |
+| mechanics, bay count | derived | derived | derived | derived | yes | rebuilt from upgrade levels in both |
+| seenHelp / seenRank / muted | — | — | Y | Y | n/a | web-only UI preferences |
+
+### Bug 1 — the next-car countdown (web)
+
+Proved before fixing: the save carried no `spawnTimer`, so a reload fell back to the fresh-game
+default of 2 seconds. An 8-second countdown became 2 (the car arrived 6s early); a 0.2-second one
+also became 2 (1.8s late). Now persisted, and the boundary is covered: restored at 0.2 or at 0,
+exactly one car arrives, the countdown re-arms to 9s, and nothing spawns twice or stalls.
+
+### Bug 2 — the calm-customer cooldown (web)
+
+Core persisted `calmCooldown`; the web did not. Reloading handed back a free use of a button the
+player should have had to wait 40 seconds for — the same shape of reload exploit as the event skip.
+
+### Bug 3 — the work-started patience reading (both builds, differently)
+
+The finishing tip is paid on how fast the **repair** went, not on how long the car had been
+standing there. That baseline is `TimeRemainingWhenWorkBegan` in Core and `workBegan` on the web.
+
+- **Core wrote nothing**, so a car reloaded mid-repair came back with the sentinel and the next
+  round set a fresh baseline — reloading raised the tip.
+- **The web never initialised it at all.** The guard is `if (car.workBegan < 0)`, and a freshly
+  spawned car had `workBegan === undefined`; `undefined < 0` is false, so the branch never ran and
+  the tip fell back to the whole-patience fraction. A car restored from a save *did* come back as
+  `-1` and got the right basis. So **reloading a car changed how it was paid** — which is why this
+  belonged in a save/load audit rather than outside it.
+
+Measured rather than guessed, paired on the same 31 cars of a 25-minute session so there is no
+cross-trial noise: mean tip basis 0.2202 under the old behaviour against 0.2957 under Core's rule,
+a **+32.8% tip pool**. The tip is a quarter of labour scaled by that basis, so this is worth
+roughly **+1.8% of total income**. Flagging it plainly because it is an income change, not a
+rebalance: it restores the rule Core already documents (the whole-patience basis is the one that
+made buying bays 32% worse, which is why it was replaced). Say the word and it reverts.
+
+An earlier unpaired measurement of this suggested −18%; that was noise — the two arms completed
+4.5 and 5.6 cars, which the change cannot cause.
+
+### Intentionally left alone
+
+- **`randomState` / `nextCarId`** — the web spawner uses `Math.random`, so there is no stream to
+  restore. Car ids on the web are render-cache keys, renumbered contiguously on load; they cannot
+  collide, and nothing gameplay-facing reads them.
+- **The current repair session** and the inspection/quote screens — transient, and neither build
+  saves them. A reload puts you back at the bench with the car intact.
+- **The combo idle timer** — reset by both.
+- **Condition quantisation.** Condition is stored as whole percent, so 0.351 comes back as 0.35.
+  Both builds do this with identical half-up rounding (`(int)(v*100+0.5)` and `Math.round(v*100)`),
+  so it is matched and deliberate, not drift. It is the only non-time difference left in a reload
+  diff, and it is at most half a percent per system.
+
+### Changed
+
+- `Assets/Scripts/Core/Cars/ActiveCar.cs` — `RestoreWorkBegan`, shared `RestoredWorkBegan` rule.
+- `Assets/Scripts/Core/Simulation/GarageSimulation.cs` — shared `RestoredSpawnTimer` rule, now
+  used by the `SpawnTimer` setter too.
+- `Assets/Scripts/Core/Save/GameStateSerializer.cs` — writes and reads `workBegan` per car.
+- `garage-tycoon.html` (web) — persists `spawnTimer` and `calmLeft`, mirrors both clamp rules, and
+  initialises `workBegan: -1` at spawn.
+- `Tools/HeadlessTests/Tests/SaveFieldTests.cs` — new, 11 tests.
+- `ParityDump.cs`, `vparity.js`, `diffparity.py` — new `saveTimers` section, 16 cases.
+
+### Verified
+
+- **442 tests pass** (was 431) — 11 new, including a save/load **fixed-point** test: saving a
+  loaded game twice must produce identical JSON, which fails loudly if any future field is written
+  but not read back.
+- **1,328 parity cases identical** (was 1,312).
+- Unity compile check: 0 errors. Web syntax check: OK.
+- **Full reload regression in a real browser**, with all ten states live at once and built by
+  playing — ten cars finished with real clicks, four upgrades bought through the shop UI, a
+  mechanic hired, parts consumed, standing moved, an event that fired on its own timer, a 7-of-8
+  fleet run, six cars queued, two in bays, both mid-diagnosis. After the reload the **only**
+  differences were the six fields that advance with elapsed time (1.15s of it) and the condition
+  quantisation above. Every job tuple, diagnosis mask, part, mood, complaint, quote state, upgrade
+  level, perk, token and counter came back byte-identical. No console errors.
+- **Save compatibility across eight save shapes**, each seeded into a fresh browser profile before
+  any page script ran: today's save, and saves written before `spawnTimer`/`calmLeft`, before the
+  event fields, before per-car `workBegan`, before all of those together, before parts, before
+  fleets, and before standing. All eight load with cash, all-time earnings, prestige, perks,
+  upgrades, bays and all nine cars intact, and each documented fallback behaves as documented
+  (a full opening shelf for a pre-parts save, standing 0 for a pre-standing one).
+- The previous passes still hold: event persistence 21/21, quote bypass 10/10 on both suites.
+
+---
+
 ## Active event save/load — the event that vanished, and the one that never ended
 
 The web save left the active random event out entirely. Investigating it turned up a second,
