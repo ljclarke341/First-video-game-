@@ -174,6 +174,9 @@ namespace GarageTycoon.Core.Save
                 jobJson.Add("rounds", job.RoundsPlayed);
                 jobJson.Add("perfect", job.PerfectRounds);
                 jobJson.Add("damaged", job.DamagedRounds);
+                // Absent in a save from before partial credit existed; see the read side.
+                jobJson.Add("good", job.GoodRounds);
+                jobJson.Add("weak", job.WeakRounds);
                 jobJson.Add("accepted", job.IsAccepted);
                 jobJson.Add("partFitted", job.PartFitted);
                 jobJson.Add("partGrade", (int)job.FittedGrade);
@@ -429,7 +432,12 @@ namespace GarageTycoon.Core.Save
                     jobJson["damaged"].AsInt(0),
                     // Defaults to accepted, so every job in a save written before quotes existed
                     // comes back as work the customer wants doing - exactly as it behaved then.
-                    jobJson["accepted"].AsBool(true));
+                    jobJson["accepted"].AsBool(true),
+                    // Zero in a save written before good and weak rounds were counted, which is
+                    // right: the score then falls back to counting perfect rounds alone, exactly
+                    // as that save was scored when it was written.
+                    jobJson["good"].AsInt(0),
+                    jobJson["weak"].AsInt(0));
 
                 job.RestorePart(
                     jobJson["partFitted"].AsBool(false),

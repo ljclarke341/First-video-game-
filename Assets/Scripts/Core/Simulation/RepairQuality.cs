@@ -27,6 +27,13 @@ namespace GarageTycoon.Core.Simulation
         /// <summary>Share of rounds that were dead-on.</summary>
         public double Accuracy;
 
+        /// <summary>
+        /// How well the rounds were executed, 0..1, giving partial credit for work that was right
+        /// without being flawless. This is what the score is actually built from; Accuracy above is
+        /// kept because the UI and the stats screen both report "perfect rounds" to the player.
+        /// </summary>
+        public double Execution;
+
         /// <summary>How close the job came to the fewest rounds it could possibly have taken.</summary>
         public double Efficiency;
 
@@ -69,6 +76,23 @@ namespace GarageTycoon.Core.Simulation
     /// </summary>
     public static class RepairQuality
     {
+        /// <summary>
+        /// What a round is worth towards the workmanship score, by how it went.
+        ///
+        /// Perfect is 1 and a miss is 0, which was always true. What is new is that the two
+        /// outcomes in between are worth something. Before this, the score counted perfect rounds
+        /// only: a player who hit every window but never dead-centre scored ZERO on workmanship,
+        /// identically to one who missed every round, and the only thing separating them was that
+        /// missing takes more rounds. That is what made the measured distribution bimodal - there
+        /// was no arithmetic path to a middling score.
+        ///
+        /// A Good round is deliberately worth less than a Perfect one by a wide margin, so aiming
+        /// for dead-centre is still the thing that distinguishes a skilled player.
+        /// </summary>
+        public const double GoodRoundCredit = 0.55d;
+
+        public const double WeakRoundCredit = 0.22d;
+
         /// <summary>How much of the score is workmanship rather than pace.</summary>
         private const double AccuracyWeight = 0.55d;
         private const double EfficiencyWeight = 0.45d;
@@ -82,11 +106,14 @@ namespace GarageTycoon.Core.Simulation
         /// Named rather than inlined because both builds have to agree on them and the parity
         /// suite pins them by name. The base is set from the measured median score, not chosen.
         /// </summary>
-        public const double QualityBase = 0.55d;
+        public const double QualityBase = 0.53d;
         public const double QualitySlope = 0.5d;
 
         /// <summary>Meeting a customer's expectation exactly lands here, not at 100%.</summary>
-        private const double SatisfactionAtExpectation = 0.8d;
+        public const double SatisfactionAtExpectation = 0.8d;
+
+        /// <summary>How steeply satisfaction falls away BELOW what the customer expected.</summary>
+        public const double ShortfallSlope = 0.8d;
 
         /// <summary>
         /// The fewest rounds this job could ever have taken: every round perfect, no misses.
@@ -99,6 +126,24 @@ namespace GarageTycoon.Core.Simulation
 
             int rounds = (int)Math.Ceiling(job.WorkAmount / GameBalance.PerfectProgress);
             return rounds < 1 ? 1 : rounds;
+        }
+
+        /// <summary>
+        /// Workmanship across a job's rounds, 0..1, with partial credit for the middle outcomes.
+        ///
+        /// A save written before good and weak rounds were counted reports both as zero, so this
+        /// falls back to the share of perfect rounds - which is exactly how that save was scored
+        /// when it was written. Old saves therefore keep their scores instead of being re-judged.
+        /// </summary>
+        public static double ExecutionOf(RepairJob job)
+        {
+            if (job == null || job.RoundsPlayed <= 0) return 0d;
+
+            double credited = job.PerfectRounds
+                + job.GoodRounds * GoodRoundCredit
+                + job.WeakRounds * WeakRoundCredit;
+
+            return Clamp01(credited / job.RoundsPlayed);
         }
 
         /// <summary>Scores one finished job for a customer who expects nothing in particular.</summary>
@@ -136,10 +181,11 @@ namespace GarageTycoon.Core.Simulation
             }
 
             report.Accuracy = job.PerfectRounds / (double)job.RoundsPlayed;
+            report.Execution = ExecutionOf(job);
             report.DamageRate = job.DamagedRounds / (double)job.RoundsPlayed;
             report.Efficiency = Clamp01(MinimumRounds(job) / (double)job.RoundsPlayed);
 
-            double score = report.Accuracy * AccuracyWeight + report.Efficiency * EfficiencyWeight;
+            double score = report.Execution * AccuracyWeight + report.Efficiency * EfficiencyWeight;
             score -= report.DamageRate * DamagePenalty;
 
             // What went on the car counts, but only a little. A good part must not rescue sloppy
@@ -188,6 +234,18 @@ namespace GarageTycoon.Core.Simulation
             {
                 report.Accuracy = report.PerfectRounds / (double)report.RoundsPlayed;
                 report.DamageRate = report.DamagedRounds / (double)report.RoundsPlayed;
+
+                // Rolled up across the car's jobs the same way the score is: by work, not by job
+                // count, so a long engine job counts for more than a quick touch-up.
+                double credited = 0d, rounds = 0d;
+                for (int i = 0; i < car.Jobs.Count; i++)
+                {
+                    RepairJob job = car.Jobs[i];
+                    if (job.RoundsPlayed <= 0) continue;
+                    credited += ExecutionOf(job) * job.RoundsPlayed;
+                    rounds += job.RoundsPlayed;
+                }
+                report.Execution = rounds <= 0d ? 0d : Clamp01(credited / rounds);
             }
 
             return Finish(report, car.Mood);
@@ -237,9 +295,31 @@ namespace GarageTycoon.Core.Simulation
             // 1 star for finishing at all, 5 for near-perfect work.
             report.Stars = MathUtil.ClampInt((int)(report.Score * 5d) + 1, 1, 5);
 
+            // Satisfaction, with the top half of the curve given room to breathe.
+            //
+            // This used to be one straight line of slope 0.8 through the expectation point, which
+            // reached 1.0 at a score only 0.25 above expectation and was clamped flat from there
+            // on. For an ordinary customer that meant EVERY score from 0.80 upwards produced
+            // identical satisfaction, so good work, excellent work and flawless work were the same
+            // event to standing, reputation and the customer mix downstream.
+            //
+            // Below expectation the line is untouched, deliberately: falling short should cost
+            // exactly what it always cost. Above it, the remaining headroom is spread across the
+            // remaining score range, so a perfect job reaches 1.0 and nothing short of it does.
             double expectation = ExpectationOf(mood);
-            report.Satisfaction = Clamp01(
-                SatisfactionAtExpectation + (report.Score - expectation) * 0.8d);
+
+            if (report.Score <= expectation)
+            {
+                report.Satisfaction = Clamp01(
+                    SatisfactionAtExpectation + (report.Score - expectation) * ShortfallSlope);
+            }
+            else
+            {
+                double headroom = 1d - expectation;
+                double above = headroom <= 0d ? 1d : (report.Score - expectation) / headroom;
+                report.Satisfaction = Clamp01(
+                    SatisfactionAtExpectation + above * (1d - SatisfactionAtExpectation));
+            }
 
             // Centred on what players ACTUALLY score, not on the midpoint of the scale.
             //

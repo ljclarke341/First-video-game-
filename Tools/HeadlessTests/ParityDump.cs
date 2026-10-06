@@ -106,6 +106,67 @@ namespace GarageTycoon.HeadlessTests
             }
             json.Append("\n],\n");
 
+
+            // --- the graded quality curve, Phase C.3 ---
+            //
+            // The section above predates partial credit for good rounds, so it cannot see the new
+            // term at all: every case in it has zero good rounds. This one drives the whole chain
+            // on purpose - execution, score, satisfaction and pay - across every round mix, every
+            // part grade, with and without a customer expectation, for both an ordinary customer
+            // and a collector.
+            //
+            // Emitted at six decimals rather than three because satisfaction now varies in the
+            // third decimal where it used to be clamped flat, and a three-decimal round would hide
+            // exactly the separation this phase was built to create.
+            json.Append("\"qualityGraded\":[\n");
+            first = true;
+            foreach (int perfect in new[] { 0, 1, 3 })
+            {
+                foreach (int good in new[] { 0, 1, 2, 4 })
+                {
+                    foreach (int weak in new[] { 0, 2 })
+                    {
+                        foreach (int damage in new[] { 0, 1 })
+                        {
+                            foreach (Core.Parts.PartGrade grade in Enum.GetValues(typeof(Core.Parts.PartGrade)))
+                            {
+                                foreach (Core.Parts.PartGrade? expected in new Core.Parts.PartGrade?[] { null, Core.Parts.PartGrade.Performance })
+                                {
+                                    RepairJob job = new RepairJob(JobType.Engine, MinigameType.TimingBar, 1.4f, 100d, 1f);
+                                    for (int i = 0; i < perfect; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Perfect, ""));
+                                    for (int i = 0; i < good; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Good, ""));
+                                    for (int i = 0; i < weak; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Weak, ""));
+                                    for (int i = 0; i < damage; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Damage, ""));
+                                    job.RecordPart(grade, 0d, 0d);
+
+                                    foreach (CustomerMood mood in new[] { CustomerMood.Ordinary, CustomerMood.Vip })
+                                    {
+                                        QualityReport report = RepairQuality.ForJob(job, mood, expected);
+
+                                        if (!first) json.Append(",\n");
+                                        first = false;
+
+                                        json.Append("  {\"p\":").Append(perfect)
+                                            .Append(",\"g\":").Append(good)
+                                            .Append(",\"k\":").Append(weak)
+                                            .Append(",\"d\":").Append(damage)
+                                            .Append(",\"grade\":").Append((int)grade)
+                                            .Append(",\"exp\":").Append(expected.HasValue ? ((int)expected.Value).ToString(CultureInfo.InvariantCulture) : "-1")
+                                            .Append(",\"m\":").Append((int)mood)
+                                            .Append(",\"exec\":").Append(D9(report.Execution))
+                                            .Append(",\"score\":").Append(D9(report.Score))
+                                            .Append(",\"sat\":").Append(D9(report.Satisfaction))
+                                            .Append(",\"pay\":").Append(D9(report.PayMultiplier))
+                                            .Append('}');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            json.Append("\n],\n");
+
             // --- the diagnosis bonus, over accuracy ---
             json.Append("\"diagBonus\":[\n");
             first = true;
@@ -316,7 +377,11 @@ namespace GarageTycoon.HeadlessTests
                             .Append(",\"g\":").Append((int)grade)
                             .Append(",\"mix\":\"").Append(mix[0]).Append('-').Append(mix[1]).Append('-').Append(mix[2])
                             .Append("\",\"pct\":").Append(report.Percent)
-                            .Append(",\"mult\":").Append(F((float)Math.Round(report.PayMultiplier, 4)))
+                            // Six decimals, not four: four lands on an exact rounding tie here, where C#
+                            // rounds half-to-even and JS half-up, so 0.85825 read 0.8582 in one dump
+                            // and 0.8583 in the other with nothing actually different. The
+                            // comparator's tolerance should judge this, not the formatter.
+                            .Append(",\"mult\":").Append(D(Math.Round(report.PayMultiplier, 6)))
                             .Append(",\"pay\":").Append(F((float)Core.Util.MathUtil.RoundCash(payout)))
                             .Append('}');
                     }
@@ -688,6 +753,20 @@ namespace GarageTycoon.HeadlessTests
         private static string D(double value)
         {
             return value.ToString("0.######", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Nine decimals, for values that land on an exact tie at six.
+        ///
+        /// A pay multiplier of 0.8190625 is exactly half way at the sixth decimal, where C# rounds
+        /// half-to-even and JS rounds half-up: 0.819062 against 0.819063. The two builds agree
+        /// perfectly and the printout does not, and the difference reads as 1.0000000000287557e-06
+        /// in floating point, which clears the comparator's 1e-6 tolerance by a hair and fails.
+        /// Printing past the tie removes the ambiguity rather than widening the tolerance to hide it.
+        /// </summary>
+        private static string D9(double value)
+        {
+            return value.ToString("0.#########", CultureInfo.InvariantCulture);
         }
     }
 }

@@ -45,6 +45,19 @@ namespace GarageTycoon.Core.Cars
         /// <summary>Rounds that damaged the part.</summary>
         public int DamagedRounds { get; private set; }
 
+        /// <summary>
+        /// Rounds that landed inside the window without being dead-on, and rounds that only just
+        /// scraped it.
+        ///
+        /// These exist because the quality score used to count ONLY perfect rounds, which meant a
+        /// round the player got right scored exactly the same as a round they missed completely.
+        /// Every level of competent-but-not-flawless work therefore collapsed into one number, and
+        /// the measured distribution had almost nothing between "bad" and "perfect".
+        /// </summary>
+        public int GoodRounds { get; private set; }
+
+        public int WeakRounds { get; private set; }
+
         public bool IsComplete { get { return Progress >= 1f; } }
 
         /// <summary>
@@ -124,6 +137,8 @@ namespace GarageTycoon.Core.Cars
             RoundsPlayed++;
 
             if (result.Outcome == MinigameOutcome.Perfect) PerfectRounds++;
+            if (result.Outcome == MinigameOutcome.Good) GoodRounds++;
+            if (result.Outcome == MinigameOutcome.Weak) WeakRounds++;
             if (result.Outcome == MinigameOutcome.Damage) DamagedRounds++;
 
             // Divide by WorkAmount so a legendary car's jobs genuinely take more rounds than a ute's.
@@ -163,14 +178,21 @@ namespace GarageTycoon.Core.Cars
         }
 
         /// <summary>Used by the save system to restore a part-finished job.</summary>
+        /// <remarks>
+        /// goodRounds and weakRounds default to zero, which is exactly right for a save written
+        /// before they were tracked: the graded score then falls back to counting perfect rounds
+        /// alone, which is precisely how that save scored when it was written.
+        /// </remarks>
         public void RestoreProgress(float progress, int roundsPlayed, int perfectRounds, int damagedRounds,
-            bool accepted = true)
+            bool accepted = true, int goodRounds = 0, int weakRounds = 0)
         {
             IsAccepted = accepted;
             Progress = MathUtil.Clamp01(progress);
             RoundsPlayed = roundsPlayed < 0 ? 0 : roundsPlayed;
             PerfectRounds = perfectRounds < 0 ? 0 : perfectRounds;
             DamagedRounds = damagedRounds < 0 ? 0 : damagedRounds;
+            GoodRounds = goodRounds < 0 ? 0 : goodRounds;
+            WeakRounds = weakRounds < 0 ? 0 : weakRounds;
         }
     }
 }

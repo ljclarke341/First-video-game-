@@ -24,22 +24,26 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             suite.Add("The multiplier is the existing formula, untouched", () =>
             {
-                // 0.75 + score * 0.5. Deliberately not redesigned here - only connected.
-                Check.IsTrue(Math.Abs(Multiplier(0f) - 0.55d) < 0.0001d, "a 0% job should pay 0.55x");
-                Check.IsTrue(Math.Abs(Multiplier(0.5f) - 0.8d) < 0.0001d, "a 50% job should pay 0.80x");
-
-                // 0.90 is the measured median score, and the point the curve is centred on.
-                Check.IsTrue(Math.Abs(Multiplier(0.9f) - 1d) < 0.0001d,
-                    "a typical job should pay exactly 1x");
-                Check.IsTrue(Math.Abs(Multiplier(1f) - 1.05d) < 0.0001d, "a 100% job should pay 1.05x");
+                // QualityBase + score * QualitySlope. The SLOPE has never moved: the spread
+                // between a poor job and a perfect one is the same 0.5x it always was. Only the
+                // point the curve passes through 1.0 has, twice, each time because the measured
+                // score distribution moved underneath it.
+                Check.IsTrue(Math.Abs(Multiplier(0f) - 0.53d) < 0.0001d, "a 0% job should pay 0.53x");
+                Check.IsTrue(Math.Abs(Multiplier(0.5f) - 0.78d) < 0.0001d, "a 50% job should pay 0.78x");
+                Check.IsTrue(Math.Abs(Multiplier(0.94f) - 1d) < 0.0001d,
+                    "the curve should pass through 1x at a score of 0.94");
+                Check.IsTrue(Math.Abs(Multiplier(1f) - 1.03d) < 0.0001d, "a 100% job should pay 1.03x");
             });
 
             suite.Add("A typical repair is exactly neutral", () =>
             {
-                // The curve is centred on the MEASURED median score of 0.90, not on the midpoint
-                // of the scale - so a typical job pays exactly the untouched labour, and the
-                // multiplier is a differentiator rather than a raise.
-                double paid = PayFor(PartGrade.Standard, perfect: 0, good: 0, weak: 0, custom: 0.9f, gross: 1000d);
+                // The curve is centred on what players ACTUALLY score, not on the midpoint of the
+                // scale, so a typical job pays the untouched labour and the multiplier is a
+                // differentiator rather than a raise. Phase C.3 moved that centre from 0.90 to
+                // 0.94, because partial credit for good and weak rounds moved the distribution:
+                // the test of the centring is that measured income/min did not move (it came back
+                // within 0.7% at all three stages), not that any particular score is the median.
+                double paid = PayFor(PartGrade.Standard, perfect: 0, good: 0, weak: 0, custom: 0.94f, gross: 1000d);
                 double labour = 1000d / GameBalance.PartsPayoutCompensation;
 
                 Check.IsTrue(Math.Abs(paid - labour) < 0.51d,

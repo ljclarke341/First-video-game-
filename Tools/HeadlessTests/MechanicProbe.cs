@@ -108,6 +108,56 @@ namespace GarageTycoon.HeadlessTests
 
 
         /// <summary>
+        /// Phase C.3: the economy, in the few numbers a quality change can move.
+        ///
+        ///     dotnet run --project Tools/HeadlessTests -- mech economy
+        ///
+        /// A change to the quality curve reaches the wallet through the pay multiplier, and reaches
+        /// the customer mix through satisfaction and standing. Both have to be watched at once: a
+        /// curve that reads beautifully and quietly pays 10% more has still broken the game.
+        /// </summary>
+        public static void Economy(string seedArg)
+        {
+            ApplySeeds(seedArg);
+
+            Console.WriteLine("=== THE ECONOMY UNDER THE CURRENT QUALITY CURVE ===");
+            Console.WriteLine();
+            Console.WriteLine("good-round credit " + RepairQuality.GoodRoundCredit
+                + ", weak " + RepairQuality.WeakRoundCredit
+                + ", pay base " + RepairQuality.QualityBase + " slope " + RepairQuality.QualitySlope);
+            Console.WriteLine();
+            Console.WriteLine("stage                 income/min  income/car  cars  lost%  quality  mean pay x  satisf  standing    bias");
+
+            Economy("EARLY 1 bay, 0 crew", new Garage("early", 1, 0), false);
+            Economy("MID   3 bays, 2 crew", new Garage("mid", 3, 2), true);
+            Economy("LATE  4 bays, 4 crew", new Garage("late", 4, 4), true);
+
+            Console.WriteLine();
+        }
+
+        private static void Economy(string label, Garage garage, bool trained)
+        {
+            List<double> pays = new List<double>();
+            Result r = Measure(garage, trained, handsOff: false, paySink: pays);
+
+            double meanPay = 0d;
+            for (int i = 0; i < pays.Count; i++) meanPay += pays[i];
+            meanPay = pays.Count == 0 ? 0d : meanPay / pays.Count;
+
+            Console.WriteLine(
+                label.PadRight(21)
+                + ("$" + r.IncomePerMin.ToString("0")).PadLeft(10)
+                + ("$" + (r.Cars <= 0d ? 0d : r.IncomePerMin * (SessionSeconds / 60d) / r.Cars).ToString("0.0")).PadLeft(12)
+                + r.Cars.ToString("0.0").PadLeft(6)
+                + (r.LostPercent.ToString("0.0") + "%").PadLeft(7)
+                + r.Quality.ToString("0.000").PadLeft(9)
+                + meanPay.ToString("0.0000").PadLeft(12)
+                + (r.Satisfaction * 100d).ToString("0").PadLeft(7) + "%"
+                + r.Standing.ToString("+0.000;-0.000;0.000").PadLeft(9)
+                + r.RarityBias.ToString("+0.000;-0.000;0.000").PadLeft(8));
+        }
+
+        /// <summary>
         /// Section 11: does automation actually change the player's ROLE?
         ///
         /// "Player rounds" cannot answer that on its own. The virtual player works every second it
@@ -210,8 +260,8 @@ namespace GarageTycoon.HeadlessTests
             for (int crew = 0; crew <= 4; crew++)
             {
                 Garage garage = new Garage(crew + " crew", 4, crew);
-                Result working = Measure(garage, true, handsOff: false, ratesOverride: 10);
-                Result off = Measure(garage, true, handsOff: true, ratesOverride: 10);
+                Result working = Measure(garage, true, handsOff: false, ratesOverride: 10, seedWallet: true);
+                Result off = Measure(garage, true, handsOff: true, ratesOverride: 10, seedWallet: true);
 
                 double gain = hasPrevious ? working.IncomePerMin - previous.IncomePerMin : 0d;
                 double hire = HireCost(crew);
@@ -523,7 +573,8 @@ namespace GarageTycoon.HeadlessTests
         /// </param>
         private static Result Measure(Garage garage, bool trained, bool handsOff,
             Func<GarageSimulation, int> bayPicker = null, List<double> scoreSink = null,
-            int ratesOverride = -1, int trainingLevels = -1)
+            int ratesOverride = -1, int trainingLevels = -1, List<double> paySink = null,
+            bool seedWallet = false)
         {
             double income = 0d, quality = 0d, mechQuality = 0d, satisfaction = 0d, standing = 0d, bias = 0d;
             double bayUsed = 0d, bayAvailable = 0d, crewUsed = 0d, crewAvailable = 0d;
@@ -552,7 +603,10 @@ namespace GarageTycoon.HeadlessTests
                 }
 
                 // Seed the wallet AFTER the grants: granting credits the wallet to pay for itself.
-                simulation.Wallet.Earn(garage.Crew >= 4 ? 1600000d : 120000d);
+                // Seeded only where a crew has to be afforded. A 0-crew garage is left broke on
+                // purpose: handing it $120,000 changes how it buys parts, which quietly moved the
+                // early-game baseline when the payback table needed every row funded.
+                if (garage.Crew > 0 || seedWallet) simulation.Wallet.Earn(garage.Crew >= 4 ? 1600000d : 120000d);
 
                 Dictionary<int, float> entered = new Dictionary<int, float>();
 
@@ -577,6 +631,10 @@ namespace GarageTycoon.HeadlessTests
                     quality += score;
                     qualityJobs++;
                     if (scoreSink != null) scoreSink.Add(score);
+                    if (paySink != null)
+                    {
+                        paySink.Add(RepairQuality.ForJob(job, car.Mood, car.ExpectedPartGrade).PayMultiplier);
+                    }
 
                     // A car a mechanic touched at all: the honest attribution, since the player
                     // can take over a bay part-way and both pairs of hands share the car.

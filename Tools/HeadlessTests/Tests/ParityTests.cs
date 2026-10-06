@@ -240,16 +240,33 @@ namespace GarageTycoon.HeadlessTests.Tests
 
             suite.Add("Quality weights match the web build", () =>
             {
-                // web: qualityOf() - accuracy * 0.55 + efficiency * 0.45 - damage * 0.7
+                // web: qualityOf() - execution * 0.55 + efficiency * 0.45 - damage * 0.7
                 RepairJob flawless = Played(1f, perfect: 3);
                 Check.IsTrue(RepairQuality.ForJob(flawless, CustomerMood.Ordinary).Score > 0.99f,
                     "a flawless job should score 100% under 0.55 + 0.45");
 
-                RepairJob half = Played(1f, perfect: 0, good: 3);
-                QualityReport report = RepairQuality.ForJob(half, CustomerMood.Ordinary);
-                Check.IsTrue(Math.Abs(report.Score - 0.45f) < 0.02f,
-                    "a job with no perfect rounds but perfect efficiency should score about 45%, got "
-                        + report.Percent + "%; the web uses the same 0.55 / 0.45 split");
+                // Three good rounds is the case that pins the graded credit AND the split at once.
+                // It used to score 0.45 - efficiency alone - because good rounds earned nothing at
+                // all towards workmanship. It now earns 0.55 of a perfect round each, so the score
+                // is 0.55 x 0.55 + 1.00 x 0.45. If either number drifts from the web build's, this
+                // is the test that says so.
+                RepairJob allGood = Played(1f, perfect: 0, good: 3);
+                QualityReport report = RepairQuality.ForJob(allGood, CustomerMood.Ordinary);
+
+                Check.IsTrue(Math.Abs(RepairQuality.ExecutionOf(allGood) - RepairQuality.GoodRoundCredit) < 0.0001d,
+                    "three good rounds should execute at exactly the good-round credit, got "
+                        + RepairQuality.ExecutionOf(allGood) + "; the web uses GOOD_ROUND_CREDIT");
+
+                double expectedScore = RepairQuality.GoodRoundCredit * 0.55d + 0.45d;
+                Check.IsTrue(Math.Abs(report.Score - expectedScore) < 0.002d,
+                    "a job of good rounds at perfect efficiency should score " + expectedScore
+                        + ", got " + report.Score + "; the web uses the same 0.55 / 0.45 split");
+
+                // And a weak round is worth distinctly less than a good one, in both builds.
+                RepairJob allWeak = Played(1f, perfect: 0, good: 0, weak: 3);
+                Check.IsTrue(Math.Abs(RepairQuality.ExecutionOf(allWeak) - RepairQuality.WeakRoundCredit) < 0.0001d,
+                    "three weak rounds should execute at exactly the weak-round credit, got "
+                        + RepairQuality.ExecutionOf(allWeak) + "; the web uses WEAK_ROUND_CREDIT");
             });
 
             suite.Add("Customer expectations match the web build", () =>
@@ -366,16 +383,18 @@ namespace GarageTycoon.HeadlessTests.Tests
             suite.Add("The quality pay curve matches the web build", () =>
             {
                 // web: QUALITY_BASE and QUALITY_SLOPE
-                Check.IsTrue(Math.Abs(RepairQuality.QualityBase - 0.55d) < 0.0001d,
-                    "QualityBase is " + RepairQuality.QualityBase + "; the web's QUALITY_BASE is 0.55");
+                Check.IsTrue(Math.Abs(RepairQuality.QualityBase - 0.53d) < 0.0001d,
+                    "QualityBase is " + RepairQuality.QualityBase + "; the web's QUALITY_BASE is 0.53");
                 Check.IsTrue(Math.Abs(RepairQuality.QualitySlope - 0.5d) < 0.0001d,
                     "QualitySlope is " + RepairQuality.QualitySlope + "; the web's QUALITY_SLOPE is 0.5");
 
                 // The four points the curve was specified by.
-                CheckCurve(0d, 0.55d);
-                CheckCurve(0.5d, 0.8d);
-                CheckCurve(0.9d, 1d);
-                CheckCurve(1d, 1.05d);
+                // Re-centred in Phase C.3: giving good and weak rounds partial credit raised the
+                // mean score everywhere, and the base came down 0.02 to keep income where it was.
+                CheckCurve(0d, 0.53d);
+                CheckCurve(0.5d, 0.78d);
+                CheckCurve(0.9d, 0.98d);
+                CheckCurve(1d, 1.03d);
             });
 
             suite.Add("Standard parts are economically invisible, in both builds", () =>
@@ -620,11 +639,12 @@ namespace GarageTycoon.HeadlessTests.Tests
             return new ActiveCar(1, CarCatalog.All[0], jobs, 100f, CustomerMood.Ordinary);
         }
 
-        private static RepairJob Played(float work, int perfect = 0, int good = 0)
+        private static RepairJob Played(float work, int perfect = 0, int good = 0, int weak = 0)
         {
             RepairJob job = new RepairJob(JobType.Engine, MinigameType.TimingBar, work, 100d, 1f);
             for (int i = 0; i < perfect; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Perfect, string.Empty));
             for (int i = 0; i < good; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Good, string.Empty));
+            for (int i = 0; i < weak; i++) job.ApplyResult(MinigameResult.FromOutcome(MinigameOutcome.Weak, string.Empty));
             return job;
         }
 

@@ -6,6 +6,134 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.3 — The quality curve had no middle
+
+Repair quality was bimodal: `perfect%` and `top-band%` were **the same number for every actor
+measured**, which is not a figure of speech - there was literally nothing scoring between 0.90 and
+1.00. Good work, excellent work and flawless work were one event to satisfaction, standing,
+reputation and the customer mix.
+
+### Where the compression actually was
+
+Three layers, found by driving dictated round histories down the whole chain rather than by playing:
+
+1. **The score counted perfect rounds only.** `Accuracy = PerfectRounds / RoundsPlayed`, so a round
+   the player got right scored **identically to a round they missed**. A job of nothing but good
+   rounds scored 0.338 - below the "average" band - and the only thing separating competence from
+   failure was that failing takes more rounds. This was the root cause: there was no arithmetic path
+   to a middling score.
+2. **Satisfaction saturated.** One straight line of slope 0.8 through the expectation point reached
+   1.0 only a quarter above expectation and was clamped flat from there, so for an ordinary customer
+   **every score from 0.80 upwards produced identical satisfaction**.
+3. The 0..1 score clamp, which only bites on flawless work with a performance part fitted.
+
+### The fix, at the two layers that caused it
+
+A round now earns partial credit towards workmanship: perfect 1.0, **good 0.55**, **weak 0.22**,
+miss and damage 0 (damage is still penalised separately). And above expectation, satisfaction spreads
+the remaining headroom across the remaining score range, so **only** flawless work reaches 1.0.
+
+Below expectation the satisfaction line is untouched, deliberately - disappointing a customer costs
+exactly what it always cost, and the collector's deliberate downside asymmetry is preserved.
+
+### The 0.90-1.00 band, before and after
+
+| actor | perfect% | top band% before | top band% **after** | mean before | mean **after** |
+|---|---|---|---|---|---|
+| player, weak (0.55) | 15.0% | 15.0% | **22.1%** | 0.549 | 0.644 |
+| player, decent (0.75) | 36.8% | 36.7% | **49.6%** | 0.751 | 0.818 |
+| player, strong (0.85) | 65.9% | 66.1% | **74.4%** | 0.891 | 0.914 |
+| player, expert (0.95) | 93.4% | 93.3% | **93.8%** | 0.980 | 0.981 |
+| mechanics, untrained | 12.9% | 12.9% | **17.0%** | 0.485 | 0.576 |
+| mechanics, trained | 30.7% | 30.6% | **42.5%** | 0.702 | 0.772 |
+
+Percentiles separate now too: a weak player's p10/p25/p50 went 0.235/0.338/0.500 to
+0.320/0.471/0.640.
+
+**Perfect is no rarer, on purpose.** Making it rarer needs harder mini-games or a redefinition of
+what perfect means, both out of scope and both explicitly warned against. The goal was that
+excellent be *distinguishable* from perfect, and it now is: satisfaction 0.963 against 1.000.
+
+### Eight grades of work, eight different outcomes
+
+| band | score | pay x | satisfaction | standing (ordinary) | standing (collector) |
+|---|---|---|---|---|---|
+| terrible | 0.000 | 0.530 | 0.360 | -0.0228 | -0.1810 |
+| poor | 0.232 | 0.646 | 0.545 | -0.0154 | -0.1365 |
+| below average | 0.407 | 0.733 | 0.685 | -0.0098 | -0.1029 |
+| average | 0.595 | 0.827 | 0.820 | -0.0044 | -0.0668 |
+| good | 0.640 | 0.850 | 0.840 | -0.0036 | -0.0581 |
+| very good | 0.835 | 0.948 | 0.927 | -0.0001 | -0.0148 |
+| excellent | 0.918 | 0.989 | 0.963 | +0.0013 | -0.0060 |
+| perfect | 1.000 | 1.030 | 1.000 | +0.0028 | +0.0110 |
+
+Before, "average" and "good" were byte-identical and the last three rows all read satisfaction 1.000.
+
+### The economy was held, and that was measured on purpose
+
+Partial credit raised the mean score everywhere - the point - which lifted the mean pay multiplier
+and would have been a silent **2.0-2.7% pay rise**. `QualityBase` came down 0.55 to 0.53, the same
+documented re-centring the constant already carried, with the slope untouched so the spread from poor
+to perfect is exactly as wide as before:
+
+| stage | income/min before | after | change |
+|---|---|---|---|
+| early 1 bay, 0 crew | $542 | $543 | +0.2% |
+| mid 3 bays, 2 trained | $1,628 | $1,631 | +0.2% |
+| late 4 bays, 4 trained | $2,009 | $2,023 | +0.7% |
+
+Each layer was measured in isolation first: the satisfaction curve alone costs 0.4-1.1% of income,
+the credit layer alone adds 2.0-2.7%.
+
+### Standing is now earned rather than given
+
+The honest cost of removing the saturation: satisfaction no longer sits at 1.0 for most work, so
+standing is harder to accumulate. Over an hour of solo play it went from a nearly flat +0.31 to
++0.67 across all skill levels, to **+0.041 (weak) / +0.104 (decent) / +0.262 (expert)** - a real
+skill gradient, no runaway, and nowhere near the clamp. A garage running mostly on mechanics now
+drifts slightly negative (late trained: +0.004 to -0.071, bias -0.018), which is a real consequence
+of automating that the player can answer by working the cars that matter.
+
+### Special jobs and the collector
+
+All five survive. Performance is still the most quality-sensitive (0.690 against ordinary 0.804),
+Restoration still the longest at 21.5 rounds and the best paid at $529, Fleet still the cheapest per
+van and the one mechanics absorb. Payouts moved by at most 2% except the collector's, down 5.7%.
+
+The collector decision is now **better** than it was - it flips on skill: taking collectors is -3.0%
+income and -0.036 standing for a poor player, and +1.6% and +0.090 for an expert. Per collector,
+standing moves -0.0257 / -0.0073 / +0.0108 at poor / average / expert.
+
+### Also fixed: a confound I introduced in Phase C.2
+
+The payback table needed every row funded, so I had made the probe's wallet seed unconditional. That
+gave the 0-crew garage $120,000 it never has, which changed how it buys parts and silently moved the
+early-game baseline. Seeding is now explicit and opt-in. The Phase C.2 conclusions are unaffected -
+they all concern garages with crew, which were always seeded - but the 1-bay row of that report's
+quality table was measured under it.
+
+### Verified
+
+**392 tests** pass (17 new, pinning separation rather than constants, so they keep their meaning if
+the numbers are ever retuned). **1,161 parity cases identical**, up from 585: a new `qualityGraded`
+section drives execution, score, satisfaction and pay across every round mix, part grade, expectation
+and both customer types. Fixing that section exposed four places where the web dump was passing round
+counts without the outcomes behind them, and one 6-decimal rounding tie that needed nine.
+
+Unity compile check clean, web soak clean, no page errors. In the real browser: eight bands,
+monotonic, **eight distinct satisfaction values**; an old save scores 0.6125 exactly as it always
+did; a job carrying 2 perfect / 3 good / 1 weak / 1 damaged round survives the positional save array
+(16 long, good at 14, weak at 15) with its score identical to six decimals; a save truncated to the
+old 14 fields loads with the new counters at zero; offline credits exactly what it reports.
+
+### Reported, not fixed
+
+- **The top quartile is still flat for strong players.** p75 and p90 are 1.000 from skill 0.85 up,
+  because an expert genuinely does execute perfectly. Addressing it means the mini-games.
+- The fourth mechanic (-$17/min) and late-game over-capacity, both from C.2, are untouched.
+
+---
+
 ## Phase C.2 — Mechanic automation already works; the measurement was wrong
 
 **No shipped value changed.** `Assets/` is untouched. The whole phase is one correction plus the

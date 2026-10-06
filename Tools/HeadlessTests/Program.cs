@@ -27,6 +27,26 @@ namespace GarageTycoon.HeadlessTests
                 return 0;
             }
 
+            if (args != null && args.Length > 1 && args[0] == "quality" && args[1] == "dist")
+            {
+                int seeds = 60;
+                if (args.Length > 2) int.TryParse(args[2], out seeds);
+                QualityProbe.Distribution(seeds < 1 ? 60 : seeds);
+                return 0;
+            }
+
+            if (args != null && args.Length > 0 && args[0] == "quality")
+            {
+                QualityProbe.Run();
+                return 0;
+            }
+
+            if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "economy")
+            {
+                MechanicProbe.Economy(args.Length > 2 ? args[2] : null);
+                return 0;
+            }
+
             if (args != null && args.Length > 1 && args[0] == "mech" && args[1] == "training")
             {
                 MechanicProbe.Training(args.Length > 2 ? args[2] : null);
