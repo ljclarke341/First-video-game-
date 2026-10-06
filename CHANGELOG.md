@@ -6,6 +6,49 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C — Full-game audit, and two fixes
+
+An investigation pass over the whole game. Two changes implemented, both repairs rather than
+balance; everything else is measured and written up for you to decide on.
+
+### The two fixes
+
+**Standing was invisible, because of a line I wrote that drew nothing.** `els.standingNote = word`
+assigned to a property on the elements object and rendered nowhere, and Unity never showed standing
+at all. So the garage's name silently decided which calibre of car turned up and the player had no
+way to see it. The rank row now reads WELL SPOKEN OF or WORD HAS GOT ROUND, and both stats screens
+carry it.
+
+**"Happy customers" measured retention, not happiness.** It is `completed / (completed + lost)` -
+the share who did not drive off in a huff. Since Phase B.2h there is a real satisfaction figure, and
+it drives standing. Two different numbers, one name. Renamed to "Customers served", with standing
+beside it.
+
+### What the audit found and did NOT change
+
+Measured across 120 seeds per configuration. These are recommendations, not changes:
+
+| | finding |
+|---|---|
+| **CRITICAL** | Automation degrades reputation. Quality falls 0.890 (early) to 0.615 (late) because mechanics cap at 0.72 skill, so standing goes **negative** (-0.176) in a fully-staffed garage. Hiring fights the system Collector is built on. |
+| **HIGH** | Quality saturates: **62% of repairs score a perfect 1.0**, and "good" and "excellent" both produce satisfaction 1.000. The top of the chain is clipped, so excellence is unrewarded and Collector's upside is capped while its downside is open. |
+| **HIGH** | Five trap upgrades. Mechanic Training and Air Tools return **0.0%**; Local Radio Ads **-3.5%**, Slow-Wind Rig **-2.8%**, Labelled Tool Wall **-15.5%**. The shop shows no numbers, and the Precision branch opens first. |
+| **HIGH** | Extra Bay returns **+1.5%** for $23,104 - a 36-hour payback on the most prominent upgrade in the game. The bottleneck is the player's hands, not bays. |
+| **MEDIUM** | Upgrades erase skill. A 0.30-skill player and a 0.95 one both reach ~42% rare cars and positive standing within an hour; income differs by only 1.9x. Collector's risk/reward decision evaporates once the shop is open. |
+| **MEDIUM** | All five special jobs together are 17.6% of income, 2.5-3.8% each. They are distinct and none dominates - but each moves under 4% of the economy. |
+| **MEDIUM** | Prestige needs $120,000; an hour from scratch earns $59,067. **0 of 60 runs** reached it within an hour. |
+| **LOW** | `QualityReport.Efficiency` and `DamageRate` are public and read by nobody; `Stats.DiagnosisRoundsPlayed` is written and read only by a test. |
+
+Audited clean: every event modifier is consumed, every prestige perk lands somewhere, every
+`UpgradeEffects` field is read. No duplicate multipliers found.
+
+### Verified after the changes
+
+375 tests pass, 585 parity cases identical, 20-minute soak clean, saves round-trip, and all five
+special jobs plus skip/commit re-checked in the browser.
+
+---
+
 ## Phase B.2h — Special jobs: COLLECTOR (VIP), and the reputation that was already there
 
 The last of the five, and the first whose answer depends on the PLAYER rather than the garage.

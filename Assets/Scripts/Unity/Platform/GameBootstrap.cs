@@ -420,6 +420,19 @@ namespace GarageTycoon.Unity.Platform
         // Popups
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// How the garage is spoken of, in words.
+        ///
+        /// Standing decides which calibre of car turns up next, and until now it did that
+        /// silently - the player had no way to see it anywhere in either build.
+        /// </summary>
+        private static string StandingWord(double standing)
+        {
+            if (standing >= 0.08d) return "Well spoken of";
+            if (standing <= -0.08d) return "Word has got round";
+            return "Nothing much said";
+        }
+
         private void ShowStats()
         {
             GameStats stats = _simulation.Stats;
@@ -427,7 +440,12 @@ namespace GarageTycoon.Unity.Platform
             string body =
                 "Cars completed:  " + stats.CarsCompleted + "\n" +
                 "Customers lost:  " + stats.CarsLost + "\n" +
-                "Happy customers:  " + Mathf.RoundToInt(stats.SatisfactionRate * 100f) + "%\n\n" +
+                // Renamed: this is the share of customers who did not drive off in a huff, which
+                // is retention. It read "happy customers", which is now a different number
+                // entirely - satisfaction drives the garage's standing and has nothing to do
+                // with this ratio.
+                "Customers served: " + Mathf.RoundToInt(stats.SatisfactionRate * 100f) + "%\n" +
+                "Garage standing:  " + StandingWord(stats.Standing) + "\n\n" +
                 "Jobs finished:  " + stats.JobsCompleted + "\n" +
                 "Mini-games played:  " + stats.RoundsPlayed + "\n" +
                 "Perfect rounds:  " + Mathf.RoundToInt(stats.PerfectRate * 100f) + "%\n" +
