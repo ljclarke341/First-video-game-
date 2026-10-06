@@ -6,6 +6,101 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## E1 follow-up — concurrent diagnosis: measured, and deliberately NOT built
+
+The question was whether a diagnosis check could run alongside a repair, to give the player back
+the hands that E1 proved were the real cost. Answer: the seam is tiny, but the idea does not work,
+and the measurement says so clearly enough that nothing was implemented.
+
+### The seam is one line, and it does not do what it looks like
+
+`Tick` already ticks `TickDiagnosis` and `TickSession(PlayerSession, ...)` on the same frame - the
+loop never enforced exclusivity. The only gate is `StartDiagnosis` calling `ClearPlayerSession()`.
+
+Removing it does not produce concurrency, because of what `TickSession` then does to an
+unattended repair:
+
+```
+session.Minigame.Tick(scaledDelta);
+if (session.AutoPlayer != null) session.AutoPlayer.Tick(scaledDelta);   // null for the player
+if (session.Minigame.IsFinished) ResolveRound(session, session.Minigame.Result);
+```
+
+A player session has no auto-player. Left running while the player looks at another car, the
+repair round plays itself out uninputted and resolves as a **miss** - patience damage, broken
+streak, no progress. Worse than today, and it would push misses into quality and standing.
+
+So there were only two real options, neither of them small:
+
+- **Freeze and resume** (keep the session, skip ticking it during a check). Clean to build, but it
+  frees no player time, and in the probe's model it is provably a no-op: `TryInspect` only runs
+  when both sessions are already null, so every check happens *before* the repair starts and no
+  in-flight round is ever abandoned. There is nothing there to recover.
+- **Let the repair advance unattended.** That means handing the player's session a
+  `MinigameAutoPlayer` - a mechanic with no bay and no wage. A new automation feature, not a seam.
+
+### So the ceiling was measured instead of a feature being built
+
+A throwaway probe resolved each check by ticking only the mini-game and never the garage: the same
+check, same skill, same mini-game, same reveal rules, same accuracy and therefore the same
+diagnosis bonus - but costing the garage no time whatsoever. That is strictly better than any real
+concurrency could ever be, so whatever it gains is the most the idea is worth.
+
+**1 bay, no crew** (never inspect = $704/min, 38.1 cars, 6.8% lost):
+
+| strategy | shipped | ceiling | cars (ceiling) | lost% | declined |
+|---|---|---|---|---|---|
+| one check, then quote | -9.2% | **+2.2%** | 37.8 | 6.3% | 0.4% |
+| targeted (2 checks) | -19.5% | **+7.5%** | 46.0 | 2.6% | 15.0% |
+| full inspection (7) | -42.8% | **+42.3%** | **78.8** | 0.3% | 52.2% |
+
+**3 bays, crew of 2** (never inspect = $1470/min):
+
+| strategy | shipped | ceiling |
+|---|---|---|
+| one check, then quote | -12.1% | -8.4% |
+| targeted (2 checks) | -11.6% | -10.5% |
+| full inspection (7) | -18.4% | -11.9% |
+
+### Why this kills the idea
+
+The desired shape was: targeted viable, full inspection still inefficient. The ceiling produces
+the **opposite**. With checks free, full inspection is not merely viable, it is dominant - +42.3%
+against targeted's +7.5%, finishing 78.8 cars against 38.1 and losing 0.3% of customers. Free
+information plus the right to decline half the work doubles throughput, because every declined job
+is a round the player never has to play.
+
+That exposes something worth writing down: **the time a check costs is the only thing holding
+full inspection back.** It is not an accident of tuning, it is the balancing force against free
+information. Remove it and the optimal play becomes "run all seven checks, decline half the bill,
+double your cars". The current design is self-consistent; concurrency would invert it.
+
+And in a crewed garage the ceiling does not even help - every strategy stays between -8% and -12%,
+because the mechanics are doing the rounds and declining work only removes what they could have
+billed for.
+
+### Nothing was changed
+
+No game code was touched. No patience rates, no diagnosis bonus, no difficulty or reveal rules, no
+quote logic, parts, quality, prestige, mechanics, specials or upgrade prices. The ceiling probe was
+removed after measuring.
+
+Verified unchanged: **449 tests pass**, **1,336 parity cases identical**, Unity compile 0 errors,
+web syntax OK, quote bypass 10/10 on all 16 checks, event persistence 21/21.
+
+One caveat on the table above: the probe's player-rounds column counts player and mechanic rounds
+together (`SessionReport.RoundsPlayed` is the total), so it is not a player/mechanic split. The
+split in the audit's crew table is the one to trust.
+
+### If this is picked up again
+
+The lever that remains untried is the one that does not hand out free information: make the
+*information* cheaper to act on rather than cheaper to get - for instance letting one check speak
+to more than the system it tested, so two checks approach what seven reveal today. That keeps a
+cost on the player's hands while shortening the path to a usable diagnosis. Not attempted here.
+
+---
+
 ## E1 — diagnosis patience cost halved. The experiment, and why it was not enough
 
 One controlled change, measured before and after with the same probe and the same 120 seeds.
