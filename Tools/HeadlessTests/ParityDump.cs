@@ -262,6 +262,31 @@ namespace GarageTycoon.HeadlessTests
             // RandomEventSystem.RestoredRemaining decides is what the web must decide too.
             // --- the plain timers a reload has to carry ---
             // Driven through the shipped Core rules, so the web cannot clamp them differently.
+            // --- what a car in a bay pays in patience, including on the inspection ramp ---
+            // Driven through the shipped Core rule, so the price of a check cannot drift.
+            json.Append("\"patienceRate\":[\n");
+            first = true;
+            foreach (bool diag in new[] { false, true })
+            {
+                foreach (bool attended in new[] { false, true })
+                {
+                    foreach (bool preview in new[] { false, true })
+                    {
+                        if (!first) json.Append(",\n");
+                        first = false;
+
+                        json.Append("  {\"diag\":").Append(diag ? 1 : 0)
+                            .Append(",\"attended\":").Append(attended ? 1 : 0)
+                            .Append(",\"preview\":").Append(preview ? 1 : 0)
+                            .Append(",\"rate\":")
+                            .Append(D(Math.Round((double)GarageSimulation.PatienceRateForBayCar(
+                                diag, attended, preview), 6)))
+                            .Append('}');
+                    }
+                }
+            }
+            json.Append("\n],\n");
+
             json.Append("\"saveTimers\":[\n");
             first = true;
             foreach (double saved in new[] { -12d, -0.5d, 0d, 0.05d, 4.5d, 30d, 59.5d, 9999d })

@@ -832,6 +832,31 @@ namespace GarageTycoon.Core.Simulation
         /// </summary>
         private const float UnattendedPatienceRate = 0.22f;
 
+        /// <summary>
+        /// What a customer's patience costs while their car is on the inspection ramp.
+        ///
+        /// Half the unattended rate. Looking at a car is work the customer can see happening, so
+        /// the clock on THAT car runs at half the speed it does while the car simply sits there.
+        /// A separate constant from UnattendedPatienceRate on purpose: the price of a check can
+        /// then be tuned without changing what an untouched car costs.
+        /// </summary>
+        private const float DiagnosisPatienceRate = UnattendedPatienceRate * 0.5f;
+
+        /// <summary>
+        /// How fast a car in a bay loses patience. The one rule both builds ask, so the cost of a
+        /// check cannot drift between them.
+        ///
+        /// A car being inspected is the cheapest, then a car nobody has reached, and the car
+        /// actually under the spanner is the expensive one - the pressure is meant to come from
+        /// the job in your hands. Reading a round's preview is not charged at all beyond the
+        /// unattended rate, because memorising what the round is asking is not work on the car.
+        /// </summary>
+        public static float PatienceRateForBayCar(bool underDiagnosis, bool attended, bool readingPreview)
+        {
+            if (underDiagnosis) return DiagnosisPatienceRate;
+            return attended && !readingPreview ? 1f : UnattendedPatienceRate;
+        }
+
         /// <summary>Counts down every customer's patience and boots out the ones who give up.</summary>
         private void TickPatience(float deltaTime)
         {
@@ -853,7 +878,8 @@ namespace GarageTycoon.Core.Simulation
 
                 // The pressure comes from the car under your hands, not from the ones waiting -
                 // and not from the seconds you spend reading what the round is asking of you.
-                float rate = IsAttended(car) && !IsReadingPreview(car) ? 1f : UnattendedPatienceRate;
+                bool underDiagnosis = DiagnosisSession != null && DiagnosisSession.Car == car;
+                float rate = PatienceRateForBayCar(underDiagnosis, IsAttended(car), IsReadingPreview(car));
 
                 if (car.TickPatience(deltaTime * rate))
                 {

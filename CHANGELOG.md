@@ -6,6 +6,125 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## E1 — diagnosis patience cost halved. The experiment, and why it was not enough
+
+One controlled change, measured before and after with the same probe and the same 120 seeds.
+**It did not fix the problem**, and the reason is now pinned down.
+
+### There was no constant to change
+
+The audit recommended cutting "the patience cost per diagnosis check". Looking for that constant
+turned up something more useful: **it does not exist**. The cost of a check was never a number -
+it was the patience that drained while the check played, and `IsAttended` deliberately does not
+count a diagnosis session, so the inspected car was already draining at the *unattended* rate of
+0.22x rather than the 1.0x a car under the spanner pays.
+
+Implemented in Core at `GarageSimulation.TickPatience`, mirrored in the web build's own patience
+loop. Both were already identical, so there was no divergence to fix.
+
+### What was changed
+
+| | before | after |
+|---|---|---|
+| car on the inspection ramp | 0.22x (the unattended rate) | **0.11x** |
+| car nobody has reached | 0.22x | 0.22x |
+| car under the spanner | 1.0x | 1.0x |
+| reading a round's preview | 0.22x | 0.22x |
+
+`GarageSimulation.DiagnosisPatienceRate = UnattendedPatienceRate * 0.5f`, read through a new
+shared rule, `PatienceRateForBayCar(underDiagnosis, attended, readingPreview)`, which both builds
+now ask instead of each writing the branch out. Measured live in the browser: a waiting car loses
+0.22 patience per second, a car on the ramp loses **0.11** - a ratio of exactly 0.500.
+
+### Before and after, same probe, same seeds
+
+| strategy | income/min before | after | vs never (before -> after) | cars | lost% | $/car | checks/car | declined | bonus |
+|---|---|---|---|---|---|---|---|---|---|
+| never inspect | $896 | $896 | 0.0% -> 0.0% | 37.3 | 11.0% | $351 | 0.00 | 0.0% | 1.000x |
+| targeted (complaint) | $857 | $864 | **-5.2% -> -4.5%** | 45.4 | 3.7% | $280 | 2.05 | 35.5% | 1.076x |
+| one check, then quote | $872 | $847 | **-3.3% -> -6.0%** | 34.3 | 13.7% | $355 | 1.00 | 4.0% | 1.040x |
+| full inspection | $526 | $537 | **-41.9% -> -40.7%** | 31.4 | 10.5% | $249 | 7.00 | 51.7% | 1.113x |
+| skip / commit | $896 | $896 | 0.0% -> 0.0% | 37.3 | 11.0% | $351 | 0.00 | 0.0% | 1.000x |
+
+Every movement is about a percentage point, which is inside the run-to-run noise - "one check"
+got *worse*, which is the giveaway. Quality and standing per strategy did not move either:
+one-check 0.910 / +0.042, four-check 0.819 / +0.017, seven-check 0.743 / -0.017.
+
+The change does scale correctly with the number of checks, which is the right shape even though
+the magnitude is small: at seven checks it is worth +2.7pp (declining) and +3.2pp (declining
+nothing), and customer loss on a seven-check car fell from 29.3% to 26.7%. At one or two checks
+it is worth nothing measurable, because there is barely any ramp time to discount.
+
+### Why it was never going to be enough
+
+A decomposition built for this pass separates the two things inspecting costs. Each row inspects
+the same number of times; the left column declines the optional work it found, the right quotes
+everything and declines nothing, so the only cost left in the right column is the time:
+
+| checks | declines optional | quotes everything |
+|---|---|---|
+| 1 | -8.4% | -8.2% |
+| 2 | -19.9% | -22.2% |
+| 4 | -21.8% | -25.0% |
+| 7 | -45.5% | -44.5% |
+
+The two columns agree. **Declining work is not the cost** - the shipped `InspectionProbe` always
+declines, which had made it look like the culprit. The cost is the time, and specifically it is
+*lost repair progress*, not faster draining: at seven checks quoting everything, cars finished
+collapses from 38.1 to 19.2 and loss climbs from 6.8% to 29.3%, while the inspected car's own
+clock was already the cheapest on the forecourt.
+
+So the arithmetic ceiling on this lever is small. Seven checks hold a car on the ramp for roughly
+a minute; halving 0.22 to 0.11 gives that one car back about six seconds of patience, against a
+sixty-second cycle and six cars on site. The measured +2-3pp is exactly that, and no re-tuning of
+this constant reaches a 40% gap - inspecting costs the player their *hands*, not the customer's
+patience.
+
+### Where that leaves the decision
+
+Not a disaster, and closer than the headline suggested. Targeted inspection at -4.5% finishes
+**45.4 cars against 37.3** and loses **3.7% of customers against 11.0%** - it trades a little
+income for a third of the churn, which is a real choice for anyone who cares about their name.
+One check at -6.0% is marginal. Seven checks at -40.7% remains correctly unattractive, so nobody
+is pushed into running every check.
+
+What is still true is that skipping inspection is the income-optimal play at every check count,
+and this change did not alter that. **Stopping here as instructed rather than reaching for a
+second lever.**
+
+### Changed
+
+- `Assets/Scripts/Core/Simulation/GarageSimulation.cs` - `DiagnosisPatienceRate`, the shared
+  `PatienceRateForBayCar` rule, and `TickPatience` now asking it.
+- `garage-tycoon.html` (web) - `B.diagnosisPatienceRate`, a mirrored `patienceRateForBayCar`, and
+  the bay patience loop asking it.
+- `Tools/HeadlessTests/Tests/DiagnosisPatienceTests.cs` - new, 7 tests.
+- `ParityDump.cs`, `vparity.js`, `diffparity.py` - new `patienceRate` section, 8 cases.
+
+Unity needed no change: it reads patience through `GarageSimulation`, so it consumes the Core rule
+by construction.
+
+### Verified
+
+- **449 tests pass** (was 442) - 7 new.
+- **1,336 parity cases identical** (was 1,328) - 8 new, driven through the shipped Core rule.
+- Unity compile: 0 errors. Web syntax: OK.
+- **Real browser, fresh saves, trusted clicks.** The constant takes effect: 0.22/s waiting against
+  0.11/s on the ramp, ratio 0.500. Across never-inspect, one-check and three-check runs: no
+  automatic "Everything", no hidden work revealed, quote rows always matched the quote's own
+  lines, and a car whose revealed systems were all healthy still read "Nothing to fix found yet".
+  No console errors. The browser arms are twelve cars each, far too few to compare income - that
+  comparison stays with the 120-seed probe.
+- No regression of the earlier passes: quote bypass 10/10 on both suites, event persistence 21/21.
+
+### Nothing else touched
+
+Quality, prestige, Fleet, Restoration, mechanics, Tool Wall, upgrade prices, standing, parts,
+special-job payouts, bay costs, quote logic and the diagnosis reveal rules are all unchanged. The
+diagnosis bonus was not raised.
+
+---
+
 ## Save/load parity audit — the whole save file, field by field
 
 Rather than wait for the next missing field to show up as a bug, every field Core's
