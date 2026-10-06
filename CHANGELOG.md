@@ -6,6 +6,76 @@ I made a reasonable choice on and would rather you confirmed.
 
 ---
 
+## Phase C.4 (follow-up) — Verification, and the 150k
+
+A review of a downloaded HTML file reported the mechanic cap, the prestige readout and the sell-up
+copy as missing. They were present in the published build; the reviewed file was an earlier download.
+Verified rather than asserted - the live artifact was fetched back and searched:
+
+```
+published version dbe8:  maxMechanicsFor x3   blockedReason x3   labelHold x4
+                         e.mechanics = clamp(lvl('auto_mechanic'), 0, maxMechanicsFor(e.bayCount))
+```
+
+Three things the review got right, though, and all three are now fixed.
+
+### `prestigeCap: 150000` - where it came from
+
+Real, and worth catching. The balance block carried `prestigeCap: 150000`, and sixty lines below it
+`B.prestigeCap = 120000;` quietly corrected it at module scope before any gameplay ran. So the
+**effective requirement was always $120,000** in both builds - Core has only `PrestigeCashCap = 120000d`
+and the parity suite pins it - but anybody reading the balance block was told 150k. The literal is now
+120000 and the override line is gone. No behaviour change; the `prestigeReadout` parity section proves
+the requirement is identical on both sides.
+
+### Hire Mechanic still offered a fourth level
+
+The cap was enforced by the effect clamp and the purchase gate, but the catalog still advertised
+`max: 4`. With four bays the most that can ever work is three, so the fourth level was unreachable and
+the shop read **"LVL 3 / 4 - Need another bay first"** at full bays, telling the player to buy a bay
+that cannot exist. The catalog maximum is now 3 in both builds, and the description says "Works a
+**spare** bay alone" so the dependency is visible before purchase rather than only on refusal.
+
+What the shop now reads, straight out of the browser:
+
+| bays | working | level | message | buy |
+|---|---|---|---|---|
+| 1 | 0 | LVL 0 / 3 | Need another bay first | disabled |
+| 2 | 1 | LVL 1 / 3 | Need another bay first | disabled |
+| 3 | 2 | LVL 2 / 3 | Need another bay first | disabled |
+| 4 | 3 | LVL 3 / 3 | Maxed out | disabled |
+
+An unreachable branch was written and then removed on the way: at full bays the crew cap and the
+upgrade's own maximum coincide, so the "Fully upgraded" check answers first and a second message for
+that case would have been dead code.
+
+### The Tool Wall, proved rather than argued
+
+The income tables were evidence, not proof. This measures the two things that have to be true, on one
+garage at the same seeds:
+
+| Tool Wall | secs/round | **patience burned per round** | patience per car | cars | lost% | income/min |
+|---|---|---|---|---|---|---|
+| none | 0.840 | 1.630 | 18.72 | 93.3 | 0.8% | $1,721 |
+| 3 levels | 0.833 | 1.577 | 17.00 | 100.2 | 0.2% | $1,872 |
+| **6 levels** | **0.839** | **1.538** | 16.15 | **102.1** | 0.0% | $2,074 |
+
+Round length is flat within noise (±0.8%) and the customer's patience burn per round **falls** 5.6%,
+because better recall means fewer damaged rounds and each of those cost 2.5s. So the preview is free
+with respect to the customer's clock, and the upgrade is throughput-positive: 93.3 cars to 102.1.
+
+### Verified
+
+407 tests pass, 1,228 parity cases identical, Unity compile clean, web soak clean with no page errors,
+standalone rebuilt and verified playable. The prestige HUD, read out of the live page:
+
+```
+$74.3K / $120K
+Sell up at $120K cash on hand · $45.8K to go · ~18m 29s at this pace · +12 tokens
+```
+
+---
+
 ## Phase C.4 (implementation) — The four confirmed fixes
 
 ### 1. Selling up now actually ends the old garage

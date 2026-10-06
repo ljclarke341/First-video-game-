@@ -30,9 +30,12 @@ namespace GarageTycoon.Core.Economy
                 270d, 1.8d, 6, 0.05f, "-{0}% game speed", 100f),
 
             // ---------------- AUTOMATION: idle income ----------------
+            // Three, not four: the player permanently occupies a bay and a mechanic can only work
+            // a car already in one, so a four-bay garage supports three. A fourth level could
+            // never be bought, and offering it read as "buy another bay" when there are none left.
             new UpgradeDefinition("auto_mechanic", UpgradeBranch.Automation,
-                "Hire Mechanic", "Works a bay on its own, even while you are away",
-                650d, 2.4d, 4, 1f, "+{0} mechanic", 1f),
+                "Hire Mechanic", "Works a spare bay on its own, even while you are away",
+                650d, 2.4d, 3, 1f, "+{0} mechanic", 1f),
 
             new UpgradeDefinition("auto_skill", UpgradeBranch.Automation,
                 "Mechanic Training", "Your mechanics miss far less often",

@@ -1187,6 +1187,9 @@ namespace GarageTycoon.Core.Simulation
                 {
                     // The player holds a bay themselves, so there is physically nowhere for this
                     // mechanic to work. Measured at 0.0% busy, so selling it would be a con.
+                    //
+                    // Only ever reached below the bay ceiling: at the maximum bays the crew cap and
+                    // the upgrade's own maximum coincide, so IsMaxed above has already answered.
                     return "Need another bay first";
                 }
             }

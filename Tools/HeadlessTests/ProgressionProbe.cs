@@ -371,6 +371,87 @@ namespace GarageTycoon.HeadlessTests
             Console.WriteLine();
         }
 
+
+        /// <summary>
+        /// Direct proof that the Tool Wall's preview no longer costs the customer anything.
+        ///
+        ///     dotnet run --project Tools/HeadlessTests -- prog patience
+        ///
+        /// Income tables are evidence but not proof: they could move for a dozen reasons. This
+        /// measures the thing itself - seconds of the customer's patience burned per round, and
+        /// real seconds per round - at no Tool Wall and at full Tool Wall, on the same garage.
+        /// </summary>
+        public static void Patience(string seedArg)
+        {
+            ApplySeeds(seedArg);
+
+            Console.WriteLine("=== DOES THE TOOL WALL'S PREVIEW COST THE CUSTOMER ANYTHING? ===");
+            Console.WriteLine();
+            Console.WriteLine("Same garage, same seeds. 'patience/round' is customer seconds actually consumed;");
+            Console.WriteLine("'secs/round' is real time per round. Neither may rise with the upgrade.");
+            Console.WriteLine();
+            Console.WriteLine("levels  rounds  secs/round  patience/round  patience/car  cars  lost%  income/min");
+
+            foreach (int levels in new[] { 0, 3, 6 })
+            {
+                double patienceBurned = 0d, elapsed = 0d, income = 0d;
+                int rounds = 0, completed = 0, lost = 0, sessions = 0;
+
+                for (int seed = 0; seed < Seeds; seed++)
+                {
+                    GarageSimulation simulation = new GarageSimulation(92000 + seed);
+                    GameplayHarness.GrantUpgrade(simulation, "workshop_rates", 10);
+                    GameplayHarness.GrantUpgrade(simulation, "workshop_bays", 2);
+                    GameplayHarness.GrantMechanics(simulation, 2);
+                    GameplayHarness.GrantUpgrade(simulation, "auto_skill", 6);
+                    GameplayHarness.GrantUpgrade(simulation, "auto_speed", 6);
+                    if (levels > 0) GameplayHarness.GrantUpgrade(simulation, "precision_preview", levels);
+                    simulation.Wallet.Earn(1600000d);
+
+                    // Patience left on every car in a bay, sampled every tick, so the drop IS the burn.
+                    Dictionary<int, float> lastSeen = new Dictionary<int, float>();
+
+                    simulation.RoundResolved += (session, result) => { rounds++; };
+                    simulation.CarCompleted += (car, money) => { completed++; };
+                    simulation.CarLeftAngry += car => { lost++; };
+
+                    SessionReport report = GameplayHarness.Play(simulation, SessionSeconds, Skill,
+                        onTick: sim =>
+                        {
+                            elapsed += 1d / 60d;
+                            for (int b = 0; b < sim.Bays.Count; b++)
+                            {
+                                ActiveCar car = sim.Bays[b];
+                                if (car == null) continue;
+
+                                float previous;
+                                if (lastSeen.TryGetValue(car.InstanceId, out previous))
+                                {
+                                    double drop = previous - car.TimeRemaining;
+                                    if (drop > 0d) patienceBurned += drop;
+                                }
+                                lastSeen[car.InstanceId] = car.TimeRemaining;
+                            }
+                        });
+
+                    income += report.CashEarned - simulation.Inventory.TotalSpent;
+                    sessions++;
+                }
+
+                Console.WriteLine(
+                    levels.ToString().PadLeft(6)
+                    + (rounds / (double)sessions).ToString("0").PadLeft(8)
+                    + (rounds == 0 ? 0d : elapsed / rounds).ToString("0.000").PadLeft(12)
+                    + (rounds == 0 ? 0d : patienceBurned / rounds).ToString("0.000").PadLeft(16)
+                    + (completed == 0 ? 0d : patienceBurned / completed).ToString("0.00").PadLeft(14)
+                    + (completed / (double)sessions).ToString("0.0").PadLeft(6)
+                    + ((completed + lost == 0 ? 0d : lost * 100d / (completed + lost)).ToString("0.0") + "%").PadLeft(7)
+                    + ("$" + (income / sessions / (SessionSeconds / 60d)).ToString("0")).PadLeft(12));
+            }
+
+            Console.WriteLine();
+        }
+
         // ============================================================================
         // ISSUE 4: prestige
         // ============================================================================
