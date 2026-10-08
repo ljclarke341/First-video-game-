@@ -38,7 +38,13 @@ export function isAdFree() {
   return !!profile.adFree;
 }
 
+const isDevHost = () =>
+  ['localhost', '127.0.0.1', ''].includes(location.hostname);
+
 function placeholder(seconds = 3) {
+  // Only ever a local testing aid. On a real host with no ad SDK the honest
+  // answer is "no ad", not a fake one.
+  if (!isDevHost()) return Promise.resolve(false);
   return new Promise(resolve => {
     const el = document.getElementById('adSim');
     const timer = document.getElementById('adTimer');

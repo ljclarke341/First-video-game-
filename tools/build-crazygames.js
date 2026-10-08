@@ -17,8 +17,12 @@ const SRC = join(ROOT, 'www');
 const OUT = join(ROOT, 'dist', 'crazygames');
 const ZIP = join(ROOT, 'dist', 'chroma-rush-crazygames.zip');
 
+// The flag marks the build target explicitly. Without it, an SDK that fails
+// to load (adblock, CDN hiccup) would make the game fall back to the AdMob
+// backend and show its dev ad placeholder to real players.
 const SDK_TAG =
-  '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>';
+  '<script>window.__CG_BUILD = true;</script>\n'
+  + '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>';
 
 async function dirSize(dir) {
   let total = 0;

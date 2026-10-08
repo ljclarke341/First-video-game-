@@ -20,7 +20,12 @@ const ADMOB = {
 let backend = ADMOB;
 
 export async function initPlatform() {
-  if (crazygames.detect()) backend = { name: 'crazygames', ...crazygames };
+  // `__CG_BUILD` is stamped in by the CrazyGames build. It pins the backend
+  // even when their SDK fails to load, so a blocked SDK means "no ads"
+  // rather than silently falling through to the other platform's.
+  if (window.__CG_BUILD || crazygames.detect()) {
+    backend = { name: 'crazygames', ...crazygames };
+  }
   try {
     await backend.init();
   } catch { /* the game runs fine without a host */ }
