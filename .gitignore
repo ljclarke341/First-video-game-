@@ -111,3 +111,6 @@ InitTestScene*.unity*
 *.keystore
 *.jks
 keystore.properties
+
+# Build output (regenerate with: npm run build:crazygames)
+/dist/
