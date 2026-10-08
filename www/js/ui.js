@@ -3,10 +3,12 @@
 import { profile, save } from './storage.js';
 import { SKINS } from './skins.js';
 import { sfx, unlock } from './audio.js';
+import { ensureMissions, missionText } from './missions.js';
+import { dailyState } from './daily.js';
 
 const $ = id => document.getElementById(id);
 
-const SCREENS = ['menu', 'how', 'shop', 'paused', 'over'];
+const SCREENS = ['menu', 'how', 'shop', 'missions', 'paused', 'over'];
 
 export class UI {
   constructor(hooks) {
@@ -17,6 +19,7 @@ export class UI {
     this.bind();
     this.refresh();
     this.renderShop();
+    this.renderMissions();
   }
 
   // ------------------------------------------------------------- navigation
@@ -26,6 +29,7 @@ export class UI {
     for (const id of SCREENS) this.el[id].hidden = id !== name;
     this.el.hud.hidden = name !== null;
     if (name === 'menu' || name === 'shop') this.refresh();
+    if (name === 'missions') this.renderMissions();
   }
 
   showHud() {
@@ -55,6 +59,9 @@ export class UI {
     const tap = (id, fn) => $(id).addEventListener('click', () => { unlock(); sfx.ui(); fn(); });
 
     tap('playBtn', () => this.hooks.play());
+    tap('dailyBtn', () => this.hooks.daily());
+    tap('missionBtn', () => this.show('missions'));
+    tap('missionBack', () => this.show('menu'));
     tap('shopBtn', () => this.show('shop'));
     tap('howBtn', () => this.show('how'));
     tap('howBack', () => this.show('menu'));
@@ -75,6 +82,12 @@ export class UI {
       save();
       this.refresh();
     });
+    tap('musicBtn', () => {
+      profile.music = !profile.music;
+      save();
+      this.hooks.musicToggled?.();
+      this.refresh();
+    });
     tap('hapticBtn', () => {
       profile.haptics = !profile.haptics;
       save();
@@ -88,8 +101,53 @@ export class UI {
     $('bestMenu').textContent = profile.best;
     $('coinsMenu').textContent = profile.coins;
     $('coinsShop').textContent = profile.coins;
-    $('soundBtn').textContent = `SOUND: ${profile.sound ? 'ON' : 'OFF'}`;
-    $('hapticBtn').textContent = `VIBRATE: ${profile.haptics ? 'ON' : 'OFF'}`;
+    $('soundBtn').textContent = `SFX: ${profile.sound ? 'ON' : 'OFF'}`;
+    $('musicBtn').textContent = `MUSIC: ${profile.music ? 'ON' : 'OFF'}`;
+    $('hapticBtn').textContent = `BUZZ: ${profile.haptics ? 'ON' : 'OFF'}`;
+
+    const daily = dailyState();
+    const btn = $('dailyBtn');
+    btn.disabled = !daily.available;
+    const streak = profile.dailyStreak > 1 ? `  ${profile.dailyStreak} DAY STREAK` : '';
+    btn.textContent = daily.available
+      ? 'DAILY CHALLENGE'
+      : `DAILY DONE - ${daily.score}${streak}`;
+  }
+
+  renderMissions() {
+    const list = $('missionList');
+    list.innerHTML = '';
+    for (const m of ensureMissions()) {
+      const pct = Math.min(100, Math.round((m.progress / m.target) * 100));
+
+      const card = document.createElement('div');
+      card.className = 'mission';
+
+      const top = document.createElement('div');
+      top.className = 'mission-top';
+      const text = document.createElement('span');
+      text.className = 'mission-text';
+      text.textContent = missionText(m);
+      const reward = document.createElement('span');
+      reward.className = 'mission-reward';
+      const dot = document.createElement('span');
+      dot.className = 'coin-dot';
+      reward.append(dot, document.createTextNode(String(m.reward)));
+      top.append(text, reward);
+
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      const fill = document.createElement('i');
+      fill.style.width = pct + '%';
+      bar.append(fill);
+
+      const count = document.createElement('div');
+      count.className = 'mission-count';
+      count.textContent = `${Math.min(m.progress, m.target)} / ${m.target}`;
+
+      card.append(top, bar, count);
+      list.append(card);
+    }
   }
 
   hud(score, coins, mult) {
@@ -100,8 +158,37 @@ export class UI {
     combo.classList.toggle('hidden', mult <= 1);
   }
 
-  gameOver({ score, coins, isBest, canRevive, canDouble }) {
-    $('overTitle').textContent = isBest ? 'NEW BEST!' : 'RUN OVER';
+  gameOver({ score, coins, isBest, canRevive, canDouble, nearMiss, completed, daily }) {
+    $('overTitle').textContent = isBest ? 'NEW BEST!'
+      : nearMiss ? 'SO CLOSE'
+      : daily ? 'DAILY DONE' : 'RUN OVER';
+
+    // A near miss is the strongest reason to tap Play Again, so name the gap.
+    const sub = $('overSub');
+    if (nearMiss) {
+      sub.textContent = `${nearMiss} point${nearMiss === 1 ? '' : 's'} off your best`;
+      sub.hidden = false;
+    } else if (daily) {
+      sub.textContent = 'Come back tomorrow for a new course';
+      sub.hidden = false;
+    } else {
+      sub.hidden = true;
+    }
+
+    const box = $('overMissions');
+    box.innerHTML = '';
+    box.hidden = !completed || !completed.length;
+    for (const c of completed || []) {
+      const row = document.createElement('div');
+      row.className = 'payout';
+      const label = document.createElement('span');
+      label.textContent = c.text;
+      const amt = document.createElement('b');
+      amt.textContent = `+${c.reward}`;
+      row.append(label, amt);
+      box.append(row);
+    }
+
     $('finalScore').textContent = score;
     $('finalBest').textContent = profile.best;
     $('finalCoins').textContent = coins;

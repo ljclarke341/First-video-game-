@@ -3,7 +3,7 @@
 import { Generator, LANES, WALL } from './level.js';
 import { getSkin } from './skins.js';
 import { profile } from './storage.js';
-import { sfx, buzz } from './audio.js';
+import { sfx, buzz, startMusic, stopMusic, setMusicIntensity } from './audio.js';
 
 const VW = 480;                // virtual width; everything is tuned in these units
 const PLAYER_R = 24;
@@ -42,6 +42,7 @@ export class Game {
     this.gen = new Generator();
     this.items = [];
     this.particles = [];
+    this.popups = [];
     this.trail = [];
     this.stars = [];
     this.scroll = 0;
@@ -84,8 +85,10 @@ export class Game {
 
   // ---------------------------------------------------------------- lifecycle
 
-  start() {
-    this.gen.reset();
+  start(seedValue) {
+    this.gen.reset(seedValue);
+    this.popups = [];
+    this.beatBest = false;
     this.items.length = 0;
     this.particles.length = 0;
     this.trail.length = 0;
@@ -114,10 +117,17 @@ export class Game {
     this.gen.lastGateY = this.gen.gap - 60;
     this.gen.fill(this.items, LOOKAHEAD);
     this.state = 'playing';
+    startMusic();
+    setMusicIntensity(1);
   }
 
-  pause() { if (this.state === 'playing') this.state = 'paused'; }
-  resume() { if (this.state === 'paused') { this.state = 'playing'; this.last = 0; } }
+  pause() {
+    if (this.state === 'playing') { this.state = 'paused'; stopMusic(); }
+  }
+
+  resume() {
+    if (this.state === 'paused') { this.state = 'playing'; this.last = 0; startMusic(); }
+  }
 
   /** Continue after a crash: clear the danger and resync the course. */
   revive() {
@@ -135,6 +145,7 @@ export class Game {
     this.gen.fill(this.items, LOOKAHEAD);
     this.state = 'playing';
     this.last = 0;
+    startMusic();
     sfx.revive();
   }
 
@@ -185,6 +196,7 @@ export class Game {
     if (this.state === 'dying') {
       this.timeScale = Math.max(0.12, this.timeScale - dt * 1.4);
       this.updateParticles(dt);
+      this.updatePopups(dt);
       this.dyingFor = (this.dyingFor || 0) + dt;
       if (this.dyingFor > 0.85) this.finish();
       return;
@@ -220,6 +232,7 @@ export class Game {
     this.gen.fill(this.items, LOOKAHEAD);
 
     this.updateParticles(dt);
+    this.updatePopups(dt);
     if (this.hints) this.checkHints();
     this.hooks.onHud?.(this.score, this.coinsEarned, this.mult);
   }
@@ -262,6 +275,11 @@ export class Game {
       this.combo += 1;
       this.bestCombo = Math.max(this.bestCombo, this.combo);
       this.score += 10 * this.mult;
+      this.popup(this.player.x, this.playerY - 42,
+                 this.mult > 1 ? `+${10 * this.mult}  x${this.mult}` : '+10',
+                 this.colorOf(this.player.color));
+      setMusicIntensity(this.mult);
+      this.checkBest();
       this.player.squash = 1;
       this.shake = Math.min(6, 1.6 + this.mult * 0.5);
       this.burst(this.player.x, this.playerY, this.colorOf(this.player.color), 9, 150);
@@ -278,8 +296,10 @@ export class Game {
     if (it.type === 'coin') {
       this.coinsEarned += 1;
       this.score += 5 * this.mult;
+      this.popup(laneX(it.lane), this.playerY - 26, `+${5 * this.mult}`, '#f5b93a');
       this.burst(laneX(it.lane), this.playerY, '#f5b93a', 8, 130);
       sfx.coin();
+      this.checkBest();
     } else {
       this.player.color = it.color;
       this.player.squash = 0.8;
@@ -291,6 +311,7 @@ export class Game {
 
   crash(gate, idx) {
     this.state = 'dying';
+    stopMusic();
     this.dyingFor = 0;
     this.shake = 16;
     this.flash = 1;
@@ -308,12 +329,51 @@ export class Game {
     this.hooks.onGameOver?.({
       score: this.score,
       coins: this.coinsEarned,
+      gates: this.gen.passed,
       bestCombo: this.bestCombo,
       canRevive: this.revivesUsed < 1
     });
   }
 
   colorOf(i) { return this.skin.colors[i] || '#ffffff'; }
+
+  popup(x, y, text, color) {
+    this.popups.push({ x, y, text, color, life: 0.9, max: 0.9 });
+    if (this.popups.length > 24) this.popups.shift();
+  }
+
+  /** Fires once, the moment a run overtakes the stored personal best. */
+  checkBest() {
+    if (this.beatBest || !profile.best || this.score <= profile.best) return;
+    this.beatBest = true;
+    this.popup(VW / 2, this.playerY - 150, 'NEW BEST!', '#ffd23f');
+    this.flash = 0.5;
+    sfx.revive();
+  }
+
+  updatePopups(dt) {
+    for (let i = this.popups.length - 1; i >= 0; i--) {
+      const p = this.popups[i];
+      p.life -= dt;
+      p.y -= 52 * dt;
+      if (p.life <= 0) this.popups.splice(i, 1);
+    }
+  }
+
+  drawPopups(ctx) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '700 20px ui-monospace, Menlo, Consolas, monospace';
+    for (const p of this.popups) {
+      const t = p.life / p.max;
+      ctx.globalAlpha = Math.min(1, t * 1.8);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.restore();
+  }
 
   burst(x, y, color, count, spread) {
     for (let i = 0; i < count; i++) {
@@ -375,6 +435,7 @@ export class Game {
     }
 
     this.drawParticles(ctx);
+    this.drawPopups(ctx);
     if (this.state !== 'dying' && this.state !== 'idle') this.drawPlayer(ctx);
 
     // Vignette keeps the eye on the centre lane cluster.

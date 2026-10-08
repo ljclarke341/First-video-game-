@@ -19,6 +19,18 @@ phone. No build step, no dependencies.
 
 ## What's here
 
+## Modes and progression
+
+- **Endless** — the score chase. Procedurally generated, never the same twice.
+- **Daily challenge** — one fixed course per calendar day, one attempt. The
+  seed is derived from the date, so every player gets a byte-identical course
+  and scores are comparable. Tracks a day streak.
+- **Missions** — three rolling goals (pass N gates, hit a x4 combo, score N…)
+  that pay out coins and reroll. Targets scale with how much you've played, so
+  a new player is never handed a goal they can't reach.
+- **Near-miss feedback** — a run that lands within 15% of your best says how
+  many points short it was, because that's the moment people tap Play Again.
+
 ```
 www/                the whole game (plain HTML/CSS/JS, zero dependencies)
   index.html        shell + DOM overlay screens
@@ -30,6 +42,8 @@ www/                the whole game (plain HTML/CSS/JS, zero dependencies)
   js/audio.js       all sound, synthesized — no audio files
   js/storage.js     save data
   js/skins.js       the six themes
+  js/daily.js       daily challenge seeding and streaks
+  js/missions.js    rolling goals and payouts
 store/              Play Store icon, feature graphic, screenshots, listing copy
 docs/               setup, publishing, monetization, privacy policy
 tools/dev-server.js zero-dependency static server

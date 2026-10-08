@@ -9,9 +9,28 @@
 export const LANES = 3;
 export const WALL = -1;
 
-const pick = arr => arr[(Math.random() * arr.length) | 0];
-const chance = p => Math.random() < p;
 const lerp = (a, b, t) => a + (b - a) * t;
+
+/** mulberry32 - small, fast, and good enough for level layout. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Stable 32-bit hash, so a date string always yields the same course. */
+export function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
 /** 0 before `from` gates, 1 after `to`, linear between. */
 const ramp = (n, from, to) => Math.max(0, Math.min(1, (n - from) / (to - from)));
 
@@ -20,7 +39,16 @@ export class Generator {
     this.reset();
   }
 
-  reset() {
+  /** Pass a seed for a reproducible course; omit it for a random run. */
+  seed(value) {
+    this.rand = value === undefined ? Math.random : mulberry32(value);
+  }
+
+  pick(arr) { return arr[(this.rand() * arr.length) | 0]; }
+  chance(p) { return this.rand() < p; }
+
+  reset(seedValue) {
+    this.seed(seedValue);
     this.gates = 0;    // gates SPAWNED - runs ~6 ahead of the player
     this.passed = 0;   // gates the player has actually cleared
     this.pathLane = 1;    // lane the solution path is in
@@ -87,14 +115,14 @@ export class Generator {
     const fromColor = this.pathColor;
 
     // Where the path goes through this gate.
-    const solLane = chance(0.72)
-      ? pick([0, 1, 2].filter(l => l !== fromLane))
+    const solLane = this.chance(0.72)
+      ? this.pick([0, 1, 2].filter(l => l !== fromLane))
       : fromLane;
 
     // Does the player have to repaint before this gate?
-    const needsChange = chance(this.changeChance);
+    const needsChange = this.chance(this.changeChance);
     const solColor = needsChange
-      ? pick([0, 1, 2].filter(c => c !== fromColor))
+      ? this.pick([0, 1, 2].filter(c => c !== fromColor))
       : fromColor;
 
     if (needsChange) {
@@ -102,20 +130,20 @@ export class Generator {
       // detour; keeping it on the path lanes is the gentler version.
       // A blob off the direct line forces a real detour - only once the
       // player is comfortable collecting one at all.
-      const detour = d > 0.3 && chance(lerp(0.15, 0.5, d));
+      const detour = d > 0.3 && this.chance(lerp(0.15, 0.5, d));
       const paintLane = detour
-        ? pick([0, 1, 2])
-        : pick([fromLane, solLane]);
+        ? this.pick([0, 1, 2])
+        : this.pick([fromLane, solLane]);
       out.push({
         type: 'paint', y: gateY + gap * 0.52, lane: paintLane,
-        color: solColor, taken: false, spin: Math.random() * 6.28
+        color: solColor, taken: false, spin: this.rand() * 6.28
       });
       this.pathLane = paintLane;
     }
 
     // Build the gate cells around the solution cell.
     const wallChance = this.wallChance;
-    let mercyLeft = chance(this.mercyChance) ? 1 : 0;   // at most one extra safe cell
+    let mercyLeft = this.chance(this.mercyChance) ? 1 : 0;   // at most one extra safe cell
     const cells = [];
     for (let i = 0; i < LANES; i++) {
       if (i === solLane) {
@@ -123,23 +151,23 @@ export class Generator {
       } else if (mercyLeft > 0) {
         mercyLeft -= 1;
         cells.push(solColor);
-      } else if (chance(wallChance)) {
+      } else if (this.chance(wallChance)) {
         cells.push(WALL);
       } else {
-        cells.push(pick([0, 1, 2].filter(c => c !== solColor)));
+        cells.push(this.pick([0, 1, 2].filter(c => c !== solColor)));
       }
     }
 
     out.push({ type: 'gate', y: gateY, cells, solLane, resolved: false });
 
     // Coins reward committing to the line early rather than drifting late.
-    const coinCount = chance(0.62) ? 1 + ((Math.random() * 3) | 0) : 0;
+    const coinCount = this.chance(0.62) ? 1 + ((this.rand() * 3) | 0) : 0;
     for (let i = 0; i < coinCount; i++) {
       const t = 0.18 + (i + 1) * (0.52 / (coinCount + 1));
       out.push({
         type: 'coin', y: gateY + gap * t,
-        lane: chance(0.75) ? solLane : pick([0, 1, 2]),
-        taken: false, spin: Math.random() * 6.28
+        lane: this.chance(0.75) ? solLane : this.pick([0, 1, 2]),
+        taken: false, spin: this.rand() * 6.28
       });
     }
 

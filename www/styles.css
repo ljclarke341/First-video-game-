@@ -108,6 +108,41 @@ h2{margin:0 0 2px;font-size:22px;letter-spacing:3px;font-weight:800}
 }
 .btn.small{padding:11px 10px;font-size:11px;letter-spacing:1px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn.daily{
+  background:linear-gradient(135deg,#9b5de5,#ff5d8f);color:#fff;border-color:transparent;
+  box-shadow:0 8px 28px rgba(155,93,229,.3)
+}
+.btn.daily[disabled]{
+  background:rgba(255,255,255,.06);color:var(--muted);box-shadow:none;
+  border:1px solid var(--line)
+}
+
+/* ---------- Missions ---------- */
+#missionList{display:flex;flex-direction:column;gap:10px}
+.mission{
+  border:1px solid var(--line);border-radius:13px;padding:13px 14px;
+  background:rgba(255,255,255,.04);display:flex;flex-direction:column;gap:9px;text-align:left
+}
+.mission-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.mission-text{font-size:12px;letter-spacing:.6px;line-height:1.4}
+.mission-reward{
+  display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;
+  color:#f5b93a;white-space:nowrap
+}
+.bar{height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:4px;
+  background:linear-gradient(90deg,var(--accent),#25b7f0)}
+.mission-count{font-size:10px;color:var(--muted);letter-spacing:1px}
+
+/* ---------- Mission payouts on the game-over screen ---------- */
+.payouts{display:flex;flex-direction:column;gap:6px}
+.payout{
+  border:1px solid rgba(245,185,58,.4);background:rgba(245,185,58,.1);
+  border-radius:10px;padding:9px 12px;font-size:11px;letter-spacing:.8px;
+  display:flex;justify-content:space-between;gap:10px;align-items:center
+}
+.payout b{color:#f5b93a;white-space:nowrap}
 
 .rules{text-align:left;margin:0;padding-left:20px;color:var(--muted);
   font-size:13px;line-height:1.75}

@@ -31,13 +31,16 @@
       <p class="tag">Match the shape. Hold the line.</p>
       <div class="best">BEST <b id="bestMenu">0</b></div>
       <button id="playBtn" class="btn primary">PLAY</button>
+      <button id="dailyBtn" class="btn daily">DAILY CHALLENGE</button>
       <div class="row">
+        <button id="missionBtn" class="btn">MISSIONS</button>
         <button id="shopBtn" class="btn">THEMES</button>
-        <button id="howBtn" class="btn">HOW TO PLAY</button>
       </div>
-      <div class="row">
-        <button id="soundBtn" class="btn small">SOUND: ON</button>
-        <button id="hapticBtn" class="btn small">VIBRATE: ON</button>
+      <button id="howBtn" class="btn">HOW TO PLAY</button>
+      <div class="row3">
+        <button id="soundBtn" class="btn small">SFX: ON</button>
+        <button id="musicBtn" class="btn small">MUSIC: ON</button>
+        <button id="hapticBtn" class="btn small">BUZZ: ON</button>
       </div>
       <div class="coins-line"><span class="coin-dot"></span><b id="coinsMenu">0</b></div>
     </div>
@@ -72,6 +75,16 @@
     </div>
   </div>
 
+  <!-- Missions -->
+  <div id="missions" class="layer screen" hidden>
+    <div class="stack">
+      <h2>MISSIONS</h2>
+      <p class="tag">Finish one and the coins are yours. A new goal takes its place.</p>
+      <div id="missionList"></div>
+      <button id="missionBack" class="btn primary">BACK</button>
+    </div>
+  </div>
+
   <!-- Pause -->
   <div id="paused" class="layer screen" hidden>
     <div class="stack">
@@ -86,6 +99,8 @@
   <div id="over" class="layer screen" hidden>
     <div class="stack">
       <h2 id="overTitle">RUN OVER</h2>
+      <p id="overSub" class="tag" hidden></p>
+      <div id="overMissions" class="payouts" hidden></div>
       <div class="scoreboard">
         <div><span>SCORE</span><b id="finalScore">0</b></div>
         <div><span>BEST</span><b id="finalBest">0</b></div>

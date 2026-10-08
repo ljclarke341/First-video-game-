@@ -92,6 +92,99 @@ export const sfx = {
   }
 };
 
+// ---------------------------------------------------------------- music
+//
+// A generative bassline on a lookahead scheduler. It layers up with the combo
+// multiplier, so holding a chain is audible as well as visible. Nothing is
+// streamed or loaded - it is the same oscillators as the sound effects.
+
+const ROOTS = [55, 55, 73.42, 55, 82.41, 55, 73.42, 65.41];  // A1 pattern
+const ARP = [220, 329.63, 440, 329.63];
+
+let musicTimer = null;
+let nextNote = 0;
+let stepIndex = 0;
+let intensity = 0;           // 0-2, driven by the combo multiplier
+
+const STEP = 0.235;          // eighth notes at ~128bpm
+const LOOKAHEAD = 0.12;
+
+function scheduleStep(time) {
+  const c = ctx;
+  const i = stepIndex % 8;
+
+  // Bass - always present.
+  const bass = c.createOscillator();
+  const bg = c.createGain();
+  bass.type = 'triangle';
+  bass.frequency.setValueAtTime(ROOTS[i], time);
+  bg.gain.setValueAtTime(0.0001, time);
+  bg.gain.exponentialRampToValueAtTime(0.22, time + 0.015);
+  bg.gain.exponentialRampToValueAtTime(0.0001, time + STEP * 0.9);
+  bass.connect(bg).connect(master);
+  bass.start(time);
+  bass.stop(time + STEP);
+
+  // Hi-hat from the first combo step up.
+  if (intensity >= 1 && i % 2 === 1) {
+    const frames = Math.floor(c.sampleRate * 0.04);
+    const buf = c.createBuffer(1, frames, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let n = 0; n < frames; n++) data[n] = (Math.random() * 2 - 1) * (1 - n / frames);
+    const src = c.createBufferSource();
+    const hp = c.createBiquadFilter();
+    const hg = c.createGain();
+    hp.type = 'highpass';
+    hp.frequency.value = 7000;
+    hg.gain.value = 0.07;
+    src.buffer = buf;
+    src.connect(hp).connect(hg).connect(master);
+    src.start(time);
+  }
+
+  // Arpeggio once the chain is really going.
+  if (intensity >= 2) {
+    const a = c.createOscillator();
+    const ag = c.createGain();
+    a.type = 'square';
+    a.frequency.setValueAtTime(ARP[i % ARP.length], time);
+    ag.gain.setValueAtTime(0.0001, time);
+    ag.gain.exponentialRampToValueAtTime(0.05, time + 0.01);
+    ag.gain.exponentialRampToValueAtTime(0.0001, time + STEP * 0.6);
+    a.connect(ag).connect(master);
+    a.start(time);
+    a.stop(time + STEP);
+  }
+
+  stepIndex += 1;
+}
+
+export function startMusic() {
+  if (!profile.music || musicTimer) return;
+  const c = ensure();
+  if (!c) return;
+  stepIndex = 0;
+  intensity = 0;
+  nextNote = c.currentTime + 0.1;
+  musicTimer = setInterval(() => {
+    if (!profile.music) return stopMusic();
+    while (nextNote < ctx.currentTime + LOOKAHEAD) {
+      scheduleStep(nextNote);
+      nextNote += STEP;
+    }
+  }, 25);
+}
+
+export function stopMusic() {
+  if (musicTimer) clearInterval(musicTimer);
+  musicTimer = null;
+}
+
+/** Combo multiplier 1-5 maps onto the three arrangement layers. */
+export function setMusicIntensity(mult) {
+  intensity = mult >= 4 ? 2 : mult >= 2 ? 1 : 0;
+}
+
 export function buzz(pattern) {
   if (!profile.haptics) return;
   try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }

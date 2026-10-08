@@ -9,8 +9,14 @@ const DEFAULTS = {
   owned: ['neon'],
   skin: 'neon',
   sound: true,
+  music: true,
   haptics: true,
-  adFree: false
+  adFree: false,
+  missions: [],
+  daily: null,          // { date, score } for the most recent attempt
+  dailyBest: 0,
+  dailyStreak: 0,
+  dailyLast: ''
 };
 
 function read() {

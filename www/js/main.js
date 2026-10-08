@@ -2,7 +2,9 @@
 import { Game } from './game.js';
 import { UI } from './ui.js';
 import { profile, save } from './storage.js';
-import { unlock } from './audio.js';
+import { unlock, stopMusic, startMusic } from './audio.js';
+import { applyRun } from './missions.js';
+import { dailySeed, dailyState, recordDaily } from './daily.js';
 import { initAds, showRewarded, maybeShowInterstitial, isAdFree } from './ads.js';
 
 const canvas = document.getElementById('game');
@@ -13,11 +15,25 @@ const game = new Game(canvas, {
   onGameOver: result => onGameOver(result)
 });
 
+// A daily run is flagged so its result is recorded against today's date and
+// the game-over screen can say so.
+let dailyRun = false;
+
 const ui = new UI({
-  play: () => { game.start(); ui.showHud(); },
+  play: () => { dailyRun = false; game.start(); ui.showHud(); },
+  daily: () => {
+    if (!dailyState().available) return ui.toast('Already played today');
+    dailyRun = true;
+    game.start(dailySeed());
+    ui.showHud();
+    ui.toast("Today's course - one attempt");
+  },
+  musicToggled: () => {
+    if (game.state === 'playing') startMusic(); else stopMusic();
+  },
   pause: () => { game.pause(); ui.show('paused'); },
   resume: () => { game.resume(); ui.showHud(); },
-  quit: () => { game.state = 'idle'; ui.show('menu'); },
+  quit: () => { game.state = 'idle'; stopMusic(); ui.show('menu'); },
   revive: async () => {
     const btn = document.getElementById('reviveBtn');
     btn.disabled = true;
@@ -41,14 +57,30 @@ const ui = new UI({
 
 let lastRunCoins = 0;
 
-async function onGameOver({ score, coins, canRevive }) {
+async function onGameOver({ score, coins, gates, bestCombo, canRevive }) {
   lastRunCoins = coins;
+  const prevBest = profile.best;
   profile.coins += coins;
   profile.runs += 1;
-  const isBest = score > profile.best;
+  const isBest = score > prevBest;
   if (isBest) profile.best = score;
+
+  // Missions are scored before the screen renders so payouts show immediately.
+  const completed = applyRun({ gates, score, combo: bestCombo, coins });
+
+  const wasDaily = dailyRun;
+  if (wasDaily) recordDaily(score);
   save();
-  ui.gameOver({ score, coins, isBest, canRevive, canDouble: coins > 0 && !isAdFree() });
+
+  // "So close" only means something against a best you nearly matched.
+  const gap = prevBest - score;
+  const nearMiss = !isBest && prevBest > 0 && gap > 0 && score >= prevBest * 0.85
+    ? gap : 0;
+
+  ui.gameOver({
+    score, coins, isBest, canRevive, nearMiss, completed, daily: wasDaily,
+    canDouble: coins > 0 && !isAdFree()
+  });
   if (!canRevive && !isAdFree()) maybeShowInterstitial();
 }
 
