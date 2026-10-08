@@ -53,6 +53,25 @@ html = (await readFile(indexPath, 'utf8'))
   .replace(/\n\s*<link rel="manifest"[^>]*>/, '');
 await writeFile(indexPath, html);
 
+// Drop the local-testing ad placeholder. It is unreachable on this build,
+// but it is markup that names another ad network and a reviewer reading the
+// DOM should not find it.
+html = (await readFile(indexPath, 'utf8'))
+  .replace(/\n\s*<!-- Simulated ad[\s\S]*?<\/div>\s*<\/div>\n/, '\n');
+await writeFile(indexPath, html);
+
+// Replace the AdMob backend with a stub. It never runs on this build (the
+// __CG_BUILD flag pins the CrazyGames backend), but shipping a file full of
+// another ad network's unit IDs invites a reviewer to fail the "no external
+// ads" check over dead code.
+await writeFile(join(OUT, 'js', 'ads.js'), `// AdMob backend, stubbed out of the CrazyGames build.
+// The portal serves every ad here; see crazygames.js.
+export const initAds = async () => {};
+export const showRewarded = async () => false;
+export const maybeShowInterstitial = async () => {};
+export const isAdFree = () => false;
+`);
+
 // Flatten js/ into the root. CrazyGames' uploader takes loose files dragged
 // into a drop zone rather than an archive, so a build with no subfolders
 // removes any chance of the structure arriving wrong.
