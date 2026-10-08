@@ -32,7 +32,10 @@ export async function init() {
   } catch {
     return false;
   }
-  // Tells the portal the game is playable; it ends the measured load time.
+  // The portal expects a matched pair around asset loading. This game has
+  // nothing to stream - everything ships in the initial download - so the
+  // window is immediate, but both calls still have to be reported.
+  try { s.game?.loadingStart?.(); } catch { /* non-fatal */ }
   try { s.game?.loadingStop?.(); } catch { /* non-fatal */ }
 
   applyPortalSettings();
