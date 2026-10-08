@@ -1,14 +1,14 @@
 // Boot: wires input, the game loop and the UI together.
 import { Game } from './game.js';
 import { UI } from './ui.js';
-import { profile, save } from './storage.js';
+import { profile, save, adoptBackend } from './storage.js';
 import { unlock, stopMusic, startMusic } from './audio.js';
 import { applyRun } from './missions.js';
 import { dailySeed, dailyState, recordDaily, todayKey } from './daily.js';
 import { initLeaderboard, boardAvailable, submitDaily, subscribeDaily } from './leaderboard.js';
 import {
   initPlatform, showRewarded, maybeShowInterstitial, isAdFree,
-  gameplayStart, gameplayStop, happytime
+  gameplayStart, gameplayStop, happytime, dataModule
 } from './platform.js';
 
 const canvas = document.getElementById('game');
@@ -157,7 +157,15 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
   window.__game = game;
 }
 
-initPlatform().catch(() => {});
+// Once the host is up, move saves to its own store if it has one (the
+// CrazyGames Data Module syncs a signed-in player across devices). The
+// profile object is mutated in place, so a repaint is all the UI needs.
+initPlatform()
+  .then(async () => {
+    const store = dataModule();
+    if (store) await adoptBackend(store, () => ui.refresh());
+  })
+  .catch(() => {});
 // The live board lights up if this view can run it; the game is complete
 // without it either way, and the button stays hidden when it cannot.
 initLeaderboard().then(ok => ui.setBoardAvailable(ok)).catch(() => {});

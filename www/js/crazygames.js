@@ -7,7 +7,7 @@
 // SDK shape verified against CrazyGames' published v3 integration notes.
 // Everything here is defensive: a missing method, a thrown call or a callback
 // that never fires must not be able to wedge the game.
-import { setMuted } from './audio.js';
+import { setMuted, setPortalMute } from './audio.js';
 
 const sdk = () => window.CrazyGames?.SDK;
 
@@ -34,7 +34,33 @@ export async function init() {
   }
   // Tells the portal the game is playable; it ends the measured load time.
   try { s.game?.loadingStop?.(); } catch { /* non-fatal */ }
+
+  applyPortalSettings();
+  // The listener name is not something this build could verify against the
+  // live docs, so it is optional - gameplayStart re-checks as a backstop.
+  try { s.game?.addSettingsChangeListener?.(applyPortalSettings); } catch { /* ok */ }
   return true;
+}
+
+/** Mirrors the portal's own volume control into the game's master gain. */
+function applyPortalSettings() {
+  try {
+    setPortalMute(!!sdk()?.game?.settings?.muteAudio);
+  } catch { /* leave audio as-is */ }
+}
+
+/**
+ * The portal's cloud save. Same interface as localStorage, and for a
+ * signed-in player it follows them across devices. Only valid after init(),
+ * which is why storage swaps to it rather than starting on it.
+ */
+export function dataModule() {
+  const d = sdk()?.data;
+  if (!ready || !d) return null;
+  return {
+    getItem: k => d.getItem(k),
+    setItem: (k, v) => d.setItem(k, v)
+  };
 }
 
 /** No in-app purchases on the portal, so ads are always on. */
@@ -87,6 +113,7 @@ export async function maybeShowInterstitial() {
 // The portal uses these to decide when it may interrupt the player.
 
 export function gameplayStart() {
+  applyPortalSettings();            // backstop if no settings listener exists
   try { sdk()?.game?.gameplayStart?.(); } catch { /* non-fatal */ }
 }
 

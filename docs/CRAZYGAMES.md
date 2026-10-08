@@ -37,6 +37,19 @@ on an external script it cannot reach.
 | New personal best | `game.happytime()` |
 | "Watch ad to continue" / "2x coins" | `ad.requestAd('rewarded', …)` |
 | Every third game over | `ad.requestAd('midgame', …)` |
+| Progress save | `data.getItem` / `data.setItem` (cloud save) |
+| Portal volume control | `game.settings.muteAudio` |
+
+**Progress save** uses their Data Module, so a signed-in player's best score,
+coins, themes and missions follow them across devices. The game boots on
+localStorage and swaps to the Data Module once the SDK initializes (it is
+only valid after `init()`); whatever the cloud already holds wins, and if the
+cloud is empty the local progress seeds it.
+
+**Portal mute** is mirrored into the audio master gain and deliberately
+overrides the in-game SFX/MUSIC toggles — a player who muted the page must
+not get audio back by toggling something inside the game. Test it locally
+with `?muteAudio=true`.
 
 Audio ducks on `adStarted` and restores on `adFinished` **or** `adError`, and
 every ad request has a 45-second timeout, so a callback that never fires can't
@@ -76,6 +89,17 @@ contact fields.
 Hidden automatically on this build — the live board runs on the claude.ai
 artifact runtime, which doesn't exist here. See `docs/LEADERBOARD.md` for
 putting it on Firestore if you want it on the portal.
+
+## Answering the submission form
+
+| Field | Answer |
+|---|---|
+| Game name | `Chroma Rush` |
+| Game engine | HTML5 |
+| Does your game save progress? | **Yes, using the Data Module from the CrazyGames SDK** |
+| Supports mobile devices | ✅ yes |
+| Online multiplayer | ❌ no |
+| Supports CrazyGames muting audio through SDK | ✅ yes |
 
 ## Submitting
 

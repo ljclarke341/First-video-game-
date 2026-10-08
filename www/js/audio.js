@@ -160,7 +160,7 @@ function scheduleStep(time) {
 }
 
 export function startMusic() {
-  if (!profile.music || musicTimer) return;
+  if (!profile.music || musicTimer || portalMuted || adMuted) return;
   const c = ensure();
   if (!c) return;
   stepIndex = 0;
@@ -185,17 +185,42 @@ export function setMusicIntensity(mult) {
   intensity = mult >= 4 ? 2 : mult >= 2 ? 1 : 0;
 }
 
-/** Ducks all audio (ads must play without the game underneath them). */
-export function setMuted(on) {
+// Two independent reasons to silence the game: an ad is playing, or the
+// portal's own volume control is off. Either one wins, and neither clobbers
+// the other when it lifts.
+const MASTER_GAIN = 0.32;
+let adMuted = false;
+let portalMuted = false;
+
+function applyGain() {
   const c = ensure();
   if (!c || !master) return;
+  const target = (adMuted || portalMuted) ? 0 : MASTER_GAIN;
   try {
-    master.gain.setValueAtTime(on ? 0 : 0.32, c.currentTime);
+    master.gain.setValueAtTime(target, c.currentTime);
   } catch {
-    master.gain.value = on ? 0 : 0.32;
+    master.gain.value = target;
   }
-  if (on) stopMusic();
+  if (target === 0) stopMusic();
 }
+
+/** Ducks audio while an ad plays. */
+export function setMuted(on) {
+  adMuted = on;
+  applyGain();
+}
+
+/**
+ * The host portal's mute setting. It deliberately overrides the in-game
+ * SFX/MUSIC toggles - a player who muted the page must not get audio back
+ * by toggling something inside the game.
+ */
+export function setPortalMute(on) {
+  portalMuted = on;
+  applyGain();
+}
+
+export function isPortalMuted() { return portalMuted; }
 
 export function buzz(pattern) {
   if (!profile.haptics) return;

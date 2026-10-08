@@ -14,7 +14,8 @@ const ADMOB = {
   isAdFree: admob.isAdFree,
   gameplayStart: noop,
   gameplayStop: noop,
-  happytime: noop
+  happytime: noop,
+  dataModule: () => null
 };
 
 let backend = ADMOB;
@@ -39,3 +40,5 @@ export const isAdFree = () => backend.isAdFree();
 export const gameplayStart = () => backend.gameplayStart();
 export const gameplayStop = () => backend.gameplayStop();
 export const happytime = () => backend.happytime();
+/** The host's own save store, if it has one. Null means use localStorage. */
+export const dataModule = () => backend.dataModule?.() ?? null;
