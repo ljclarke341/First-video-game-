@@ -53,6 +53,20 @@ html = (await readFile(indexPath, 'utf8'))
   .replace(/\n\s*<link rel="manifest"[^>]*>/, '');
 await writeFile(indexPath, html);
 
+// Flatten js/ into the root. CrazyGames' uploader takes loose files dragged
+// into a drop zone rather than an archive, so a build with no subfolders
+// removes any chance of the structure arriving wrong.
+const jsDir = join(OUT, 'js');
+for (const name of await readdir(jsDir)) {
+  await cp(join(jsDir, name), join(OUT, name));
+}
+await rm(jsDir, { recursive: true, force: true });
+
+// The modules import each other with './x.js', which still resolves at the
+// root; only the entry point's path in the HTML has to change.
+html = (await readFile(indexPath, 'utf8')).replace('src="js/main.js"', 'src="main.js"');
+await writeFile(indexPath, html);
+
 try {
   await run('zip', ['-qr', ZIP, '.'], { cwd: OUT });
 } catch {
