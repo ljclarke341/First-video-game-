@@ -38,6 +38,13 @@ export async function init() {
   try { s.game?.loadingStart?.(); } catch { /* non-fatal */ }
   try { s.game?.loadingStop?.(); } catch { /* non-fatal */ }
 
+  // Ad problems are otherwise invisible from the outside: the player just
+  // sees "unavailable" whether the SDK is missing, the call threw, or the
+  // request was simply unfilled. These say which.
+  console.info('[CG] ready =', ready,
+               '| ad module =', typeof s.ad?.requestAd,
+               '| keys =', Object.keys(s).join(','));
+
   applyPortalSettings();
   // The listener name is not something this build could verify against the
   // live docs, so it is optional - gameplayStart re-checks as a backstop.
@@ -76,7 +83,14 @@ export function isAdFree() { return false; }
 function runAd(type) {
   return new Promise(resolve => {
     const s = sdk();
-    if (!ready || !s?.ad?.requestAd) return resolve(false);
+    if (!ready) {
+      console.warn('[CG] ad skipped: SDK never finished init()');
+      return resolve(false);
+    }
+    if (typeof s?.ad?.requestAd !== 'function') {
+      console.warn('[CG] ad skipped: SDK.ad.requestAd missing. SDK.ad =', s?.ad);
+      return resolve(false);
+    }
 
     let settled = false;
     const finish = value => {
@@ -86,19 +100,27 @@ function runAd(type) {
       resolve(value);
     };
 
+    console.info('[CG] requestAd ->', type);
     try {
       s.ad.requestAd(type, {
-        adStarted: () => setMuted(true),
-        adFinished: () => finish(true),
+        adStarted: () => { console.info('[CG] adStarted', type); setMuted(true); },
+        adFinished: () => { console.info('[CG] adFinished', type); finish(true); },
         // Unfilled, ad-blocked or dismissed all arrive here. Normal, not a bug.
-        adError: () => finish(false)
+        adError: (err, data) => {
+          console.warn('[CG] adError', type, err, data);
+          finish(false);
+        }
       });
-    } catch {
+    } catch (e) {
+      console.warn('[CG] requestAd threw', e);
       return finish(false);
     }
 
     // A callback that never fires would otherwise leave the player stuck.
-    setTimeout(() => finish(false), AD_TIMEOUT_MS);
+    setTimeout(() => {
+      if (!settled) console.warn('[CG] ad timed out with no callback', type);
+      finish(false);
+    }, AD_TIMEOUT_MS);
   });
 }
 
