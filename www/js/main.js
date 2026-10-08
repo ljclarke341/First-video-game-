@@ -4,7 +4,8 @@ import { UI } from './ui.js';
 import { profile, save } from './storage.js';
 import { unlock, stopMusic, startMusic } from './audio.js';
 import { applyRun } from './missions.js';
-import { dailySeed, dailyState, recordDaily } from './daily.js';
+import { dailySeed, dailyState, recordDaily, todayKey } from './daily.js';
+import { initLeaderboard, boardAvailable, submitDaily, subscribeDaily } from './leaderboard.js';
 import { initAds, showRewarded, maybeShowInterstitial, isAdFree } from './ads.js';
 
 const canvas = document.getElementById('game');
@@ -31,6 +32,15 @@ const ui = new UI({
   musicToggled: () => {
     if (game.state === 'playing') startMusic(); else stopMusic();
   },
+  board: () => {
+    ui.showBoard(boardAvailable());
+    if (!boardAvailable()) return;
+    stopBoard();
+    // One subscription while the screen is open, torn down on navigation.
+    stopBoard = subscribeDaily(todayKey(), (rows, total) => ui.renderBoard(rows, total));
+  },
+  boardClosed: () => stopBoard(),
+  boardUsable: () => boardAvailable(),
   pause: () => { game.pause(); ui.show('paused'); },
   resume: () => { game.resume(); ui.showHud(); },
   quit: () => { game.state = 'idle'; stopMusic(); ui.show('menu'); },
@@ -56,8 +66,11 @@ const ui = new UI({
 });
 
 let lastRunCoins = 0;
+let stopBoard = () => {};
 
-async function onGameOver({ score, coins, gates, bestCombo, canRevive }) {
+async function onGameOver({
+  score, coins, gates, bestCombo, duration, paints, topSpeed, revives, canRevive
+}) {
   lastRunCoins = coins;
   const prevBest = profile.best;
   profile.coins += coins;
@@ -65,11 +78,19 @@ async function onGameOver({ score, coins, gates, bestCombo, canRevive }) {
   const isBest = score > prevBest;
   if (isBest) profile.best = score;
 
-  // Missions are scored before the screen renders so payouts show immediately.
-  const completed = applyRun({ gates, score, combo: bestCombo, coins });
-
   const wasDaily = dailyRun;
-  if (wasDaily) recordDaily(score);
+
+  // Missions are scored before the screen renders so payouts show immediately.
+  const completed = applyRun({
+    gates, score, coins, duration, paints, topSpeed, revives,
+    combo: bestCombo, daily: wasDaily
+  });
+
+  if (wasDaily) {
+    recordDaily(score);
+    // Posting must never hold up or break the game-over screen.
+    submitDaily(todayKey(), score).catch(() => {});
+  }
   save();
 
   // "So close" only means something against a best you nearly matched.
@@ -128,4 +149,7 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
 }
 
 initAds();
+// The live board lights up if this view can run it; the game is complete
+// without it either way.
+initLeaderboard().catch(() => {});
 ui.show('menu');

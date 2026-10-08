@@ -4,11 +4,11 @@ import { profile, save } from './storage.js';
 import { SKINS } from './skins.js';
 import { sfx, unlock } from './audio.js';
 import { ensureMissions, missionText } from './missions.js';
-import { dailyState } from './daily.js';
+import { dailyState, todayKey } from './daily.js';
 
 const $ = id => document.getElementById(id);
 
-const SCREENS = ['menu', 'how', 'shop', 'missions', 'paused', 'over'];
+const SCREENS = ['menu', 'how', 'shop', 'missions', 'board', 'paused', 'over'];
 
 export class UI {
   constructor(hooks) {
@@ -30,6 +30,8 @@ export class UI {
     this.el.hud.hidden = name !== null;
     if (name === 'menu' || name === 'shop') this.refresh();
     if (name === 'missions') this.renderMissions();
+    // The board holds a live subscription; drop it whenever we navigate away.
+    if (name !== 'board') this.hooks.boardClosed?.();
   }
 
   showHud() {
@@ -62,6 +64,9 @@ export class UI {
     tap('dailyBtn', () => this.hooks.daily());
     tap('missionBtn', () => this.show('missions'));
     tap('missionBack', () => this.show('menu'));
+    tap('boardBtn', () => this.hooks.board());
+    tap('boardFromOver', () => this.hooks.board());
+    tap('boardBack', () => this.show('menu'));
     tap('shopBtn', () => this.show('shop'));
     tap('howBtn', () => this.show('how'));
     tap('howBack', () => this.show('menu'));
@@ -112,6 +117,68 @@ export class UI {
     btn.textContent = daily.available
       ? 'DAILY CHALLENGE'
       : `DAILY DONE - ${daily.score}${streak}`;
+  }
+
+  // ------------------------------------------------------------- leaderboard
+
+  showBoard(available) {
+    $('boardDate').textContent = todayKey();
+    const note = $('boardNote');
+    if (available) {
+      note.hidden = true;
+      this.renderBoard(null, 0);              // "loading" until the first snapshot
+    } else {
+      $('boardList').innerHTML = '';
+      note.hidden = false;
+      note.textContent =
+        'The live board runs on the hosted version of the game. Your daily '
+        + 'scores are still saved on this device.';
+    }
+    this.show('board');
+  }
+
+  /** `rows` null means waiting for the first snapshot. */
+  renderBoard(rows, total) {
+    const list = $('boardList');
+    list.innerHTML = '';
+
+    if (rows === null) {
+      const p = document.createElement('div');
+      p.className = 'lb-empty';
+      p.textContent = 'Loading today\u2019s board...';
+      list.append(p);
+      return;
+    }
+    if (!rows.length) {
+      const p = document.createElement('div');
+      p.className = 'lb-empty';
+      p.textContent = 'Nobody has played today\u2019s course yet. Go set the pace.';
+      list.append(p);
+      return;
+    }
+
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = `lb-row${r.isMe ? ' me' : ''}`;
+
+      const rank = document.createElement('span');
+      rank.className = 'lb-rank';
+      rank.textContent = `#${r.rank}`;
+
+      const name = document.createElement('span');
+      name.className = 'lb-name';
+      name.textContent = r.isMe ? `${r.name} (you)` : r.name;
+
+      const score = document.createElement('span');
+      score.className = 'lb-score';
+      score.textContent = r.score;
+
+      row.append(rank, name, score);
+      list.append(row);
+    }
+
+    $('boardDate').textContent =
+      `${todayKey()}  -  ${total} player${total === 1 ? '' : 's'}`;
   }
 
   renderMissions() {
@@ -192,6 +259,7 @@ export class UI {
     $('finalScore').textContent = score;
     $('finalBest').textContent = profile.best;
     $('finalCoins').textContent = coins;
+    $('boardFromOver').hidden = !(daily && this.hooks.boardUsable?.());
     $('reviveBtn').hidden = !canRevive;
     // Only offered when there is something worth doubling, and never alongside
     // a revive - two ad prompts on one screen reads as a shakedown.

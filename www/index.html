@@ -36,6 +36,7 @@
         <button id="missionBtn" class="btn">MISSIONS</button>
         <button id="shopBtn" class="btn">THEMES</button>
       </div>
+      <button id="boardBtn" class="btn">LEADERBOARD</button>
       <button id="howBtn" class="btn">HOW TO PLAY</button>
       <div class="row3">
         <button id="soundBtn" class="btn small">SFX: ON</button>
@@ -75,6 +76,17 @@
     </div>
   </div>
 
+  <!-- Daily leaderboard -->
+  <div id="board" class="layer screen" hidden>
+    <div class="stack">
+      <h2>DAILY BOARD</h2>
+      <p id="boardDate" class="tag"></p>
+      <div id="boardList"></div>
+      <p id="boardNote" class="tag" hidden></p>
+      <button id="boardBack" class="btn primary">BACK</button>
+    </div>
+  </div>
+
   <!-- Missions -->
   <div id="missions" class="layer screen" hidden>
     <div class="stack">
@@ -108,6 +120,7 @@
       </div>
       <button id="reviveBtn" class="btn revive" hidden>WATCH AD &rarr; CONTINUE</button>
       <button id="doubleBtn" class="btn revive" hidden>WATCH AD &rarr; 2&times; COINS</button>
+      <button id="boardFromOver" class="btn" hidden>VIEW LEADERBOARD</button>
       <button id="againBtn" class="btn primary">PLAY AGAIN</button>
       <button id="overMenuBtn" class="btn">MAIN MENU</button>
     </div>

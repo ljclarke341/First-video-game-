@@ -135,6 +135,20 @@ h2{margin:0 0 2px;font-size:22px;letter-spacing:3px;font-weight:800}
   background:linear-gradient(90deg,var(--accent),#25b7f0)}
 .mission-count{font-size:10px;color:var(--muted);letter-spacing:1px}
 
+/* ---------- Leaderboard ---------- */
+#boardList{display:flex;flex-direction:column;gap:5px;max-height:48vh;overflow-y:auto}
+.lb-row{
+  display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;
+  padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);
+  border:1px solid transparent;font-size:13px;text-align:left
+}
+.lb-row.me{border-color:var(--accent);background:rgba(54,245,208,.1)}
+.lb-rank{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.5px}
+.lb-row:nth-child(1) .lb-rank{color:#f5b93a}
+.lb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-score{font-weight:800;font-variant-numeric:tabular-nums}
+.lb-empty{color:var(--muted);font-size:12px;padding:18px 0;line-height:1.6}
+
 /* ---------- Mission payouts on the game-over screen ---------- */
 .payouts{display:flex;flex-direction:column;gap:6px}
 .payout{

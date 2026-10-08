@@ -98,6 +98,9 @@ export class Game {
     this.combo = 0;
     this.bestCombo = 0;
     this.revivesUsed = 0;
+    this.elapsed = 0;
+    this.paints = 0;
+    this.topSpeed = 0;
     this.shake = 0;
     this.flash = 0;
     this.grace = 0.6;
@@ -177,6 +180,10 @@ export class Game {
 
     const speed = this.gen.speed * this.timeScale;
     const move = speed * dt;
+    if (this.state === 'playing') {
+      this.elapsed += dt;
+      this.topSpeed = Math.max(this.topSpeed, this.gen.speed);
+    }
     this.scroll += move;
     if (this.grace > 0) this.grace -= dt;
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 2.2);
@@ -302,6 +309,7 @@ export class Game {
       this.checkBest();
     } else {
       this.player.color = it.color;
+      this.paints += 1;
       this.player.squash = 0.8;
       this.burst(laneX(it.lane), this.playerY, this.colorOf(it.color), 14, 190);
       sfx.paint();
@@ -331,6 +339,10 @@ export class Game {
       coins: this.coinsEarned,
       gates: this.gen.passed,
       bestCombo: this.bestCombo,
+      duration: this.elapsed,
+      paints: this.paints,
+      topSpeed: this.topSpeed,
+      revives: this.revivesUsed,
       canRevive: this.revivesUsed < 1
     });
   }
